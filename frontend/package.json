@@ -13,8 +13,19 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@guolao/vue-monaco-editor": "^1.6.0",
+    "axios": "^1.13.2",
+    "element-plus": "^2.13.0",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.16.27",
+    "markdown-it": "^14.1.0",
+    "markdown-it-katex": "^2.0.3",
+    "marked": "^17.0.1",
+    "monaco-editor": "^0.55.1",
+    "pinia": "^3.0.4",
     "vue": "^3.5.25",
-    "vue-router": "^4.6.3"
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.2",

@@ -12,13 +12,28 @@ submission_bp = Blueprint('submission', __name__)
 
 @submission_bp.route('/submit', methods=['POST'])
 @token_required
-def submit_code(*args, **kwargs):
-    data = request.get_json()
-    problem_id = data.get('problem_id')
-    user_code = data.get('code')
-    language = data.get('language')  # 获取语言，默认为 python
+def submit_code():
+    # 尝试获取 JSON 数据，如果不是 JSON 则返回 None 而不报错
+    data = request.get_json(silent=True)
+    
+    if data:
+        # 处理 JSON 提交
+        problem_id = data.get('problem_id')
+        user_code = data.get('code')
+        language = data.get('language')
+    else:
+        # 处理 Form-data / 文件提交 (解决 415 错误)
+        problem_id = request.form.get('problem_id')
+        language = request.form.get('language')
+        if 'file' in request.files:
+            file = request.files['file']
+            user_code = file.read().decode('utf-8')
+        else:
+            user_code = request.form.get('code')
 
-    # CRITICAL SECURITY FIX: Get user_id from the validated token, not the request body.
+    if not problem_id or not user_code:
+        return jsonify({"error": "Missing problem_id or code/file"}), 400
+
     user_id = request.current_user.id
 
     problem = Problem.query.get(problem_id)
@@ -26,16 +41,21 @@ def submit_code(*args, **kwargs):
         return jsonify({"error": "Problem not found"}), 404
 
     # 1. 记录初始提交
-    new_submission = Submission(user_id=user_id, problem_id=problem_id, language=language, status='Pending')
+    new_submission = Submission(
+        user_id=user_id,
+        problem_id=problem_id,
+        language=language,
+        code_content=user_code,
+        status='Pending'
+    )
     db.session.add(new_submission)
     db.session.commit()
 
-    # 2. 使用线程异步执行判题 (替代 Celery)
-    # 获取当前 app 的真实对象传入线程
+    # 2. 使用线程异步执行判题
     app = current_app._get_current_object()
     Thread(target=judge_submission, args=(app, new_submission.id, str(problem.type), user_code, problem_id, language)).start()
 
-    # 3. 立即返回，告知前端已接收
+    # 3. 立即返回
     return jsonify({
         "message": "Submission received, judging in background.",
         "submission_id": new_submission.id,
@@ -53,5 +73,8 @@ def get_submission(submission_id, *args, **kwargs):
         "id": submission.id,
         "status": submission.status,
         "score": submission.score,
-        "log": submission.output_log
+        "log": submission.output_log,
+        "code": submission.code_content,
+        "language": submission.language,
+        "created_at": submission.created_at.isoformat()
     }), 200

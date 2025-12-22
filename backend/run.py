@@ -5,8 +5,10 @@ from flask import Flask
 from sqlalchemy.exc import OperationalError
 
 from app.api.auth import auth_bp
+from app.api.dataset import dataset_bp
 from app.api.problem import problem_bp
 from app.api.submission import submission_bp
+from app.api.user import user_bp
 from app.models.user import db
 
 if os.path.exists('/.dockerenv'):
@@ -48,6 +50,8 @@ def hello():
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(problem_bp, url_prefix='/api/problems')
 app.register_blueprint(submission_bp, url_prefix='/api/submissions')
+app.register_blueprint(user_bp,url_prefix='/api/user')
+app.register_blueprint(dataset_bp,url_prefix='/api/datasets')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

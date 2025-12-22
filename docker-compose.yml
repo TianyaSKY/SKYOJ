@@ -1,6 +1,7 @@
 services:
   mysql:
     image: mysql:8.0
+    container_name: skyoj-db
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: oj_db
@@ -9,17 +10,41 @@ services:
     volumes:
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
+    networks:
+      - skyoj-net
 
   backend:
-    build: ./backend    # 指向我们刚才整理好的 backend 文件夹
+    build: ./backend
+    container_name: skyoj-backend
     ports:
       - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=mysql+pymysql://root:root@mysql:3306/oj_db
     volumes:
-      - ./backend:/app  # 关键：实现代码热更新
-      - /var/run/docker.sock:/var/run/docker.sock # 关键：让 Flask 能操作 Docker
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/uploads:/app/uploads
     depends_on:
       - mysql
+    networks:
+      - skyoj-net
+
+  frontend:
+    build: ./frontend
+    container_name: skyoj-frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - skyoj-net
 
 volumes:
   mysql_data:
+
+networks:
+  skyoj-net:
+    driver: bridge

@@ -14,6 +14,7 @@ class Submission(db.Model):
 
     # 提交的具体内容
     code_path = db.Column(db.String(500))  # 存放代码文件或 CSV 文件的路径
+    code_content = db.Column(db.Text)  # 用户提交的代码文本
     language = db.Column(db.String(50))  # 如: python, cpp, csv
 
     # 判题结果
@@ -28,7 +29,8 @@ class Submission(db.Model):
 
     # 建立模型间的关系，方便查询
     user = db.relationship('User', backref=db.backref('submissions', lazy=True))
-    problem = db.relationship('Problem', backref=db.backref('submissions', lazy=True))
+    # 使用 cascade="all, delete-orphan" 确保题目删除时，关联的提交记录也被删除
+    problem = db.relationship('Problem', backref=db.backref('submissions', cascade="all, delete-orphan", lazy=True))
 
     def __repr__(self):
         return f'<Submission {self.id} by User {self.user_id}>'
