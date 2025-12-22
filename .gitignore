@@ -1,0 +1,14 @@
+.idea/
+__pycache__/
+*.pyc
+.DS_Store
+venv/
+env/
+node_modules/
+dist/
+.env
+backend/uploads/problems/*
+!backend/uploads/problems/.gitkeep
+backend/uploads/submissions/*
+!backend/uploads/submissions/.gitkeep
+mysql_data/

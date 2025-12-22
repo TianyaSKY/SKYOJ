@@ -1,0 +1,25 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: oj_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+
+  backend:
+    build: ./backend    # 指向我们刚才整理好的 backend 文件夹
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app  # 关键：实现代码热更新
+      - /var/run/docker.sock:/var/run/docker.sock # 关键：让 Flask 能操作 Docker
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - mysql
+
+volumes:
+  mysql_data:

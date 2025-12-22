@@ -1,0 +1,9 @@
+﻿Flask
+Flask-SQLAlchemy
+PyMySQL
+docker
+cryptography
+Flask-Bcrypt
+requests
+urllib3
+PyJWT
