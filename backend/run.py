@@ -9,7 +9,11 @@ from app.api.dataset import dataset_bp
 from app.api.problem import problem_bp
 from app.api.submission import submission_bp
 from app.api.user import user_bp
+from app.api.sys_dict import sys_dict_bp
+from app.api.exam import exam_bp
 from app.models.user import db
+from app.models.sysdict import SysDict
+from app.utils.sys_dict import sys_dict_kv
 
 if os.path.exists('/.dockerenv'):
     db_host = 'mysql'
@@ -31,6 +35,14 @@ def init_db():
             try:
                 db.create_all()
                 print("Successfully connected to MySQL and created tables!")
+                
+                # 初始化系统字典
+                if SysDict.query.count() == 0:
+                    for key, val in sys_dict_kv.items():
+                        new_dict = SysDict(key=key, val=str(val))
+                        db.session.add(new_dict)
+                    db.session.commit()
+                    print("Initialized SysDict from sys_dict_kv.")
                 return
             except OperationalError:
                 retries -= 1
@@ -50,8 +62,10 @@ def hello():
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(problem_bp, url_prefix='/api/problems')
 app.register_blueprint(submission_bp, url_prefix='/api/submissions')
-app.register_blueprint(user_bp,url_prefix='/api/user')
-app.register_blueprint(dataset_bp,url_prefix='/api/datasets')
+app.register_blueprint(user_bp, url_prefix='/api/user')
+app.register_blueprint(dataset_bp, url_prefix='/api/datasets')
+app.register_blueprint(sys_dict_bp, url_prefix='/api/sys')
+app.register_blueprint(exam_bp, url_prefix='/api/exams')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

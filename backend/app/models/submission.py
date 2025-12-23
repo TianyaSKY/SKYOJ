@@ -11,6 +11,9 @@ class Submission(db.Model):
     # 外键关联：关联到用户和题目
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     problem_id = db.Column(db.Integer, db.ForeignKey('problems.id'), nullable=False)
+    
+    # 考试关联
+    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=True)
 
     # 提交的具体内容
     code_path = db.Column(db.String(500))  # 存放代码文件或 CSV 文件的路径
@@ -29,8 +32,8 @@ class Submission(db.Model):
 
     # 建立模型间的关系，方便查询
     user = db.relationship('User', backref=db.backref('submissions', lazy=True))
-    # 使用 cascade="all, delete-orphan" 确保题目删除时，关联的提交记录也被删除
-    problem = db.relationship('Problem', backref=db.backref('submissions', cascade="all, delete-orphan", lazy=True))
+    problem = db.relationship('Problem', backref=db.backref('submissions', lazy=True))
+    exam = db.relationship('Exam', backref=db.backref('submissions', lazy=True))
 
     def __repr__(self):
         return f'<Submission {self.id} by User {self.user_id}>'

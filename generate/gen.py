@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 DB_URI = 'mysql+pymysql://root:root@localhost:3306/oj_db'
 
 # 2. 测试用例存储路径
-BASE_TEST_CASE_PATH = './data/test_cases'
+BASE_TEST_CASE_PATH = '../backend/uploads/problems'
 
 # =========================================
 

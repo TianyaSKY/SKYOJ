@@ -30,7 +30,7 @@
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-            <el-dropdown-item v-if="isTeacher" command="admin-problems">题目管理</el-dropdown-item>
+            <el-dropdown-item v-if="isTeacher" command="teacher-dashboard">教师工作台</el-dropdown-item>
             <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -67,8 +67,8 @@ const handleCommand = (command) => {
     router.push('/login')
   } else if (command === 'profile') {
     router.push('/profile')
-  } else if (command === 'admin-problems') {
-    router.push('/admin/problems')
+  } else if (command === 'teacher-dashboard') {
+    router.push('/admin/dashboard')
   }
 }
 </script>

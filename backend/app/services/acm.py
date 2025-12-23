@@ -1,9 +1,17 @@
 import os
 import time
+import re
 
 from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream
 
+def natural_sort_key(s):
+    """
+    实现自然排序的 key 函数，将字符串中的数字部分转换为整数进行比较。
+    例如: '1.in', '2.in', '10.in'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split('([0-9]+)', s)]
 
 def run_acm_judge(submission_id, user_code, problem_id, language='python'):
     # 多语言配置
@@ -31,6 +39,9 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
     total_cases = len(in_files)
     if total_cases == 0:
         return "Runtime Error", 0, "System Error: No .in files found"
+
+    # 使用自然排序，确保 1.in, 2.in, 10.in 的顺序正确
+    in_files.sort(key=natural_sort_key)
 
     passed_count = 0
     logs = []
@@ -61,7 +72,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
                 return "Compile Error", 0, exec_result.output.decode('utf-8')
 
         # 4. 循环测试每个点
-        for in_file in sorted(in_files):
+        for in_file in in_files:
             case_name = in_file.replace('.in', '')
 
             # 读取宿主机(Backend容器)中的测试用例

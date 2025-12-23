@@ -13,16 +13,14 @@ submission_bp = Blueprint('submission', __name__)
 @submission_bp.route('/submit', methods=['POST'])
 @token_required
 def submit_code():
-    # 尝试获取 JSON 数据，如果不是 JSON 则返回 None 而不报错
+    # 尝试获取 JSON 数据
     data = request.get_json(silent=True)
     
     if data:
-        # 处理 JSON 提交
         problem_id = data.get('problem_id')
         user_code = data.get('code')
         language = data.get('language')
     else:
-        # 处理 Form-data / 文件提交 (解决 415 错误)
         problem_id = request.form.get('problem_id')
         language = request.form.get('language')
         if 'file' in request.files:
@@ -35,6 +33,10 @@ def submit_code():
         return jsonify({"error": "Missing problem_id or code/file"}), 400
 
     user_id = request.current_user.id
+    # 从 Token 中获取当前考试 ID (如果不在考试中则为 -1)
+    exam_id = getattr(request, 'exam_id', -1)
+    # 如果是 -1，在数据库中存为 None
+    db_exam_id = exam_id if exam_id != -1 else None
 
     problem = Problem.query.get(problem_id)
     if not problem:
@@ -44,6 +46,7 @@ def submit_code():
     new_submission = Submission(
         user_id=user_id,
         problem_id=problem_id,
+        exam_id=db_exam_id,  # 自动关联当前考试
         language=language,
         code_content=user_code,
         status='Pending'
@@ -59,7 +62,8 @@ def submit_code():
     return jsonify({
         "message": "Submission received, judging in background.",
         "submission_id": new_submission.id,
-        "status": "Pending"
+        "status": "Pending",
+        "exam_id": db_exam_id
     }), 202
 
 
@@ -76,5 +80,6 @@ def get_submission(submission_id, *args, **kwargs):
         "log": submission.output_log,
         "code": submission.code_content,
         "language": submission.language,
+        "exam_id": submission.exam_id,
         "created_at": submission.created_at.isoformat()
     }), 200

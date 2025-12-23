@@ -5,19 +5,20 @@ from flask import current_app, request, jsonify
 from app.models.user import User
 
 
-def encode_auth_token(user_id, role):
+def encode_auth_token(user_id, role, exam_id=-1):
     """
     生成加密的 Token
+    :param user_id: 用户ID
+    :param role: 用户角色
+    :param exam_id: 正在进行的考试ID，-1表示不在考试中
     """
     try:
         payload = {
             'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1),
             'iat': datetime.datetime.utcnow(),
-            # ---------------------------------------------------------
-            # [关键修复] PyJWT 要求 sub 必须是字符串，必须使用 str() 转换
-            # ---------------------------------------------------------
             'sub': str(user_id),
-            'role': role
+            'role': role,
+            'exam_id': exam_id
         }
         return jwt.encode(
             payload,
@@ -55,19 +56,16 @@ def token_required(f):
         elif ' ' in token:
             token = token.split()[-1]
 
-        current_user = None
-
         try:
             payload = decode_auth_token(token)
-
-            # payload['sub'] 现在是字符串，SQLAlchemy 通常能自动处理字符串转数字的主键查询
-            # 如果报错，可以改写为 User.query.get(int(payload['sub']))
             current_user = User.query.get(payload['sub'])
 
             if not current_user:
                 return jsonify({'message': 'User not found, token is invalid.'}), 401
 
+            # 将用户信息和考试状态存入 request 对象
             request.current_user = current_user
+            request.exam_id = payload.get('exam_id', -1)
 
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired.'}), 401

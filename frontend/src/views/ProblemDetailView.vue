@@ -1,5 +1,10 @@
 <template>
   <div class="problem-detail-container" :class="{ 'scrollable-container': isKaggle }">
+    <!-- Exam Header (if in exam) -->
+    <div v-if="examId" class="exam-status-bar">
+      <el-button :icon="ArrowLeft" @click="backToExam" size="small">返回考试题单</el-button>
+      <span class="exam-info-text">正在进行考试模式</span>
+    </div>
 
     <!-- Kaggle Layout (Top-Bottom) -->
     <div v-if="isKaggle" class="kaggle-layout">
@@ -129,7 +134,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getProblemDetail, submitSolution } from '@/api/problem'
 import { ElMessage } from 'element-plus'
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { UploadFilled, ArrowLeft } from '@element-plus/icons-vue'
 
 // Markdown and Highlighting
 import MarkdownIt from 'markdown-it'
@@ -141,6 +146,7 @@ import 'katex/dist/katex.min.css'
 const route = useRoute()
 const router = useRouter()
 const problemId = route.params.id
+const examId = computed(() => route.query.exam_id)
 
 const problem = ref({
   id: '',
@@ -219,20 +225,14 @@ const fetchProblem = async () => {
     const data = await getProblemDetail(problemId)
     if (data) {
       problem.value = data
-    } else {
-      // Mock data fallback
-      problem.value = {
-        id: problemId,
-        title: 'A+B Problem (Mock)',
-        content: 'Mock content...',
-        time_limit: 1000,
-        memory_limit: 128,
-        type: 'ACM'
-      }
     }
   } catch (error) {
     ElMessage.error('Failed to load problem')
   }
+}
+
+const backToExam = () => {
+  router.push(`/exam/${examId.value}`)
 }
 
 // Standard Submission
@@ -244,6 +244,7 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
+    // exam_id is now handled by backend automatically
     const res = await submitSolution({
       problem_id: parseInt(problemId),
       code: code.value,
@@ -290,6 +291,7 @@ const handleSubmitKaggle = async () => {
     const formData = new FormData()
     formData.append('problem_id', problemId)
     formData.append('file', selectedFile.value)
+    // exam_id is now handled by backend automatically
 
     const res = await submitSolution(formData)
     ElMessage.success('File uploaded successfully!')
@@ -317,6 +319,22 @@ onMounted(() => {
   min-height: calc(100vh - 120px);
   overflow-y: auto;
   padding-bottom: 40px;
+}
+
+.exam-status-bar {
+  background-color: #fdf6ec;
+  border-bottom: 1px solid #faecd8;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.exam-info-text {
+  color: #e6a23c;
+  font-weight: bold;
+  font-size: 14px;
 }
 
 .full-height {
@@ -372,7 +390,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-/* ... existing styles ... */
 .editor-card {
   height: 100%;
   display: flex;

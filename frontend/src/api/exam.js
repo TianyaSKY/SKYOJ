@@ -1,0 +1,77 @@
+import request from '@/utils/request'
+
+export function getExamList(params) {
+  return request({
+    url: '/exams/',
+    method: 'get',
+    params
+  })
+}
+
+export function getExamDetail(id) {
+  return request({
+    url: `/exams/${id}`,
+    method: 'get'
+  })
+}
+
+export function createExam(data) {
+  return request({
+    url: '/exams/',
+    method: 'post',
+    data
+  })
+}
+
+export function updateExam(id, data) {
+  return request({
+    url: `/exams/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+export function deleteExam(id) {
+  return request({
+    url: `/exams/${id}`,
+    method: 'delete'
+  })
+}
+
+export function addExamProblem(examId, data) {
+  return request({
+    url: `/exams/${examId}/problems`,
+    method: 'post',
+    data
+  })
+}
+
+export function removeExamProblem(examId, problemId) {
+  return request({
+    url: `/exams/${examId}/problems/${problemId}`,
+    method: 'delete'
+  })
+}
+
+export function verifyExamPassword(id, password) {
+  return request({
+    url: `/exams/${id}/verify`,
+    method: 'post',
+    data: { password }
+  })
+}
+
+export function enterExam(id, password) {
+  return request({
+    url: `/exams/${id}/enter`,
+    method: 'post',
+    data: { password }
+  })
+}
+
+export function getMyExamStatus() {
+  return request({
+    url: '/exams/status',
+    method: 'get'
+  })
+}

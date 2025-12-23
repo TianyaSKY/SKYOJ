@@ -16,6 +16,16 @@
       </div>
     </el-card>
 
+    <!-- Heatmap Card -->
+    <el-card class="heatmap-card mb-4" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <h3 class="header-title"><el-icon><Calendar /></el-icon> Activity</h3>
+        </div>
+      </template>
+      <submission-heatmap :submissions="submissions" v-loading="loading" />
+    </el-card>
+
     <!-- Submissions Table -->
     <el-card class="submissions-card" shadow="hover">
       <template #header>
@@ -80,7 +90,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { getUserSubmissions } from '@/api/user'
 import { ElMessage } from 'element-plus'
-import { List } from '@element-plus/icons-vue'
+import { List, Calendar } from '@element-plus/icons-vue'
+import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
 
 const userStore = useUserStore()
 const user = computed(() => userStore.user || {})

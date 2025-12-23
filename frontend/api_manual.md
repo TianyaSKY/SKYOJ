@@ -25,122 +25,27 @@
     "role": "student" 
   }
   ```
-  *注：role 可选值为 'student' 或 'teacher'，默认为 'student'。*
 - **Success Response**: `201 Created`
-  ```json
-  { "message": "User registered successfully" }
-  ```
 
 ### 2.2 用户登录
 - **URL**: `/auth/login`
 - **Method**: `POST`
 - **Auth Required**: No
-- **Request Body**:
-  ```json
-  {
-    "username": "testuser",
-    "password": "password123"
-  }
-  ```
-- **Success Response**: `200 OK`
-  ```json
-  {
-    "message": "Login successful",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "id": 1,
-      "username": "testuser",
-      "role": "student"
-    }
-  }
-  ```
+- **Success Response**: `200 OK` (返回 token 和用户信息)
 
 ---
 
 ## 3. 题目管理模块 (Problems)
 
-### 3.1 创建题目
-- **URL**: `/problems/`
-- **Method**: `POST`
-- **Auth Required**: No (建议后续增加权限校验)
-- **Request Body**:
-  ```json
-  {
-    "title": "A+B Problem",
-    "content": "Calculate the sum of two integers.",
-    "language": "python",
-    "type": "acm",
-    "time_limit": 1000,
-    "memory_limit": 128,
-    "template_code": ""
-  }
-  ```
-- **Success Response**: `201 Created`
-  ```json
-  { "message": "Problem created successfully", "problem_id": 1 }
-  ```
+### 3.1 创建/获取/更新/删除题目
+- **URL**: `/problems/` 或 `/problems/<id>`
+- **Methods**: `POST`, `GET`, `PUT`, `DELETE`
+- **Auth Required**: No (建议教师权限)
 
-### 3.2 获取题目列表
-- **URL**: `/problems/`
-- **Method**: `GET`
-- **Auth Required**: No
-- **Success Response**: `200 OK`
-  ```json
-  [
-    { "id": 1, "title": "A+B Problem", "type": "acm" }
-  ]
-  ```
-
-### 3.3 获取题目详情
-- **URL**: `/problems/<problem_id>`
-- **Method**: `GET`
-- **Auth Required**: No
-- **Success Response**: `200 OK`
-  ```json
-  {
-    "id": 1,
-    "title": "A+B Problem",
-    "content": "...",
-    "type": "acm",
-    "language": "python",
-    "time_limit": 1000,
-    "memory_limit": 128,
-    "template_code": ""
-  }
-  ```
-
-### 3.4 更新题目
-- **URL**: `/problems/<problem_id>`
-- **Method**: `PUT`
-- **Auth Required**: No
-- **Request Body**: 同创建题目
-- **Success Response**: `200 OK`
-  ```json
-  { "message": "Problem updated successfully" }
-  ```
-
-### 3.5 删除题目
-- **URL**: `/problems/<problem_id>`
-- **Method**: `DELETE`
-- **Auth Required**: No
-- **Success Response**: `200 OK`
-  ```json
-  { "message": "Problem deleted successfully" }
-  ```
-
-### 3.6 上传测试用例 (Zip)
+### 3.2 上传测试用例 (Zip)
 - **URL**: `/problems/<problem_id>/upload_files`
 - **Method**: `POST`
-- **Auth Required**: No
-- **Request Body**: `multipart/form-data` (Key: `file`, Value: `testcases.zip`)
-- **Success Response**: `200 OK`
-  ```json
-  {
-    "message": "Test cases for problem 1 uploaded and extracted successfully.",
-    "files": ["1.in", "1.out", "2.in", "2.out"]
-  }
-  ```
-  *注：上传新压缩包会清空该题目原有的所有测试文件。*
+- **Request Body**: `multipart/form-data` (Key: `file`)
 
 ---
 
@@ -151,110 +56,86 @@
 - **Method**: `POST`
 - **Auth Required**: Yes
 - **Request Body**:
-  - **JSON 方式**:
-    ```json
-    {
-      "problem_id": 1,
-      "code": "print(sum(map(int, input().split())))",
-      "language": "python"
-    }
-    ```
-  - **Form-data 方式**: 
-    - `problem_id`: 题目ID
-    - `language`: 编程语言
-    - `code`: 代码字符串 (可选)
-    - `file`: 源码文件 (可选，若提供则优先于 `code` 字段)
+  - **JSON**: `{"problem_id": 1, "code": "...", "language": "python", "exam_id": null}`
+  - **Form-data**: 支持 `file` 字段上传源码文件。
 - **Success Response**: `202 Accepted`
-  ```json
-  {
-    "message": "Submission received, judging in background.",
-    "submission_id": 10,
-    "status": "Pending"
-  }
-  ```
 
 ### 4.2 获取提交详情
 - **URL**: `/submissions/<submission_id>`
 - **Method**: `GET`
 - **Auth Required**: Yes
-- **Success Response**: `200 OK`
-  ```json
-  {
-    "id": 10,
-    "status": "Accepted",
-    "score": 100.0,
-    "log": "Test Case 1: Passed...",
-    "code": "...",
-    "language": "python",
-    "created_at": "2023-10-27T10:00:00"
-  }
-  ```
 
 ---
 
-## 5. 用户模块 (User)
+## 5. 考试模块 (Exams)
 
-### 5.1 获取当前用户提交记录
-- **URL**: `/user/submissions`
+### 5.1 创建考试
+- **URL**: `/exams/`
+- **Method**: `POST`
+- **Auth Required**: Yes (Teacher only)
+- **Request Body**:
+  ```json
+  {
+    "title": "期中考试",
+    "description": "2023秋季期中测试",
+    "start_time": "2023-11-01T09:00:00",
+    "end_time": "2023-11-01T11:00:00",
+    "password": "123",
+    "is_visible": true
+  }
+  ```
+  *注：后端会对 password 进行哈希存储。*
+
+### 5.2 获取考试列表
+- **URL**: `/exams/`
 - **Method**: `GET`
 - **Auth Required**: Yes
-- **Success Response**: `200 OK`
+- **Success Response**: `200 OK` (学生仅能看到 `is_visible=true` 的考试)
+
+### 5.3 获取考试详情 (含题目)
+- **URL**: `/exams/<exam_id>`
+- **Method**: `GET`
+- **Auth Required**: Yes
+- **Success Response**:
   ```json
-  [
-    {
-      "id": 10,
-      "problem_id": 1,
-      "problem_title": "A+B Problem",
-      "status": "Accepted",
-      "score": 100.0,
-      "language": "python",
-      "created_at": "2023-10-27T10:00:00"
-    }
-  ]
+  {
+    "id": 1,
+    "title": "...",
+    "has_password": true,
+    "problems": [
+      { "problem_id": 10, "display_id": "A", "score": 100, "title": "A+B" }
+    ]
+  }
   ```
+  *注：`has_password` 用于前端判断是否需要弹出密码输入框。*
+
+### 5.4 验证考试密码
+- **URL**: `/exams/<exam_id>/verify`
+- **Method**: `POST`
+- **Auth Required**: Yes
+- **Request Body**: `{"password": "123"}`
+- **Success Response**: `200 OK` (`{"message": "Password verified"}`)
+- **Error Response**: `401 Unauthorized` (`{"error": "Incorrect password"}`)
+
+### 5.5 考试题目管理 (Teacher only)
+- **添加题目**: `POST /exams/<exam_id>/problems` (Body: `{"problem_id": 1, "display_id": "A", "score": 100}`)
+- **移除题目**: `DELETE /exams/<exam_id>/problems/<problem_id>`
 
 ---
 
 ## 6. 数据集模块 (Datasets)
 
-### 6.1 获取数据集列表
-- **URL**: `/datasets`
-- **Method**: `GET`
-- **Auth Required**: No
-- **Success Response**: `200 OK`
-  ```json
-  [
-    {
-      "id": 1,
-      "name": "MNIST",
-      "description": "Handwritten digits dataset",
-      "file_size": "11.06 MB",
-      "created_at": "2023-10-27T10:00:00"
-    }
-  ]
-  ```
+### 6.1 获取列表/上传/下载/删除
+- **获取列表**: `GET /datasets`
+- **上传**: `POST /datasets` (Multipart, Teacher only)
+- **下载**: `GET /datasets/<id>/download?token=<jwt_token>` (支持 URL 参数 Token)
+- **删除**: `DELETE /datasets/<id>` (Teacher only)
 
-### 6.2 上传数据集
-- **URL**: `/datasets`
-- **Method**: `POST`
-- **Auth Required**: No (建议后续增加教师权限校验)
-- **Request Body**: `multipart/form-data`
-  - `file`: 数据集文件 (必填)
-  - `name`: 数据集名称
-  - `description`: 数据集描述
-- **Success Response**: `201 Created`
-  ```json
-  {
-    "id": 1,
-    "name": "MNIST",
-    "description": "...",
-    "file_size": "11.06 MB",
-    "file_path": "uploads/datasets/mnist.zip"
-  }
-  ```
+---
 
-### 6.3 下载数据集
-- **URL**: `/datasets/<id>/download`
+## 7. 用户模块 (User)
+
+### 7.1 获取当前用户提交记录
+- **URL**: `/user/submissions`
 - **Method**: `GET`
-- **Auth Required**: No
-- **Success Response**: `200 OK` (直接返回文件二进制流，浏览器触发下载)
+- **Auth Required**: Yes
