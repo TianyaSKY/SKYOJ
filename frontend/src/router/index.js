@@ -66,6 +66,12 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'teacher' }
     },
     {
+      path: '/admin/exams/:id/monitor',
+      name: 'exam-monitor',
+      component: () => import('../views/admin/ExamMonitorView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' }
+    },
+    {
       path: '/rank',
       name: 'rank',
       component: () => import('../views/HomeView.vue') // Temporary

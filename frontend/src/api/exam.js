@@ -75,3 +75,23 @@ export function getMyExamStatus() {
     method: 'get'
   })
 }
+
+/**
+ * 获取考试监控数据（教师端）
+ */
+export function getExamMonitor(id) {
+  return request({
+    url: `/exams/${id}/monitor`,
+    method: 'get'
+  })
+}
+
+/**
+ * 获取特定提交的详细信息（包含代码）
+ */
+export function getSubmissionDetail(id) {
+  return request({
+    url: `/submissions/${id}`,
+    method: 'get'
+  })
+}

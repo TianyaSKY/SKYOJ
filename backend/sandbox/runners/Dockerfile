@@ -19,7 +19,7 @@ RUN sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/source
 ENV LANG=C.UTF-8
 
 # 复制并安装 Python 依赖 (在切换用户前以 root 身份安装)
-COPY requirements.txt /tmp/requirements.txt
+COPY ../requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements.txt
 
 # 创建非 root 用户以提高安全性

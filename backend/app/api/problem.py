@@ -1,19 +1,24 @@
 import os
 import shutil
 import zipfile
+import io
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
 from app.models.problem import Problem
 from app.models.user import db
+from app.utils.auth_tools import token_required
 
 problem_bp = Blueprint('problem', __name__)
 UPLOAD_BASE_DIR = "uploads/problems"
 
 
 @problem_bp.route('/', methods=['POST'])
+@token_required
 def create_problem():
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
     data = request.get_json()
 
     # 提取字段
@@ -42,7 +47,8 @@ def get_problems():
     return jsonify([{
         "id": p.id,
         "title": p.title,
-        "type": p.type
+        "type": p.type,
+        "language":p.language
     } for p in problems]), 200
 
 
@@ -62,7 +68,10 @@ def get_problem(problem_id):
 
 
 @problem_bp.route('/<int:problem_id>', methods=['PUT'])
+@token_required
 def update_problem(problem_id):
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
     problem = Problem.query.get_or_404(problem_id)
     data = request.get_json()
 
@@ -79,7 +88,10 @@ def update_problem(problem_id):
 
 
 @problem_bp.route('/<int:problem_id>', methods=['DELETE'])
+@token_required
 def delete_problem(problem_id):
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
     problem = Problem.query.get_or_404(problem_id)
     
     # 删除关联的测试用例目录
@@ -93,7 +105,10 @@ def delete_problem(problem_id):
 
 
 @problem_bp.route('/<int:problem_id>/upload_files', methods=['POST'])
+@token_required
 def upload_files(problem_id):
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
     # 1. 检查是否有文件
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -126,3 +141,58 @@ def upload_files(problem_id):
         }), 200
     except zipfile.BadZipFile:
         return jsonify({"error": "Invalid zip file"}), 400
+
+
+@problem_bp.route('/<int:problem_id>/test_cases', methods=['DELETE'])
+@token_required
+def delete_test_cases(problem_id):
+    """
+    删除某题的所有测试点文件
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+    
+    problem_dir = os.path.join(UPLOAD_BASE_DIR, str(problem_id))
+    if os.path.exists(problem_dir):
+        # 清空目录下的所有内容，但保留目录本身
+        for filename in os.listdir(problem_dir):
+            file_path = os.path.join(problem_dir, filename)
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        return jsonify({"message": f"All test cases for problem {problem_id} deleted."}), 200
+    else:
+        return jsonify({"error": "Test cases directory not found"}), 404
+
+
+@problem_bp.route('/<int:problem_id>/test_cases', methods=['GET'])
+@token_required
+def download_test_cases(problem_id):
+    """
+    将某题的所有测试点打包为压缩包下载
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+
+    problem_dir = os.path.join(UPLOAD_BASE_DIR, str(problem_id))
+    if not os.path.exists(problem_dir) or not os.listdir(problem_dir):
+        return jsonify({"error": "No test cases found for this problem"}), 404
+
+    # 在内存中创建压缩包
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(problem_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # 计算在压缩包内的相对路径
+                arcname = os.path.relpath(file_path, problem_dir)
+                zf.write(file_path, arcname)
+    
+    memory_file.seek(0)
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'problem_{problem_id}_test_cases.zip'
+    )

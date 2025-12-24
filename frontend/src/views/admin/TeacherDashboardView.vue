@@ -84,15 +84,15 @@
         <el-tab-pane label="智能体配置 (LLM)">
           <el-form :model="sysForm" label-width="100px" class="mt-4">
             <el-form-item label="API 接口">
-              <el-input v-model="sysForm.api_url" placeholder="https://api.openai.com/v1" />
+              <el-input v-model="sysForm.llm_api_url" placeholder="https://api.openai.com/v1" />
               <div class="form-tip">LLM 服务的基础 URL</div>
             </el-form-item>
             <el-form-item label="API 模型">
-              <el-input v-model="sysForm.api_model" placeholder="gpt-3.5-turbo" />
+              <el-input v-model="sysForm.llm_model_name" placeholder="gpt-3.5-turbo" />
               <div class="form-tip">使用的模型名称</div>
             </el-form-item>
             <el-form-item label="API 密钥">
-              <el-input v-model="sysForm.api_key" type="password" show-password placeholder="sk-..." />
+              <el-input v-model="sysForm.llm_api_key" type="password" show-password placeholder="sk-..." />
               <div class="form-tip">用于身份验证的 API Key</div>
             </el-form-item>
           </el-form>
@@ -122,9 +122,9 @@ const sysForm = ref({
   info: '',
   warning: false,
   practice: true,
-  api_url: '',
-  api_model: '',
-  api_key: ''
+  llm_api_url: '',
+  llm_model_name: '',
+  llm_api_key: ''
 })
 
 const openSysSettings = async () => {
@@ -138,9 +138,9 @@ const openSysSettings = async () => {
         info: res.info || '',
         warning: res.warning === 'True' || res.warning === true,
         practice: res.practice === 'True' || res.practice === true,
-        api_url: res.api_url || '',
-        api_model: res.api_model || '',
-        api_key: res.api_key || ''
+        llm_api_url: res.llm_api_url || '',
+        llm_model_name: res.llm_model_name || '',
+        llm_api_key: res.llm_api_key || ''
       }
     }
   } catch (error) {

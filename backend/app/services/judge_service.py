@@ -1,4 +1,5 @@
 import io
+import os
 import tarfile
 
 import docker
@@ -55,3 +56,32 @@ def judge_submission(app, submission_id, problem_type, user_code, problem_id, la
             submission.output_log = f"Judge Error: {str(e)}"
 
         db.session.commit()
+
+
+def save_non_acm_script(problem_id, code, problem_type, language):
+    """
+    封装非 ACM 类型的脚本保存逻辑
+    """
+    problem_dir = os.path.join("uploads/problems", str(problem_id))
+    os.makedirs(problem_dir, exist_ok=True)
+
+    # 映射语言到文件名
+    lang_map = {
+        'python': 'main.py',
+        'c': 'main.c',
+        'cpp': 'main.cpp',
+        'java': 'Main.java'
+    }
+
+    # 如果是 Kaggle 类型，通常固定为 score.py，但根据用户要求，这里优先遵循语言映射
+    # 如果 language 没传或不在映射中，默认用 .py
+    filename = lang_map.get(language.lower(), 'main.py')
+    # 但用户明确要求保存为 main.cpp/main.c/main.py/Main.java
+
+    file_path = os.path.join(problem_dir, filename)
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(code)
+        return True, f"Script saved as {filename} for {problem_type} problem."
+    except Exception as e:
+        return False, str(e)

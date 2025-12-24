@@ -21,8 +21,8 @@ class Submission(db.Model):
     language = db.Column(db.String(50))  # 如: python, cpp, csv
 
     # 判题结果
-    # 'Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error'
-    status = db.Column(db.Enum('Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error'),
+    # 'Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error', 'System Error'
+    status = db.Column(db.Enum('Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error', 'System Error'),
                        default='Pending')
 
     score = db.Column(db.Float, default=0.0)  # 针对 Kaggle 模式的分数

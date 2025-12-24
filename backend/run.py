@@ -11,6 +11,7 @@ from app.api.submission import submission_bp
 from app.api.user import user_bp
 from app.api.sys_dict import sys_dict_bp
 from app.api.exam import exam_bp
+from app.api.llm import llm_bp
 from app.models.user import db
 from app.models.sysdict import SysDict
 from app.utils.sys_dict import sys_dict_kv
@@ -66,6 +67,7 @@ app.register_blueprint(user_bp, url_prefix='/api/user')
 app.register_blueprint(dataset_bp, url_prefix='/api/datasets')
 app.register_blueprint(sys_dict_bp, url_prefix='/api/sys')
 app.register_blueprint(exam_bp, url_prefix='/api/exams')
+app.register_blueprint(llm_bp, url_prefix='/api/llm')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

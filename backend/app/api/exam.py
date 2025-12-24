@@ -3,9 +3,10 @@ from flask import Blueprint, request, jsonify, current_app
 from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
-from app.models.user import db
+from app.models.user import db, User
 from app.utils.auth_tools import token_required, encode_auth_token
 from datetime import datetime
+from sqlalchemy import func
 
 exam_bp = Blueprint('exam', __name__)
 
@@ -158,6 +159,73 @@ def get_my_exam_status():
         })
 
     return jsonify(result), 200
+
+@exam_bp.route('/<int:exam_id>/monitor', methods=['GET'])
+@token_required
+def get_exam_monitor(exam_id):
+    """
+    获取考试监控数据（教师端）
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+
+    exam = Exam.query.get_or_404(exam_id)
+    
+    # 1. 获取考试题目列表，用于表头
+    exam_problems = ExamProblem.query.filter_by(exam_id=exam_id).all()
+    problem_headers = [{
+        "problem_id": ep.problem_id,
+        "display_id": ep.display_id,
+        "max_score": ep.score
+    } for ep in exam_problems]
+
+    # 2. 获取所有在该考试中有提交记录的用户
+    user_ids = db.session.query(Submission.user_id).filter(Submission.exam_id == exam_id).distinct().all()
+    user_ids = [uid[0] for uid in user_ids]
+
+    monitor_data = []
+    for uid in user_ids:
+        user = User.query.get(uid)
+        user_status = {
+            "user_id": user.id,
+            "username": user.username,
+            "total_score": 0,
+            "submissions": {}
+        }
+
+        for ep in exam_problems:
+            # 获取该用户该题目的最后一次提交
+            last_sub = Submission.query.filter_by(
+                exam_id=exam_id,
+                user_id=uid,
+                problem_id=ep.problem_id
+            ).order_by(Submission.created_at.desc()).first()
+
+            if last_sub:
+                user_status["submissions"][ep.problem_id] = {
+                    "submission_id": last_sub.id,
+                    "status": last_sub.status,
+                    "score": last_sub.score,
+                    "time": last_sub.created_at.isoformat()
+                }
+                # 累加得分（如果是 Accepted 或者是 Kaggle 模式的分数）
+                user_status["total_score"] += last_sub.score
+            else:
+                user_status["submissions"][ep.problem_id] = {
+                    "status": "Not Attempted",
+                    "score": 0
+                }
+        
+        monitor_data.append(user_status)
+
+    # 按总分降序排列
+    monitor_data.sort(key=lambda x: x['total_score'], reverse=True)
+
+    return jsonify({
+        "exam_title": exam.title,
+        "problems": problem_headers,
+        "users": monitor_data
+    }), 200
 
 @exam_bp.route('/<int:exam_id>', methods=['PUT'])
 @token_required

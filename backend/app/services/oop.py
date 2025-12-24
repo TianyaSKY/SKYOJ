@@ -34,9 +34,9 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python'):
         },
         'python': {
             'student_file': 'solution.py',
-            'teacher_files': ['test_runner.py'],
+            'teacher_files': ['main.py'],
             'compile': None,
-            'run': 'python3 test_runner.py'
+            'run': 'python3 main.py'
         }
     }
 

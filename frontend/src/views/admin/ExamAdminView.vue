@@ -25,8 +25,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" align="center" fixed="right">
+        <el-table-column label="操作" width="280" align="center" fixed="right">
           <template #default="scope">
+            <el-button size="small" type="success" :icon="Monitor" @click="$router.push({ name: 'exam-monitor', params: { id: scope.row.id } })">监控</el-button>
             <el-button size="small" :icon="Edit" @click="handleEdit(scope.row)">编辑</el-button>
             <el-popconfirm
               title="确定要删除这场考试吗？"
@@ -131,7 +132,7 @@ import { ref, onMounted, computed } from 'vue'
 import { getExamList, createExam, updateExam, deleteExam, getExamDetail, addExamProblem, removeExamProblem } from '@/api/exam'
 import { getProblemList } from '@/api/problem'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Monitor } from '@element-plus/icons-vue'
 
 const exams = ref([])
 const loading = ref(false)
@@ -261,16 +262,6 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     // 1. Update basic exam info
-    // For create, we might still pass problem_ids string if backend supports it for creation.
-    // But for update, we must use add/remove endpoints as requested.
-
-    // Let's assume createExam still supports problem_ids string for convenience,
-    // or we can create first then add problems.
-    // To be safe and consistent with "update using specific APIs", let's handle problems separately for both if possible,
-    // or at least for update.
-
-    // However, createExam usually needs to return the ID to add problems.
-    // If createExam supports problem_ids string, we use it.
     form.value.problem_ids = selectedProblemIds.value.join(',')
 
     let examId = currentExamId.value
@@ -279,18 +270,15 @@ const handleSubmit = async () => {
       await updateExam(examId, form.value)
 
       // 2. Handle Problem Changes for Edit Mode
-      // Calculate added and removed problems
       const currentIds = new Set(selectedProblemIds.value)
       const originalIds = new Set(originalProblemIds.value)
 
       const toAdd = [...currentIds].filter(id => !originalIds.has(id))
       const toRemove = [...originalIds].filter(id => !currentIds.has(id))
 
-      // Execute add/remove operations
       const promises = []
 
       for (const pid of toAdd) {
-        // Default score 100, display_id can be auto or managed later
         promises.push(addExamProblem(examId, { problem_id: pid, score: 100 }))
       }
 
@@ -302,20 +290,7 @@ const handleSubmit = async () => {
 
       ElMessage.success('考试及题目更新成功')
     } else {
-      // Create mode
-      // If backend createExam supports problem_ids, it's done.
-      // If not, we might need to create then add.
-      // Assuming createExam handles the initial list via string as per previous context,
-      // or we can't add problems without an ID.
-      // Let's stick to sending problem_ids string for creation as it's a common pattern,
-      // and if backend ignores it, we can't do much without the new ID returned.
-      // (Usually create API returns the new object with ID)
       const res = await createExam(form.value)
-
-      // If createExam didn't add problems (backend implementation dependent), we could add them now if we have the ID.
-      // But typically "create with list" is supported.
-      // If the user strictly wants to use add_problem_to_exam for *updates*, we did that above.
-
       ElMessage.success('考试创建成功')
     }
 
