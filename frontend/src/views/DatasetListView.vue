@@ -5,57 +5,57 @@
         <div class="card-header">
           <h2 class="header-title">公开数据集</h2>
           <el-button
-            v-if="isTeacher"
-            type="primary"
-            :icon="Upload"
-            @click="uploadDialogVisible = true"
+              v-if="isTeacher"
+              :icon="Upload"
+              type="primary"
+              @click="uploadDialogVisible = true"
           >
             上传数据集
           </el-button>
         </div>
       </template>
 
-      <el-table :data="datasets" style="width: 100%" v-loading="loading" stripe>
-        <el-table-column prop="name" label="名称" min-width="200" />
-        <el-table-column prop="description" label="描述" min-width="300" />
-        <el-table-column prop="uploader" label="上传者" width="120" />
-        <el-table-column prop="file_size" label="大小" width="100" />
-        <el-table-column prop="created_at" label="上传日期" width="180">
+      <el-table v-loading="loading" :data="datasets" stripe style="width: 100%">
+        <el-table-column label="名称" min-width="200" prop="name"/>
+        <el-table-column label="描述" min-width="300" prop="description"/>
+        <el-table-column label="上传者" prop="uploader" width="120"/>
+        <el-table-column label="大小" prop="file_size" width="100"/>
+        <el-table-column label="上传日期" prop="created_at" width="180">
           <template #default="scope">
             {{ new Date(scope.row.created_at).toLocaleString() }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" align="center" fixed="right">
+        <el-table-column align="center" fixed="right" label="操作" width="250">
           <template #default="scope">
             <el-button-group>
               <el-button
-                type="success"
-                :icon="Download"
-                size="small"
-                @click="handleDownload(scope.row)"
+                  :icon="Download"
+                  size="small"
+                  type="success"
+                  @click="handleDownload(scope.row)"
               >
                 下载
               </el-button>
               <el-button
-                type="info"
-                :icon="Link"
-                size="small"
-                @click="copyDownloadLink(scope.row)"
+                  :icon="Link"
+                  size="small"
+                  type="info"
+                  @click="copyDownloadLink(scope.row)"
               >
                 复制链接
               </el-button>
               <el-popconfirm
-                v-if="isTeacher"
-                title="确定要删除这个数据集吗？"
-                confirm-button-text="确定"
-                cancel-button-text="取消"
-                @confirm="handleDelete(scope.row)"
+                  v-if="isTeacher"
+                  cancel-button-text="取消"
+                  confirm-button-text="确定"
+                  title="确定要删除这个数据集吗？"
+                  @confirm="handleDelete(scope.row)"
               >
                 <template #reference>
                   <el-button
-                    type="danger"
-                    :icon="Delete"
-                    size="small"
+                      :icon="Delete"
+                      size="small"
+                      type="danger"
                   >
                     删除
                   </el-button>
@@ -74,15 +74,15 @@
           <el-input v-model="uploadForm.name" placeholder="请输入数据集名称"></el-input>
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="uploadForm.description" type="textarea" placeholder="请输入数据集描述"></el-input>
+          <el-input v-model="uploadForm.description" placeholder="请输入数据集描述" type="textarea"></el-input>
         </el-form-item>
         <el-form-item label="数据集文件">
           <el-upload
-            ref="uploadRef"
-            action="#"
-            :limit="1"
-            :auto-upload="false"
-            :on-change="handleFileChange"
+              ref="uploadRef"
+              :auto-upload="false"
+              :limit="1"
+              :on-change="handleFileChange"
+              action="#"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
@@ -96,7 +96,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="uploadDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleUpload" :loading="uploading">
+          <el-button :loading="uploading" type="primary" @click="handleUpload">
             确认上传
           </el-button>
         </span>
@@ -106,11 +106,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useUserStore } from '@/stores/user'
-import { getDatasetList, uploadDataset, deleteDataset } from '@/api/dataset'
-import { ElMessage } from 'element-plus'
-import { Upload, Download, Delete, Link } from '@element-plus/icons-vue'
+import {computed, onMounted, ref} from 'vue'
+import {useUserStore} from '@/stores/user'
+import {deleteDataset, getDatasetList, uploadDataset} from '@/api/dataset'
+import {ElMessage} from 'element-plus'
+import {Delete, Download, Link, Upload} from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const datasets = ref([])
@@ -175,7 +175,7 @@ const handleFileChange = (file) => {
 }
 
 const resetUploadForm = () => {
-  uploadForm.value = { name: '', description: '', file: null }
+  uploadForm.value = {name: '', description: '', file: null}
   uploadRef.value?.clearFiles()
 }
 
@@ -213,11 +213,13 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .header-title {
   margin: 0;
 }

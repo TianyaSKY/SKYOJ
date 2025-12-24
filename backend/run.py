@@ -6,14 +6,14 @@ from sqlalchemy.exc import OperationalError
 
 from app.api.auth import auth_bp
 from app.api.dataset import dataset_bp
-from app.api.problem import problem_bp
-from app.api.submission import submission_bp
-from app.api.user import user_bp
-from app.api.sys_dict import sys_dict_bp
 from app.api.exam import exam_bp
 from app.api.llm import llm_bp
-from app.models.user import db
+from app.api.problem import problem_bp
+from app.api.submission import submission_bp
+from app.api.sys_dict import sys_dict_bp
+from app.api.user import user_bp
 from app.models.sysdict import SysDict
+from app.models.user import db
 from app.utils.sys_dict import sys_dict_kv
 
 if os.path.exists('/.dockerenv'):
@@ -28,6 +28,7 @@ app.config['SECRET_KEY'] = 'TianyaSKY'
 
 db.init_app(app)
 
+
 def init_db():
     """尝试连接数据库并创建表，带有重试机制"""
     with app.app_context():
@@ -36,7 +37,7 @@ def init_db():
             try:
                 db.create_all()
                 print("Successfully connected to MySQL and created tables!")
-                
+
                 # 初始化系统字典
                 if SysDict.query.count() == 0:
                     for key, val in sys_dict_kv.items():

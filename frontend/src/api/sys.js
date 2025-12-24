@@ -1,23 +1,23 @@
 import request from '@/utils/request'
 
 export function getSysInfo() {
-  return request({
-    url: '/sys/info',
-    method: 'get'
-  })
+    return request({
+        url: '/sys/info',
+        method: 'get'
+    })
 }
 
 export function updateSysInfo(data) {
-  return request({
-    url: '/sys/info',
-    method: 'put',
-    data
-  })
+    return request({
+        url: '/sys/info',
+        method: 'put',
+        data
+    })
 }
 
 export function getSysStatistics() {
-  return request({
-    url: '/sys/statistics',
-    method: 'get'
-  })
+    return request({
+        url: '/sys/statistics',
+        method: 'get'
+    })
 }

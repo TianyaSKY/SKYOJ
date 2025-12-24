@@ -1,5 +1,6 @@
 from app.models.user import db
 
+
 class SysDict(db.Model):
     __table__name = "sys_dict"
     id = db.Column(db.Integer, primary_key=True)

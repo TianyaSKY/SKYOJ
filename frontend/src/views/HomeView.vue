@@ -11,10 +11,14 @@
         <h1 class="title">SKYOJ</h1>
         <p class="subtitle">一个开源的在线评测与知识共享平台</p>
         <div class="hero-actions">
-          <el-button type="primary" size="large" round class="action-btn primary-btn" @click="$router.push('/problems')">
-            开始编程 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+          <el-button class="action-btn primary-btn" round size="large" type="primary"
+                     @click="$router.push('/problems')">
+            开始编程
+            <el-icon class="el-icon--right">
+              <ArrowRight/>
+            </el-icon>
           </el-button>
-          <el-button size="large" round class="action-btn" @click="scrollToAbout">
+          <el-button class="action-btn" round size="large" @click="scrollToAbout">
             了解更多
           </el-button>
         </div>
@@ -42,13 +46,13 @@
     </div>
 
     <!-- About Section -->
-    <div class="section-container" id="about-section">
+    <div id="about-section" class="section-container">
       <div class="section-header">
         <h2 class="section-title">关于 SKYOJ</h2>
         <p class="section-subtitle">现代化、开源、易用的在线评测系统</p>
       </div>
       <el-row :gutter="60" align="middle">
-        <el-col :xs="24" :md="12">
+        <el-col :md="12" :xs="24">
           <div class="about-content">
             <p class="about-text">
               SKYOJ 是一个专为学生、教育工作者和编程爱好者设计的现代化开源在线评测系统（Online Judge）。
@@ -60,25 +64,33 @@
             </p>
             <div class="features-grid">
               <div class="feature-card">
-                <el-icon class="feature-icon"><Timer /></el-icon>
+                <el-icon class="feature-icon">
+                  <Timer/>
+                </el-icon>
                 <span>实时代码评测</span>
               </div>
               <div class="feature-card">
-                <el-icon class="feature-icon"><Monitor /></el-icon>
+                <el-icon class="feature-icon">
+                  <Monitor/>
+                </el-icon>
                 <span>多语言支持</span>
               </div>
               <div class="feature-card">
-                <el-icon class="feature-icon"><DataAnalysis /></el-icon>
+                <el-icon class="feature-icon">
+                  <DataAnalysis/>
+                </el-icon>
                 <span>Kaggle 模式</span>
               </div>
               <div class="feature-card">
-                <el-icon class="feature-icon"><MagicStick /></el-icon>
+                <el-icon class="feature-icon">
+                  <MagicStick/>
+                </el-icon>
                 <span>AI 辅助教学</span>
               </div>
             </div>
           </div>
         </el-col>
-        <el-col :xs="24" :md="12">
+        <el-col :md="12" :xs="24">
           <div class="about-visual">
             <div class="code-window">
               <div class="window-header">
@@ -101,21 +113,23 @@
     </div>
 
     <!-- Documentation / Modes Section -->
-    <div class="section-container dark-section" id="docs-section">
+    <div id="docs-section" class="section-container dark-section">
       <div class="section-header">
         <h2 class="section-title">评测模式介绍</h2>
         <p class="section-subtitle">针对不同教学场景设计的专业评测模式</p>
       </div>
       <el-row :gutter="30">
-        <el-col :xs="24" :md="8" v-for="mode in modes" :key="mode.title" class="mb-4">
+        <el-col v-for="mode in modes" :key="mode.title" :md="8" :xs="24" class="mb-4">
           <div class="mode-card-new" @click="$router.push(mode.route)">
-            <div class="mode-icon-wrapper" :style="{ backgroundColor: mode.color + '15', color: mode.color }">
-              <el-icon :size="32"><component :is="mode.icon" /></el-icon>
+            <div :style="{ backgroundColor: mode.color + '15', color: mode.color }" class="mode-icon-wrapper">
+              <el-icon :size="32">
+                <component :is="mode.icon"/>
+              </el-icon>
             </div>
             <h3>{{ mode.title }}</h3>
             <p class="mode-desc">{{ mode.description }}</p>
             <div class="mode-footer">
-              <span class="learn-more">了解详情 <el-icon><ArrowRight /></el-icon></span>
+              <span class="learn-more">了解详情 <el-icon><ArrowRight/></el-icon></span>
             </div>
           </div>
         </el-col>
@@ -130,8 +144,10 @@
       </div>
       <div class="resources-grid">
         <div v-for="resource in resources" :key="resource.name" class="resource-item" @click="openLink(resource.url)">
-          <div class="resource-icon-box" :style="{ color: resource.color }">
-            <el-icon :size="28"><component :is="resource.icon" /></el-icon>
+          <div :style="{ color: resource.color }" class="resource-icon-box">
+            <el-icon :size="28">
+              <component :is="resource.icon"/>
+            </el-icon>
           </div>
           <div class="resource-info">
             <h4>{{ resource.name }}</h4>
@@ -144,11 +160,7 @@
 </template>
 
 <script setup>
-import {
-  ArrowRight, Check, Platform, Link, Share, Reading, DataLine,
-  Cpu, DataAnalysis, Connection, ChatLineSquare, MagicStick,
-  Timer, Monitor
-} from '@element-plus/icons-vue'
+import {ArrowRight, DataAnalysis, MagicStick, Monitor, Timer} from '@element-plus/icons-vue'
 
 const resources = [
   {
@@ -252,7 +264,7 @@ const modes = [
 ]
 
 const scrollToAbout = () => {
-  document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' })
+  document.getElementById('about-section')?.scrollIntoView({behavior: 'smooth'})
 }
 
 const openLink = (url) => {
@@ -458,7 +470,7 @@ const openLink = (url) => {
 .code-window {
   background: #1e1e1e;
   border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   transform: rotateY(-10deg) rotateX(5deg);
   transition: transform 0.5s;
@@ -481,9 +493,17 @@ const openLink = (url) => {
   border-radius: 50%;
 }
 
-.red { background: #ff5f56; }
-.yellow { background: #ffbd2e; }
-.green { background: #27c93f; }
+.red {
+  background: #ff5f56;
+}
+
+.yellow {
+  background: #ffbd2e;
+}
+
+.green {
+  background: #27c93f;
+}
 
 .window-content {
   padding: 24px;
@@ -491,11 +511,26 @@ const openLink = (url) => {
   font-size: 1rem;
 }
 
-.window-content pre { margin: 0; }
-.keyword { color: #c678dd; }
-.function { color: #61afef; }
-.string { color: #98c379; }
-.comment { color: #5c6370; font-style: italic; }
+.window-content pre {
+  margin: 0;
+}
+
+.keyword {
+  color: #c678dd;
+}
+
+.function {
+  color: #61afef;
+}
+
+.string {
+  color: #98c379;
+}
+
+.comment {
+  color: #5c6370;
+  font-style: italic;
+}
 
 /* Mode Cards */
 .mode-card-new {
@@ -512,7 +547,7 @@ const openLink = (url) => {
 
 .mode-card-new:hover {
   border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
   transform: translateY(-5px);
 }
 
@@ -600,10 +635,25 @@ const openLink = (url) => {
 }
 
 @media (max-width: 768px) {
-  .title { font-size: 3rem; }
-  .stats-container { gap: 30px; flex-wrap: wrap; }
-  .hero-section { padding: 80px 20px; }
-  .features-grid { grid-template-columns: 1fr; }
-  .about-visual { margin-top: 40px; }
+  .title {
+    font-size: 3rem;
+  }
+
+  .stats-container {
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .hero-section {
+    padding: 80px 20px;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .about-visual {
+    margin-top: 40px;
+  }
 }
 </style>

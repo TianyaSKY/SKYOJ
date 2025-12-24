@@ -3,12 +3,12 @@
     <el-row :gutter="20">
       <!-- Left: Exam Info & Problems -->
       <el-col :span="18">
-        <el-card shadow="never" class="mb-4">
+        <el-card class="mb-4" shadow="never">
           <template #header>
             <div class="exam-header">
               <h2 class="exam-title">{{ exam.title }}</h2>
               <div class="exam-meta">
-                <el-tag :type="timerStatus.type" effect="dark" class="timer-tag">
+                <el-tag :type="timerStatus.type" class="timer-tag" effect="dark">
                   {{ timerStatus.label }}: {{ remainingTimeStr }}
                 </el-tag>
               </div>
@@ -25,30 +25,30 @@
               <span>题目列表</span>
             </div>
           </template>
-          <el-table :data="problemStatus" v-loading="statusLoading" stripe style="width: 100%">
-            <el-table-column prop="display_id" label="#" width="80" align="center" />
+          <el-table v-loading="statusLoading" :data="problemStatus" stripe style="width: 100%">
+            <el-table-column align="center" label="#" prop="display_id" width="80"/>
             <el-table-column label="题目名称" min-width="200">
               <template #default="scope">
-                <el-link type="primary" :underline="false" @click="goToProblem(scope.row.problem_id)">
+                <el-link :underline="false" type="primary" @click="goToProblem(scope.row.problem_id)">
                   {{ scope.row.title }}
                 </el-link>
               </template>
             </el-table-column>
-            <el-table-column label="分值" width="120" align="center">
+            <el-table-column align="center" label="分值" width="120">
               <template #default="scope">
                 {{ scope.row.current_score }} / {{ scope.row.max_score }}
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="150" align="center">
+            <el-table-column align="center" label="状态" width="150">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)" size="small">
                   {{ scope.row.status }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120" align="center">
+            <el-table-column align="center" label="操作" width="120">
               <template #default="scope">
-                <el-button type="primary" size="small" @click="goToProblem(scope.row.problem_id)">
+                <el-button size="small" type="primary" @click="goToProblem(scope.row.problem_id)">
                   {{ scope.row.status === 'Not Attempted' ? '开始作答' : '继续作答' }}
                 </el-button>
               </template>
@@ -59,7 +59,7 @@
 
       <!-- Right: Sidebar Info -->
       <el-col :span="6">
-        <el-card shadow="never" class="mb-4">
+        <el-card class="mb-4" shadow="never">
           <template #header>
             <div class="card-header">
               <span>考试信息</span>
@@ -81,19 +81,19 @@
             <span class="label">题目数量:</span>
             <span class="value">{{ exam.problems?.length || 0 }}</span>
           </div>
-          <el-button type="info" plain style="width: 100%; margin-top: 10px" @click="fetchStatus">
+          <el-button plain style="width: 100%; margin-top: 10px" type="info" @click="fetchStatus">
             刷新状态
           </el-button>
-          <el-button type="danger" plain style="width: 100%; margin-top: 10px" @click="handleExitExam">
+          <el-button plain style="width: 100%; margin-top: 10px" type="danger" @click="handleExitExam">
             退出考试
           </el-button>
         </el-card>
 
         <el-alert
-          title="考试注意事项"
-          type="warning"
-          :closable="false"
-          show-icon
+            :closable="false"
+            show-icon
+            title="考试注意事项"
+            type="warning"
         >
           <p>1. 请在规定时间内完成作答并提交。</p>
           <p>2. 考试期间请勿频繁刷新页面。</p>
@@ -105,10 +105,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { getExamDetail, getMyExamStatus, exitExam } from '@/api/exam'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {exitExam, getExamDetail, getMyExamStatus} from '@/api/exam'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import dayjs from 'dayjs'
 
 const route = useRoute()
@@ -240,11 +240,11 @@ const timerStatus = computed(() => {
   const end = dayjs(exam.value.end_time)
 
   if (now.isBefore(start)) {
-    return { label: '距离开始', type: 'info' }
+    return {label: '距离开始', type: 'info'}
   } else if (now.isBefore(end)) {
-    return { label: '剩余时间', type: 'danger' }
+    return {label: '剩余时间', type: 'danger'}
   } else {
-    return { label: '已结束', type: 'info' }
+    return {label: '已结束', type: 'info'}
   }
 })
 
@@ -255,7 +255,7 @@ const formatTime = (time) => {
 const goToProblem = (problemId) => {
   router.push({
     path: `/problem/${problemId}`,
-    query: { exam_id: examId }
+    query: {exam_id: examId}
   })
 }
 

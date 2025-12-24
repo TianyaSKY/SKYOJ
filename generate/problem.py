@@ -1,6 +1,3 @@
-
-
-
 class Problem(db.Model):
     __tablename__ = 'problems'
 

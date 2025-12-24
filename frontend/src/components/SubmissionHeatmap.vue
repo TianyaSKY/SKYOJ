@@ -4,14 +4,14 @@
       <span class="total-count">{{ totalSubmissions }} submissions in the last year</span>
     </div>
     <div class="heatmap-scroll">
-      <div class="heatmap-grid" :style="{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }">
+      <div :style="{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }" class="heatmap-grid">
         <div v-for="(week, wIndex) in weeks" :key="wIndex" class="heatmap-week">
           <div
-            v-for="(day, dIndex) in week"
-            :key="dIndex"
-            class="heatmap-day"
-            :class="getColorClass(day.count)"
-            :title="formatTitle(day)"
+              v-for="(day, dIndex) in week"
+              :key="dIndex"
+              :class="getColorClass(day.count)"
+              :title="formatTitle(day)"
+              class="heatmap-day"
           ></div>
         </div>
       </div>
@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import {computed} from 'vue'
 
 const props = defineProps({
   submissions: {
@@ -145,15 +145,40 @@ const formatTitle = (day) => {
 }
 
 /* GitHub-like colors */
-.level-0 { background-color: var(--el-fill-color-lighter); }
-.level-1 { background-color: #9be9a8; }
-.level-2 { background-color: #40c463; }
-.level-3 { background-color: #30a14e; }
-.level-4 { background-color: #216e39; }
+.level-0 {
+  background-color: var(--el-fill-color-lighter);
+}
+
+.level-1 {
+  background-color: #9be9a8;
+}
+
+.level-2 {
+  background-color: #40c463;
+}
+
+.level-3 {
+  background-color: #30a14e;
+}
+
+.level-4 {
+  background-color: #216e39;
+}
 
 /* Dark mode adjustments if needed */
-:deep(.dark) .level-1 { background-color: #0e4429; }
-:deep(.dark) .level-2 { background-color: #006d32; }
-:deep(.dark) .level-3 { background-color: #26a641; }
-:deep(.dark) .level-4 { background-color: #39d353; }
+:deep(.dark) .level-1 {
+  background-color: #0e4429;
+}
+
+:deep(.dark) .level-2 {
+  background-color: #006d32;
+}
+
+:deep(.dark) .level-3 {
+  background-color: #26a641;
+}
+
+:deep(.dark) .level-4 {
+  background-color: #39d353;
+}
 </style>

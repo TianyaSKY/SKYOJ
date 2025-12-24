@@ -3,7 +3,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 </script>
 
 <template>
-  <AppLayout />
+  <AppLayout/>
 </template>
 
 <style>

@@ -11,7 +11,7 @@ class Submission(db.Model):
     # 外键关联：关联到用户和题目
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     problem_id = db.Column(db.Integer, db.ForeignKey('problems.id', ondelete='CASCADE'), nullable=False)
-    
+
     # 考试关联
     exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=True)
 
@@ -22,8 +22,10 @@ class Submission(db.Model):
 
     # 判题结果
     # 'Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error', 'System Error'
-    status = db.Column(db.Enum('Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error', 'System Error'),
-                       default='Pending')
+    status = db.Column(
+        db.Enum('Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error',
+                'System Error'),
+        default='Pending')
 
     score = db.Column(db.Float, default=0.0)  # 针对 Kaggle 模式的分数
     output_log = db.Column(db.Text)  # 存放判题过程中的错误日志或详细信息

@@ -28,7 +28,8 @@
         <li><strong>测试数据</strong>:
           <ul>
             <li>上传 <code>.zip</code> 压缩包。</li>
-            <li>包内文件结构应为平铺（无文件夹），成对出现：<code>1.in</code>, <code>1.out</code>, <code>2.in</code>, <code>2.out</code>...</li>
+            <li>包内文件结构应为平铺（无文件夹），成对出现：<code>1.in</code>, <code>1.out</code>, <code>2.in</code>, <code>2.out</code>...
+            </li>
           </ul>
         </li>
       </ul>
@@ -36,16 +37,22 @@
       <h3>1.3 OOP 模式题目 (面向对象设计)</h3>
       <p>OOP 模式侧重于类的设计、接口实现与代码复用。</p>
       <ul>
-        <li><strong>判题机制</strong>: 教师需上传单元测试文件（如 Java 的 JUnit 测试类，Python 的 <code>unittest</code> 文件）。</li>
-        <li><strong>AICase 工具</strong>: 推荐使用管理后台的 "AICase" 功能。它可以根据题目描述自动生成测试脚本，并自动完成测试点的部署。</li>
+        <li><strong>判题机制</strong>: 教师需上传单元测试文件（如 Java 的 JUnit 测试类，Python 的 <code>unittest</code>
+          文件）。
+        </li>
+        <li><strong>AICase 工具</strong>: 推荐使用管理后台的 "AICase" 功能。它可以根据题目描述自动生成测试脚本，并自动完成测试点的部署。
+        </li>
       </ul>
 
       <h3>1.4 Kaggle 模式题目 (数据科学/机器学习)</h3>
       <p>Kaggle 模式用于数据分析与模型预测任务。</p>
       <ul>
-        <li><strong>数据集</strong>: 教师需在题目描述中提供 <code>train.csv</code> 和 <code>test.csv</code> 的下载链接。</li>
+        <li><strong>数据集</strong>: 教师需在题目描述中提供 <code>train.csv</code> 和 <code>test.csv</code> 的下载链接。
+        </li>
         <li><strong>评分标准</strong>: 教师需上传 <code>truth.csv</code> (包含测试集 ID 和正确标签)。</li>
-        <li><strong>判题脚本</strong>: 使用 "AICase" 生成或手动编写 Python 脚本，读取 <code>truth.csv</code> 和学生提交的 <code>submission.csv</code> 计算得分。</li>
+        <li><strong>判题脚本</strong>: 使用 "AICase" 生成或手动编写 Python 脚本，读取 <code>truth.csv</code> 和学生提交的
+          <code>submission.csv</code> 计算得分。
+        </li>
       </ul>
 
       <hr>

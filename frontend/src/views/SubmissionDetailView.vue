@@ -1,30 +1,38 @@
 <template>
   <div class="submission-detail-container">
     <!-- Status Overview -->
-    <el-card class="status-card mb-4" shadow="hover" v-loading="loading">
+    <el-card v-loading="loading" class="status-card mb-4" shadow="hover">
       <div class="status-wrapper">
         <div class="status-main">
           <div class="status-icon">
-            <el-icon v-if="submission.status === 'Accepted'" color="#67C23A" :size="50"><CircleCheckFilled /></el-icon>
-            <el-icon v-else-if="submission.status === 'Wrong Answer'" color="#F56C6C" :size="50"><CircleCloseFilled /></el-icon>
-            <el-icon v-else-if="isPending" class="is-loading" color="#409EFF" :size="50"><Loading /></el-icon>
-            <el-icon v-else color="#E6A23C" :size="50"><QuestionFilled /></el-icon>
+            <el-icon v-if="submission.status === 'Accepted'" :size="50" color="#67C23A">
+              <CircleCheckFilled/>
+            </el-icon>
+            <el-icon v-else-if="submission.status === 'Wrong Answer'" :size="50" color="#F56C6C">
+              <CircleCloseFilled/>
+            </el-icon>
+            <el-icon v-else-if="isPending" :size="50" class="is-loading" color="#409EFF">
+              <Loading/>
+            </el-icon>
+            <el-icon v-else :size="50" color="#E6A23C">
+              <QuestionFilled/>
+            </el-icon>
           </div>
           <div class="status-text">
             <h1 :class="getStatusClass(submission.status)">{{ submission.status }}</h1>
             <div class="meta-info">
-              <el-tag size="small" effect="plain" class="mr-2">{{ submission.language }}</el-tag>
-              <span class="time-text"><el-icon><Clock /></el-icon> {{ formatTime(submission.created_at) }}</span>
+              <el-tag class="mr-2" effect="plain" size="small">{{ submission.language }}</el-tag>
+              <span class="time-text"><el-icon><Clock/></el-icon> {{ formatTime(submission.created_at) }}</span>
             </div>
           </div>
         </div>
 
         <div class="score-display">
           <el-progress
-            type="dashboard"
-            :percentage="submission.score"
-            :color="getScoreColor"
-            :width="80"
+              :color="getScoreColor"
+              :percentage="submission.score"
+              :width="80"
+              type="dashboard"
           >
             <template #default="{ percentage }">
               <span class="score-value">{{ percentage }}</span>
@@ -35,10 +43,10 @@
     </el-card>
 
     <!-- Judge Log / Test Cases -->
-    <el-card class="log-card mb-4" shadow="hover" v-if="submission.log">
+    <el-card v-if="submission.log" class="log-card mb-4" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span class="header-title"><el-icon><List /></el-icon> Judge Feedback</span>
+          <span class="header-title"><el-icon><List/></el-icon> Judge Feedback</span>
         </div>
       </template>
       <div class="log-content">
@@ -51,40 +59,40 @@
     <el-card class="code-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span class="header-title"><el-icon><Document /></el-icon> Source Code</span>
-          <el-button size="small" @click="copyCode" :icon="CopyDocument">Copy</el-button>
+          <span class="header-title"><el-icon><Document/></el-icon> Source Code</span>
+          <el-button :icon="CopyDocument" size="small" @click="copyCode">Copy</el-button>
         </div>
       </template>
       <div class="editor-wrapper">
         <vue-monaco-editor
-          v-if="submission.code"
-          v-model:value="submission.code"
-          :language="submission.language || 'python'"
-          theme="vs-light"
-          :options="editorOptions"
-          class="monaco-editor"
+            v-if="submission.code"
+            v-model:value="submission.code"
+            :language="submission.language || 'python'"
+            :options="editorOptions"
+            class="monaco-editor"
+            theme="vs-light"
         />
-        <el-empty v-else description="No code available" />
+        <el-empty v-else description="No code available"/>
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { getSubmissionDetail } from '@/api/problem'
-import { ElMessage } from 'element-plus'
-import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {useRoute} from 'vue-router'
+import {getSubmissionDetail} from '@/api/problem'
+import {ElMessage} from 'element-plus'
+import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 import {
   CircleCheckFilled,
   CircleCloseFilled,
-  QuestionFilled,
   Clock,
-  List,
-  Document,
   CopyDocument,
-  Loading
+  Document,
+  List,
+  Loading,
+  QuestionFilled
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -110,7 +118,7 @@ const isPending = computed(() => {
 const editorOptions = {
   readOnly: true,
   automaticLayout: true,
-  minimap: { enabled: false },
+  minimap: {enabled: false},
   scrollBeyondLastLine: false,
   fontSize: 14,
   fontFamily: "'Fira Code', 'Consolas', monospace",
@@ -217,10 +225,21 @@ onUnmounted(() => {
   font-size: 2rem;
 }
 
-.status-success { color: var(--el-color-success); }
-.status-danger { color: var(--el-color-danger); }
-.status-warning { color: var(--el-color-warning); }
-.status-info { color: var(--el-color-primary); }
+.status-success {
+  color: var(--el-color-success);
+}
+
+.status-danger {
+  color: var(--el-color-danger);
+}
+
+.status-warning {
+  color: var(--el-color-warning);
+}
+
+.status-info {
+  color: var(--el-color-primary);
+}
 
 .meta-info {
   display: flex;
@@ -288,7 +307,11 @@ onUnmounted(() => {
 }
 
 @keyframes rotating {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

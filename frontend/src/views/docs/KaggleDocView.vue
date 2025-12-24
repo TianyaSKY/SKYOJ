@@ -54,16 +54,31 @@
   margin: 0 auto;
   padding: 20px;
 }
+
 .markdown-body {
   line-height: 1.6;
 }
+
 h1, h2, h3 {
   margin-top: 24px;
   margin-bottom: 16px;
   font-weight: 600;
   line-height: 1.25;
 }
-h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
-h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
-h3 { font-size: 1.25em; }
+
+h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: .3em;
+}
+
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: .3em;
+}
+
+h3 {
+  font-size: 1.25em;
+}
 </style>

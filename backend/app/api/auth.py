@@ -1,8 +1,8 @@
+from app.models.user import db, User
+from app.utils.auth_tools import encode_auth_token
 from flask import Blueprint, request, jsonify
 from flask_bcrypt import Bcrypt, check_password_hash
 
-from app.models.user import db, User
-from app.utils.auth_tools import encode_auth_token
 auth_bp = Blueprint('auth', __name__)
 bcrypt = Bcrypt()
 
@@ -37,7 +37,7 @@ def login():
 
         if not token:
             return jsonify({"error": "Failed to generate token"}), 500
-        
+
         # PyJWT < 2.0 returns bytes, ensure it's a string
         if isinstance(token, bytes):
             token = token.decode('utf-8')

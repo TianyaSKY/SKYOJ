@@ -1,17 +1,19 @@
 import os
-from flask import Blueprint, request, jsonify, send_from_directory, current_app
 
 from app.models.dataset import Dataset
 from app.models.user import db
-from werkzeug.utils import secure_filename
 from app.utils.auth_tools import token_required, decode_auth_token
+from flask import Blueprint, request, jsonify, send_from_directory, current_app
+from werkzeug.utils import secure_filename
 
 dataset_bp = Blueprint('dataset', __name__)
+
 
 @dataset_bp.route('', methods=['GET'])
 def get_datasets():
     datasets = Dataset.query.all()
     return jsonify([d.to_dict() for d in datasets])
+
 
 @dataset_bp.route('', methods=['POST'])
 @token_required
@@ -61,6 +63,7 @@ def upload_dataset():
 
     return jsonify(dataset.to_dict()), 201
 
+
 @dataset_bp.route('/<int:id>', methods=['DELETE'])
 @token_required
 def delete_dataset(id):
@@ -81,6 +84,7 @@ def delete_dataset(id):
     db.session.commit()
 
     return jsonify({'message': 'Dataset deleted successfully'}), 200
+
 
 @dataset_bp.route('/<int:id>/download', methods=['GET'])
 def download_dataset(id):

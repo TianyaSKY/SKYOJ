@@ -5,38 +5,41 @@
         <div class="card-header">
           <h2>题目管理</h2>
           <div class="header-actions">
-            <el-button type="success" :icon="MagicStick" @click="handleAiCreate"
-              >AI 生成题目</el-button
+            <el-button :icon="MagicStick" type="success" @click="handleAiCreate"
+            >AI 生成题目
+            </el-button
             >
-            <el-button type="primary" :icon="Plus" @click="handleCreate">新增题目</el-button>
+            <el-button :icon="Plus" type="primary" @click="handleCreate">新增题目</el-button>
           </div>
         </div>
       </template>
 
-      <el-table :data="problems" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="title" label="标题" min-width="200">
+      <el-table v-loading="loading" :data="problems" stripe>
+        <el-table-column label="ID" prop="id" width="80"/>
+        <el-table-column label="标题" min-width="200" prop="title">
           <template #default="scope">
             <el-link type="primary" @click="goToProblem(scope.row.id)">{{ scope.row.title }}</el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="100" />
-        <el-table-column prop="language" label="语言" width="150">
+        <el-table-column label="类型" prop="type" width="100"/>
+        <el-table-column label="语言" prop="language" width="150">
           <template #default="scope">
-            <el-tag v-for="lang in (scope.row.language ? scope.row.language.split(',') : ['All'])" :key="lang" size="small" style="margin-right: 4px">
+            <el-tag v-for="lang in (scope.row.language ? scope.row.language.split(',') : ['All'])" :key="lang"
+                    size="small" style="margin-right: 4px">
               {{ lang.trim() }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" align="center" fixed="right">
+        <el-table-column align="center" fixed="right" label="操作" width="280">
           <template #default="scope">
-            <el-button size="small" :icon="Edit" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button size="small" type="warning" :icon="Cpu" @click="handleAiTestData(scope.row)"
-              >AICase</el-button
+            <el-button :icon="Edit" size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button :icon="Cpu" size="small" type="warning" @click="handleAiTestData(scope.row)"
+            >AICase
+            </el-button
             >
             <el-popconfirm title="确定要删除这道题目吗？" @confirm="handleDelete(scope.row.id)">
               <template #reference>
-                <el-button size="small" type="danger" :icon="Delete">删除</el-button>
+                <el-button :icon="Delete" size="small" type="danger">删除</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -46,57 +49,57 @@
 
     <!-- Edit/Create Dialog -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="70%" @close="resetForm">
-      <el-form :model="form" label-position="top" ref="formRef" v-loading="dialogLoading">
+      <el-form ref="formRef" v-loading="dialogLoading" :model="form" label-position="top">
         <el-form-item label="标题" prop="title">
-          <el-input v-model="form.title" />
+          <el-input v-model="form.title"/>
         </el-form-item>
         <el-form-item label="内容 (Markdown)" prop="content">
-          <el-input v-model="form.content" type="textarea" :rows="10" />
+          <el-input v-model="form.content" :rows="10" type="textarea"/>
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="6">
             <el-form-item label="类型" prop="type">
               <el-select v-model="form.type" placeholder="请选择题目类型">
-                <el-option label="ACM" value="acm" />
-                <el-option label="Kaggle" value="kaggle" />
-                <el-option label="OOP" value="oop" />
+                <el-option label="ACM" value="acm"/>
+                <el-option label="Kaggle" value="kaggle"/>
+                <el-option label="OOP" value="oop"/>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="允许语言" prop="language">
               <el-select
-                v-model="languageArray"
-                multiple
-                collapse-tags
-                placeholder="请选择允许的语言"
-                style="width: 100%"
+                  v-model="languageArray"
+                  collapse-tags
+                  multiple
+                  placeholder="请选择允许的语言"
+                  style="width: 100%"
               >
-                <el-option label="Python" value="python" />
-                <el-option label="C++" value="cpp" />
-                <el-option label="C" value="c" />
-                <el-option label="Java" value="java" />
+                <el-option label="Python" value="python"/>
+                <el-option label="C++" value="cpp"/>
+                <el-option label="C" value="c"/>
+                <el-option label="Java" value="java"/>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="时间限制 (ms)" prop="time_limit">
-              <el-input-number v-model="form.time_limit" :min="100" style="width: 100%" />
+              <el-input-number v-model="form.time_limit" :min="100" style="width: 100%"/>
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="内存限制 (MB)" prop="memory_limit">
-              <el-input-number v-model="form.memory_limit" :min="32" style="width: 100%" />
+              <el-input-number v-model="form.memory_limit" :min="32" style="width: 100%"/>
             </el-form-item>
           </el-col>
         </el-row>
         <el-form-item label="默认模板代码 (可选)" prop="template_code">
-          <div class="editor-container mini-editor" v-if="dialogVisible">
+          <div v-if="dialogVisible" class="editor-container mini-editor">
             <vue-monaco-editor
-              v-model:value="form.template_code"
-              :language="languageArray[0] || 'python'"
-              theme="vs-dark"
-              :options="miniEditorOptions"
+                v-model:value="form.template_code"
+                :language="languageArray[0] || 'python'"
+                :options="miniEditorOptions"
+                theme="vs-dark"
             />
           </div>
         </el-form-item>
@@ -106,14 +109,14 @@
           <el-divider content-position="left">测试点管理</el-divider>
           <el-form-item label="上传测试点 (ZIP)">
             <el-upload
-              class="upload-demo"
-              action="#"
-              :auto-upload="false"
-              :limit="1"
-              accept=".zip"
-              :on-change="handleTestCaseChange"
-              :on-remove="handleTestCaseRemove"
-              :file-list="testCaseFileList"
+                :auto-upload="false"
+                :file-list="testCaseFileList"
+                :limit="1"
+                :on-change="handleTestCaseChange"
+                :on-remove="handleTestCaseRemove"
+                accept=".zip"
+                action="#"
+                class="upload-demo"
             >
               <el-button type="primary">选择文件</el-button>
               <template #tip>
@@ -122,30 +125,30 @@
             </el-upload>
             <div class="mt-2">
               <el-button
-                type="success"
-                size="small"
-                @click="handleUploadTestCases"
-                :loading="uploadingTestCases"
-                :disabled="!selectedTestCaseFile"
+                  :disabled="!selectedTestCaseFile"
+                  :loading="uploadingTestCases"
+                  size="small"
+                  type="success"
+                  @click="handleUploadTestCases"
               >
                 上传测试点
               </el-button>
               <el-button
-                type="info"
-                size="small"
-                :icon="Download"
-                @click="handleDownloadTestCases"
-                :loading="downloadingTestCases"
+                  :icon="Download"
+                  :loading="downloadingTestCases"
+                  size="small"
+                  type="info"
+                  @click="handleDownloadTestCases"
               >
                 下载所有测试点
               </el-button>
               <el-popconfirm title="确定要删除所有测试点吗？" @confirm="handleDeleteAllTestCases">
                 <template #reference>
                   <el-button
-                    type="danger"
-                    size="small"
-                    :icon="Delete"
-                    :loading="deletingTestCases"
+                      :icon="Delete"
+                      :loading="deletingTestCases"
+                      size="small"
+                      type="danger"
                   >
                     删除所有测试点
                   </el-button>
@@ -156,16 +159,16 @@
         </div>
         <div v-else>
           <el-alert
-            title="请先保存题目，然后再编辑以上传测试点。"
-            type="info"
-            show-icon
-            :closable="false"
+              :closable="false"
+              show-icon
+              title="请先保存题目，然后再编辑以上传测试点。"
+              type="info"
           />
         </div>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">保存</el-button>
+        <el-button :loading="submitting" type="primary" @click="handleSubmit">保存</el-button>
       </template>
     </el-dialog>
 
@@ -174,10 +177,10 @@
       <el-form :model="aiForm" label-position="top">
         <el-form-item label="题目背景/大致方向" required>
           <el-input
-            v-model="aiForm.background"
-            type="textarea"
-            :rows="4"
-            placeholder="例如：关于字符串处理的题目，要求统计元音字母数量，适合初学者。"
+              v-model="aiForm.background"
+              :rows="4"
+              placeholder="例如：关于字符串处理的题目，要求统计元音字母数量，适合初学者。"
+              type="textarea"
           />
         </el-form-item>
         <el-form-item label="题目难度">
@@ -190,8 +193,9 @@
       </el-form>
       <template #footer>
         <el-button @click="aiDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="generateProblem" :loading="aiGenerating"
-          >生成预览</el-button
+        <el-button :loading="aiGenerating" type="primary" @click="generateProblem"
+        >生成预览
+        </el-button
         >
       </template>
     </el-dialog>
@@ -199,32 +203,32 @@
     <!-- AI Test Data Generation Dialog -->
     <el-dialog v-model="aiTestDataVisible" title="AI 生成测试数据" width="900px">
       <el-steps :active="aiStep" finish-status="success" simple style="margin-bottom: 20px">
-        <el-step title="配置方向" />
-        <el-step title="生成脚本" />
-        <el-step title="执行生成" />
+        <el-step title="配置方向"/>
+        <el-step title="生成脚本"/>
+        <el-step title="执行生成"/>
       </el-steps>
 
       <div v-if="aiStep === 0" v-loading="fetchingDetail">
         <el-form :model="testDataForm" label-position="top">
           <el-form-item label="生成方向/要求 (可选)">
             <el-input
-              v-model="testDataForm.direction"
-              type="textarea"
-              :rows="3"
-              placeholder="例如：生成 10 组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
+                v-model="testDataForm.direction"
+                :rows="3"
+                placeholder="例如：生成 10 组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
+                type="textarea"
             />
           </el-form-item>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="测试点个数">
-                <el-input-number v-model="testDataForm.count" :min="1" :max="50" />
+                <el-input-number v-model="testDataForm.count" :max="50" :min="1"/>
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="数据范围描述">
                 <el-input
-                  v-model="testDataForm.range_info"
-                  placeholder="例如：n <= 10^5, a[i] <= 10^9"
+                    v-model="testDataForm.range_info"
+                    placeholder="例如：n <= 10^5, a[i] <= 10^9"
                 />
               </el-form-item>
             </el-col>
@@ -235,28 +239,30 @@
       <div v-if="aiStep === 1">
         <div class="script-header">
           <span>生成的 {{ generatedLanguage === 'java' ? 'Java 测试类' : '测试脚本' }}</span>
-          <el-tag type="info" size="small">语言: {{ generatedLanguage }}</el-tag>
+          <el-tag size="small" type="info">语言: {{ generatedLanguage }}</el-tag>
         </div>
-        <div class="editor-container script-editor" v-if="aiTestDataVisible">
+        <div v-if="aiTestDataVisible" class="editor-container script-editor">
           <vue-monaco-editor
-            v-model:value="generatedScript"
-            :language="generatedLanguage"
-            theme="vs-dark"
-            :options="editorOptions"
+              v-model:value="generatedScript"
+              :language="generatedLanguage"
+              :options="editorOptions"
+              theme="vs-dark"
           />
         </div>
       </div>
 
       <div v-if="aiStep === 2" class="execution-status">
         <div v-if="executing" class="loading-box">
-          <el-icon class="is-loading"><Loading /></el-icon>
+          <el-icon class="is-loading">
+            <Loading/>
+          </el-icon>
           <p>正在生成测试数据并提交到服务器...</p>
         </div>
         <div v-else-if="executionResult" class="result-box">
           <el-result
-            icon="success"
-            title="生成成功"
-            :sub-title="`已成功生成并上传 ${testDataForm.count} 组测试数据。`"
+              :sub-title="`已成功生成并上传 ${testDataForm.count} 组测试数据。`"
+              icon="success"
+              title="生成成功"
           >
             <template #extra>
               <el-button type="primary" @click="aiTestDataVisible = false">完成</el-button>
@@ -269,19 +275,19 @@
         <div class="dialog-footer">
           <el-button v-if="aiStep > 0 && aiStep < 2" @click="aiStep--">上一步</el-button>
           <el-button
-            v-if="aiStep === 0"
-            type="primary"
-            @click="handleGenerateScript"
-            :loading="scriptGenerating"
-            :disabled="fetchingDetail"
+              v-if="aiStep === 0"
+              :disabled="fetchingDetail"
+              :loading="scriptGenerating"
+              type="primary"
+              @click="handleGenerateScript"
           >
             下一步：生成脚本
           </el-button>
           <el-button
-            v-if="aiStep === 1"
-            type="success"
-            @click="handleExecuteScript"
-            :loading="executing"
+              v-if="aiStep === 1"
+              :loading="executing"
+              type="success"
+              @click="handleExecuteScript"
           >
             执行并提交
           </el-button>
@@ -292,22 +298,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import {computed, onMounted, ref, watch} from 'vue'
+import {useRouter} from 'vue-router'
 import {
-  getProblemList,
   createProblem,
-  updateProblem,
-  deleteProblem,
-  getProblemDetail,
-  uploadTestCases,
-  downloadTestCases,
   deleteAllTestCases,
+  deleteProblem,
+  downloadTestCases,
+  getProblemDetail,
+  getProblemList,
+  updateProblem,
+  uploadTestCases,
 } from '@/api/problem'
-import { askLLM, executeAndSubmitTestData } from '@/api/llm'
-import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, MagicStick, Cpu, Loading, Download } from '@element-plus/icons-vue'
-import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
+import {askLLM, executeAndSubmitTestData} from '@/api/llm'
+import {ElMessage} from 'element-plus'
+import {Cpu, Delete, Download, Edit, Loading, MagicStick, Plus} from '@element-plus/icons-vue'
+import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 
 const router = useRouter()
 const problems = ref([])
@@ -345,7 +351,7 @@ const testDataForm = ref({
 // Editor Options
 const editorOptions = {
   automaticLayout: true,
-  minimap: { enabled: true },
+  minimap: {enabled: true},
   fontSize: 14,
   scrollBeyondLastLine: false,
   roundedSelection: false,
@@ -355,7 +361,7 @@ const editorOptions = {
 
 const miniEditorOptions = {
   automaticLayout: true,
-  minimap: { enabled: false },
+  minimap: {enabled: false},
   fontSize: 13,
   scrollBeyondLastLine: false,
   lineNumbers: 'on',
@@ -423,7 +429,7 @@ const handleCreate = () => {
 }
 
 const handleAiCreate = () => {
-  aiForm.value = { background: '', difficulty: '简单' }
+  aiForm.value = {background: '', difficulty: '简单'}
   aiDialogVisible.value = true
 }
 
@@ -628,7 +634,7 @@ const handleExecuteScript = async () => {
       problem_id: currentProblem.value.id,
       code: generatedScript.value,
       type: currentProblem.value.type,
-      language:currentProblem.value.language,
+      language: currentProblem.value.language,
     })
     executionResult.value = res
     ElMessage.success('测试数据生成并提交成功')
@@ -706,7 +712,7 @@ const handleDeleteAllTestCases = async () => {
 }
 
 const goToProblem = (id) => {
-  router.push({ name: 'problem-detail', params: { id } })
+  router.push({name: 'problem-detail', params: {id}})
 }
 
 onMounted(() => {
@@ -719,47 +725,57 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .header-actions {
   display: flex;
   gap: 12px;
 }
+
 .mt-2 {
   margin-top: 10px;
   display: flex;
   gap: 10px;
 }
+
 .test-cases-section {
   margin-top: 20px;
   padding-top: 10px;
   border-top: 1px dashed var(--el-border-color);
 }
+
 .script-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
 }
+
 .editor-container {
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   overflow: hidden;
   width: 100%;
 }
+
 .mini-editor {
   height: 200px;
 }
+
 .script-editor {
   height: 450px;
 }
+
 .execution-status {
   padding: 40px 0;
   text-align: center;
 }
+
 .loading-box {
   display: flex;
   flex-direction: column;
@@ -767,6 +783,7 @@ onMounted(() => {
   gap: 15px;
   color: var(--el-text-color-secondary);
 }
+
 .loading-box .el-icon {
   font-size: 40px;
 }

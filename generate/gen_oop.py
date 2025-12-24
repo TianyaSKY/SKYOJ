@@ -1,6 +1,6 @@
 import os
-import shutil
 from datetime import datetime
+
 from sqlalchemy import create_engine, Column, Integer, String, Text, Enum, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -9,6 +9,7 @@ DB_URI = 'mysql+pymysql://root:root@localhost:3306/oj_db'
 BASE_PROBLEM_PATH = '../backend/uploads/problems'
 
 Base = declarative_base()
+
 
 class Problem(Base):
     __tablename__ = 'problems'
@@ -23,9 +24,11 @@ class Problem(Base):
     template_code = Column(Text)
     created_at = Column(DateTime, default=datetime.now)
 
+
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
+
 
 def get_oop_problems():
     problems = [
@@ -451,6 +454,7 @@ if __name__ == '__main__':
     ]
     return problems
 
+
 def seed_oop():
     engine = create_engine(DB_URI)
     Session = sessionmaker(bind=engine)
@@ -480,6 +484,7 @@ def seed_oop():
     session.commit()
     session.close()
     print("OOP problems seeded successfully.")
+
 
 if __name__ == "__main__":
     seed_oop()

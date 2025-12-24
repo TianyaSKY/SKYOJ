@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from app.models.user import db
+
 
 class Dataset(db.Model):
     __tablename__ = 'datasets'

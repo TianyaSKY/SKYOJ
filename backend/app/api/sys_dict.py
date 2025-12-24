@@ -1,13 +1,15 @@
-from flask import Blueprint, jsonify, request
-from app.models.sysdict import SysDict
-from app.models.user import db, User
-from app.models.problem import Problem
-from app.models.submission import Submission
-from app.models.exam import Exam
-from app.utils.auth_tools import token_required
 from datetime import datetime, timedelta
 
+from app.models.exam import Exam
+from app.models.problem import Problem
+from app.models.submission import Submission
+from app.models.sysdict import SysDict
+from app.models.user import db, User
+from app.utils.auth_tools import token_required
+from flask import Blueprint, jsonify, request
+
 sys_dict_bp = Blueprint('sys_dict', __name__)
+
 
 @sys_dict_bp.route('/info', methods=['GET'])
 def get_sys_info():
@@ -17,7 +19,7 @@ def get_sys_info():
     dicts = SysDict.query.all()
     # 将数据库中的键值对转换为字典格式返回
     config = {d.key: d.val for d in dicts}
-    
+
     # 确保前端需要的字段存在，如果不存在则返回默认值
     required_fields = {
         "title": "SKYOJ",
@@ -28,20 +30,21 @@ def get_sys_info():
         "llm_model_name": "",
         "llm_api_key": ""
     }
-    
+
     for key, default in required_fields.items():
         if key not in config:
             config[key] = default
-            
+
     # 转换布尔字符串
     if "warning" in config:
         config["warning"] = config["warning"].lower() == "true"
     if "practice" in config:
         config["practice"] = config["practice"].lower() == "true"
-            
+
     return jsonify(config), 200
 
-@sys_dict_bp.route('/info', methods=[ 'PUT'])
+
+@sys_dict_bp.route('/info', methods=['PUT'])
 @token_required
 def update_sys_info():
     """
@@ -72,6 +75,7 @@ def update_sys_info():
         "updated_keys": updated_keys
     }), 200
 
+
 @sys_dict_bp.route('/info/<string:key>', methods=['DELETE'])
 @token_required
 def delete_sys_info(key):
@@ -89,6 +93,7 @@ def delete_sys_info(key):
     db.session.commit()
     return jsonify({"message": f"Key '{key}' deleted successfully"}), 200
 
+
 @sys_dict_bp.route('/statistics', methods=['GET'])
 @token_required
 def get_statistics():
@@ -97,7 +102,7 @@ def get_statistics():
     """
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-        
+
     # 1. 今日提交量
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     today_submissions = Submission.query.filter(Submission.created_at >= today_start).count()
@@ -112,7 +117,7 @@ def get_statistics():
     now = datetime.utcnow()
     one_year_ago = now - timedelta(days=365)
     six_months_ago = now + timedelta(days=180)
-    
+
     exams_in_range = Exam.query.filter(
         Exam.start_time >= one_year_ago,
         Exam.start_time <= six_months_ago

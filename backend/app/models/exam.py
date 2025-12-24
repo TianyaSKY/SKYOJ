@@ -1,5 +1,5 @@
 from app.models.user import db
-from datetime import datetime
+
 
 class Exam(db.Model):
     __tablename__ = 'exams'
@@ -11,7 +11,7 @@ class Exam(db.Model):
     end_time = db.Column(db.DateTime, nullable=False)
     password = db.Column(db.String(2000))  # 考试进入密码（可选）
     is_visible = db.Column(db.Boolean, default=False)  # 考试是否对学生可见
-    
+
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     creator = db.relationship('User', backref=db.backref('created_exams', lazy=True))
 
@@ -25,6 +25,7 @@ class Exam(db.Model):
             "is_visible": self.is_visible,
             "created_by": self.created_by
         }
+
 
 class ExamProblem(db.Model):
     __tablename__ = 'exam_problems'

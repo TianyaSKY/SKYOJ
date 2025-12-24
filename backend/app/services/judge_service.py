@@ -23,6 +23,26 @@ def create_tar_stream(filename, content):
     return tar_stream
 
 
+def create_tar_from_path(local_path, remote_filename):
+    """
+    将宿主机的本地文件打包成 tar 流
+    :param local_path: 宿主机上的文件绝对路径 (例如: /app/uploads/submissions/xxx.csv)
+    :param remote_filename: 放入容器后的文件名 (例如: submission.csv)
+    """
+    tar_stream = io.BytesIO()
+
+    # 检查文件是否存在
+    if not os.path.exists(local_path):
+        raise FileNotFoundError(f"无法打包，找不到源文件: {local_path}")
+
+    with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+        # arcname 决定了文件在 tar 包里的名字（即解压到容器后的文件名）
+        tar.add(local_path, arcname=remote_filename)
+
+    tar_stream.seek(0)
+    return tar_stream
+
+
 def judge_submission(app, submission_id, problem_type, user_code, problem_id, language):
     """
     执行判题逻辑 (替代原 Celery Task)

@@ -5,11 +5,11 @@ import request from '@/utils/request'
  * @param {object} params 查询参数
  */
 export function getDatasetList(params) {
-  return request({
-    url: '/datasets',
-    method: 'get',
-    params
-  })
+    return request({
+        url: '/datasets',
+        method: 'get',
+        params
+    })
 }
 
 /**
@@ -17,12 +17,12 @@ export function getDatasetList(params) {
  * @param {FormData} data 包含文件和元数据的表单数据
  */
 export function uploadDataset(data) {
-  return request({
-    url: '/datasets',
-    method: 'post',
-    data,
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+    return request({
+        url: '/datasets',
+        method: 'post',
+        data,
+        headers: {'Content-Type': 'multipart/form-data'}
+    })
 }
 
 /**
@@ -30,8 +30,8 @@ export function uploadDataset(data) {
  * @param {number} id 数据集ID
  */
 export function deleteDataset(id) {
-  return request({
-    url: `/datasets/${id}`,
-    method: 'delete'
-  })
+    return request({
+        url: `/datasets/${id}`,
+        method: 'delete'
+    })
 }

@@ -5,55 +5,55 @@
       <p class="page-desc">探索各种类型的编程挑战，提升你的技能。</p>
     </div>
 
-    <el-card shadow="never" class="table-card">
+    <el-card class="table-card" shadow="never">
       <div class="filter-container">
         <el-input
-          v-model="searchQuery"
-          placeholder="搜索题目名称或 ID..."
-          style="width: 350px"
-          class="search-input"
-          clearable
-          :prefix-icon="Search"
+            v-model="searchQuery"
+            :prefix-icon="Search"
+            class="search-input"
+            clearable
+            placeholder="搜索题目名称或 ID..."
+            style="width: 350px"
         />
         <div class="filter-group">
-          <el-select v-model="typeFilter" placeholder="题目类型" clearable style="width: 140px">
-            <el-option label="ACM" value="acm" />
-            <el-option label="Kaggle" value="kaggle" />
-            <el-option label="OOP" value="oop" />
+          <el-select v-model="typeFilter" clearable placeholder="题目类型" style="width: 140px">
+            <el-option label="ACM" value="acm"/>
+            <el-option label="Kaggle" value="kaggle"/>
+            <el-option label="OOP" value="oop"/>
           </el-select>
         </div>
       </div>
 
       <el-table
-        v-loading="loading"
-        :data="paginatedProblems"
-        style="width: 100%"
-        class="problem-table"
-        :header-cell-style="{ background: '#f8f9fa', color: '#606266', fontWeight: 'bold' }"
+          v-loading="loading"
+          :data="paginatedProblems"
+          :header-cell-style="{ background: '#f8f9fa', color: '#606266', fontWeight: 'bold' }"
+          class="problem-table"
+          style="width: 100%"
       >
-        <el-table-column prop="id" label="ID" width="100" align="center">
+        <el-table-column align="center" label="ID" prop="id" width="100">
           <template #default="scope">
             <span class="problem-id">#{{ scope.row.id }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="title" label="题目名称" min-width="250">
+        <el-table-column label="题目名称" min-width="250" prop="title">
           <template #default="scope">
             <div class="title-cell">
               <el-link
-                type="primary"
-                :underline="false"
-                class="problem-link"
-                @click="$router.push(`/problem/${scope.row.id}`)"
+                  :underline="false"
+                  class="problem-link"
+                  type="primary"
+                  @click="$router.push(`/problem/${scope.row.id}`)"
               >
                 {{ scope.row.title }}
               </el-link>
               <el-tag
-                v-if="scope.row.type"
-                size="small"
-                :type="getTypeTag(scope.row.type)"
-                effect="light"
-                class="type-tag"
+                  v-if="scope.row.type"
+                  :type="getTypeTag(scope.row.type)"
+                  class="type-tag"
+                  effect="light"
+                  size="small"
               >
                 {{ scope.row.type.toUpperCase() }}
               </el-tag>
@@ -65,11 +65,11 @@
           <template #default="scope">
             <div class="language-tags">
               <el-tag
-                v-for="lang in getLanguages(scope.row.language)"
-                :key="lang"
-                size="small"
-                effect="plain"
-                class="lang-tag"
+                  v-for="lang in getLanguages(scope.row.language)"
+                  :key="lang"
+                  class="lang-tag"
+                  effect="plain"
+                  size="small"
               >
                 {{ capitalize(lang) }}
               </el-tag>
@@ -81,20 +81,20 @@
         <el-table-column label="限制" width="200">
           <template #default="scope">
             <div class="limit-info">
-              <span title="时间限制"><el-icon><Timer /></el-icon> {{ scope.row.time_limit }}ms</span>
-              <span title="内存限制"><el-icon><Monitor /></el-icon> {{ scope.row.memory_limit }}MB</span>
+              <span title="时间限制"><el-icon><Timer/></el-icon> {{ scope.row.time_limit }}ms</span>
+              <span title="内存限制"><el-icon><Monitor/></el-icon> {{ scope.row.memory_limit }}MB</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="120" align="center">
+        <el-table-column align="center" label="操作" width="120">
           <template #default="scope">
             <el-button
-              type="primary"
-              plain
-              size="small"
-              round
-              @click="$router.push(`/problem/${scope.row.id}`)"
+                plain
+                round
+                size="small"
+                type="primary"
+                @click="$router.push(`/problem/${scope.row.id}`)"
             >
               去挑战
             </el-button>
@@ -104,13 +104,13 @@
 
       <div class="pagination-container">
         <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -118,10 +118,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { Search, Timer, Monitor } from '@element-plus/icons-vue'
-import { getProblemList } from '@/api/problem'
-import { ElMessage } from 'element-plus'
+import {computed, onMounted, ref, watch} from 'vue'
+import {Monitor, Search, Timer} from '@element-plus/icons-vue'
+import {getProblemList} from '@/api/problem'
+import {ElMessage} from 'element-plus'
 
 const loading = ref(false)
 const allProblems = ref([])
@@ -157,8 +157,8 @@ const filteredProblems = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(p =>
-      (p.title && p.title.toLowerCase().includes(query)) ||
-      (p.id && String(p.id).includes(query))
+        (p.title && p.title.toLowerCase().includes(query)) ||
+        (p.id && String(p.id).includes(query))
     )
   }
 
@@ -237,7 +237,7 @@ onMounted(() => {
 .table-card {
   border-radius: 12px;
   border: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .filter-container {

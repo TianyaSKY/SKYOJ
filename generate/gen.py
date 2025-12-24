@@ -1,10 +1,10 @@
+import math
 import os
 import random
 import string
-import math
-import shutil
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, Enum, DateTime, func
+
+from sqlalchemy import create_engine, Column, Integer, String, Text, Enum, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # =================配置区域=================

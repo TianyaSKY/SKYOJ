@@ -6,21 +6,23 @@
         <p class="page-desc">欢迎回来，这里是您的教学管理中心。</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" :icon="Plus" @click="$router.push({ name: 'problem-admin' })">新增题目</el-button>
-        <el-button type="success" :icon="Timer" @click="$router.push({ name: 'exam-admin' })">创建考试</el-button>
+        <el-button :icon="Plus" type="primary" @click="$router.push({ name: 'problem-admin' })">新增题目</el-button>
+        <el-button :icon="Timer" type="success" @click="$router.push({ name: 'exam-admin' })">创建考试</el-button>
       </div>
     </div>
 
     <!-- Stats Overview -->
     <el-row :gutter="20" class="stats-row">
-      <el-col :span="6" v-for="(stat, index) in stats" :key="stat.label">
+      <el-col v-for="(stat, index) in stats" :key="stat.label" :span="6">
         <div
-          class="stat-card"
-          :class="{ 'clickable-stat': index === 3 }"
-          @click="index === 3 ? userListVisible = true : null"
+            :class="{ 'clickable-stat': index === 3 }"
+            class="stat-card"
+            @click="index === 3 ? userListVisible = true : null"
         >
-          <div class="stat-icon" :style="{ color: stat.color, backgroundColor: stat.color + '15' }">
-            <el-icon :size="24"><component :is="stat.icon" /></el-icon>
+          <div :style="{ color: stat.color, backgroundColor: stat.color + '15' }" class="stat-icon">
+            <el-icon :size="24">
+              <component :is="stat.icon"/>
+            </el-icon>
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ stat.value }}</div>
@@ -33,57 +35,65 @@
     <h3 class="section-title">核心管理</h3>
     <el-row :gutter="20" class="dashboard-cards">
       <!-- 题目管理卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24">
         <div class="nav-card" @click="$router.push({ name: 'problem-admin' })">
           <div class="nav-icon" style="color: #409EFF; background-color: #ecf5ff">
-            <el-icon :size="32"><List /></el-icon>
+            <el-icon :size="32">
+              <List/>
+            </el-icon>
           </div>
           <h3>题目管理</h3>
           <p>创建、编辑和删除题目，管理测试数据与 SPJ 脚本。</p>
           <div class="nav-footer">
-            <span>进入管理 <el-icon><ArrowRight /></el-icon></span>
+            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
           </div>
         </div>
       </el-col>
 
       <!-- 考试管理卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24">
         <div class="nav-card" @click="$router.push({ name: 'exam-admin' })">
           <div class="nav-icon" style="color: #F56C6C; background-color: #fef0f0">
-            <el-icon :size="32"><Timer /></el-icon>
+            <el-icon :size="32">
+              <Timer/>
+            </el-icon>
           </div>
           <h3>考试管理</h3>
           <p>组织在线考试、设置访问权限及监控实时进度。</p>
           <div class="nav-footer">
-            <span>进入管理 <el-icon><ArrowRight /></el-icon></span>
+            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
           </div>
         </div>
       </el-col>
 
       <!-- 系统设置卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24">
         <div class="nav-card" @click="openSysSettings">
           <div class="nav-icon" style="color: #E6A23C; background-color: #fdf6ec">
-            <el-icon :size="32"><Setting /></el-icon>
+            <el-icon :size="32">
+              <Setting/>
+            </el-icon>
           </div>
           <h3>系统设置</h3>
           <p>配置网站公告、练习模式及 LLM 智能体 API 密钥。</p>
           <div class="nav-footer">
-            <span>打开设置 <el-icon><ArrowRight /></el-icon></span>
+            <span>打开设置 <el-icon><ArrowRight/></el-icon></span>
           </div>
         </div>
       </el-col>
 
       <!-- 教师手册卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24">
         <div class="nav-card" @click="$router.push({ name: 'doc-teacher-manual' })">
           <div class="nav-icon" style="color: #67C23A; background-color: #f0f9eb">
-            <el-icon :size="32"><Document /></el-icon>
+            <el-icon :size="32">
+              <Document/>
+            </el-icon>
           </div>
           <h3>教师手册</h3>
           <p>查阅录入指南、AICase 使用说明及评分示例。</p>
           <div class="nav-footer">
-            <span>查看文档 <el-icon><ArrowRight /></el-icon></span>
+            <span>查看文档 <el-icon><ArrowRight/></el-icon></span>
           </div>
         </div>
       </el-col>
@@ -91,9 +101,9 @@
 
     <!-- User List Dialog -->
     <el-dialog v-model="userListVisible" title="所有用户" width="800px">
-      <el-table :data="users" v-loading="usersLoading" stripe>
-        <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="username" label="用户名" min-width="150">
+      <el-table v-loading="usersLoading" :data="users" stripe>
+        <el-table-column align="center" label="ID" prop="id" width="80"/>
+        <el-table-column label="用户名" min-width="150" prop="username">
           <template #default="scope">
             <div class="user-cell">
               <el-avatar :size="24" class="mr-2">{{ scope.row.username.charAt(0).toUpperCase() }}</el-avatar>
@@ -101,45 +111,47 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="role" label="角色" width="120">
+        <el-table-column label="角色" prop="role" width="120">
           <template #default="scope">
             <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'info'" size="small">
               {{ scope.row.role }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" align="center">
+        <el-table-column align="center" label="操作" width="150">
           <template #default="scope">
-            <el-button type="primary" link @click="viewUserProfile(scope.row.id)">查看主页</el-button>
+            <el-button link type="primary" @click="viewUserProfile(scope.row.id)">查看主页</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-dialog>
 
     <!-- System Settings Dialog -->
-    <el-dialog v-model="sysDialogVisible" title="系统全局配置" width="700px" class="settings-dialog">
-      <el-tabs type="border-card" class="settings-tabs">
+    <el-dialog v-model="sysDialogVisible" class="settings-dialog" title="系统全局配置" width="700px">
+      <el-tabs class="settings-tabs" type="border-card">
         <el-tab-pane label="基础设置">
-          <el-form :model="sysForm" label-position="top" class="mt-4">
+          <el-form :model="sysForm" class="mt-4" label-position="top">
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="网站标题">
-                  <el-input v-model="sysForm.title" placeholder="例如: SKYOJ" />
+                  <el-input v-model="sysForm.title" placeholder="例如: SKYOJ"/>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="运行模式">
                   <div class="mode-switches">
-                    <el-switch v-model="sysForm.practice" active-text="练习模式" />
+                    <el-switch v-model="sysForm.practice" active-text="练习模式"/>
                     <el-tooltip content="关闭后学生只能访问考试，无法自由练习" placement="top">
-                      <el-icon class="info-icon"><InfoFilled /></el-icon>
+                      <el-icon class="info-icon">
+                        <InfoFilled/>
+                      </el-icon>
                     </el-tooltip>
                   </div>
                 </el-form-item>
               </el-col>
             </el-row>
             <el-form-item label="公告内容">
-              <el-input v-model="sysForm.info" type="textarea" :rows="3" placeholder="顶部滚动显示的公告内容" />
+              <el-input v-model="sysForm.info" :rows="3" placeholder="顶部滚动显示的公告内容" type="textarea"/>
             </el-form-item>
             <el-form-item label="公告样式">
               <el-radio-group v-model="sysForm.warning">
@@ -151,20 +163,21 @@
         </el-tab-pane>
 
         <el-tab-pane label="AI 智能体 (LLM)">
-          <el-alert title="配置后可启用 AI 辅助出题、AICase 自动生成测试数据等功能。" type="info" show-icon :closable="false" class="mb-4" />
-          <el-form :model="sysForm" label-position="top" class="mt-4">
+          <el-alert :closable="false" class="mb-4" show-icon
+                    title="配置后可启用 AI 辅助出题、AICase 自动生成测试数据等功能。" type="info"/>
+          <el-form :model="sysForm" class="mt-4" label-position="top">
             <el-form-item label="API Endpoint">
-              <el-input v-model="sysForm.llm_api_url" placeholder="https://api.openai.com/v1" />
+              <el-input v-model="sysForm.llm_api_url" placeholder="https://api.openai.com/v1"/>
             </el-form-item>
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="模型名称">
-                  <el-input v-model="sysForm.llm_model_name" placeholder="gpt-4o" />
+                  <el-input v-model="sysForm.llm_model_name" placeholder="gpt-4o"/>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="API Key">
-                  <el-input v-model="sysForm.llm_api_key" type="password" show-password placeholder="sk-..." />
+                  <el-input v-model="sysForm.llm_api_key" placeholder="sk-..." show-password type="password"/>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -175,7 +188,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="sysDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSaveSysSettings" :loading="sysSubmitting">保存全局配置</el-button>
+          <el-button :loading="sysSubmitting" type="primary" @click="handleSaveSysSettings">保存全局配置</el-button>
         </div>
       </template>
     </el-dialog>
@@ -183,16 +196,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  List, Document, Setting, Timer, Plus, ArrowRight,
-  InfoFilled, Collection, Monitor, User
-} from '@element-plus/icons-vue'
-import { getSysInfo, updateSysInfo, getSysStatistics } from '@/api/sys'
-import { getAllUsers } from '@/api/user'
-import { useSysStore } from '@/stores/sys'
-import { ElMessage } from 'element-plus'
+import {onMounted, ref, watch} from 'vue'
+import {useRouter} from 'vue-router'
+import {ArrowRight, Document, InfoFilled, List, Plus, Setting, Timer} from '@element-plus/icons-vue'
+import {getSysInfo, getSysStatistics, updateSysInfo} from '@/api/sys'
+import {getAllUsers} from '@/api/user'
+import {useSysStore} from '@/stores/sys'
+import {ElMessage} from 'element-plus'
 
 const router = useRouter()
 const sysStore = useSysStore()
@@ -213,10 +223,10 @@ const users = ref([])
 const usersLoading = ref(false)
 
 const stats = ref([
-  { label: '总题目数', value: '0', icon: 'Collection', color: '#409EFF' },
-  { label: '活跃考试', value: '0', icon: 'Timer', color: '#F56C6C' },
-  { label: '今日提交', value: '0', icon: 'Monitor', color: '#67C23A' },
-  { label: '总用户数', value: '0', icon: 'User', color: '#E6A23C' }
+  {label: '总题目数', value: '0', icon: 'Collection', color: '#409EFF'},
+  {label: '活跃考试', value: '0', icon: 'Timer', color: '#F56C6C'},
+  {label: '今日提交', value: '0', icon: 'Monitor', color: '#67C23A'},
+  {label: '总用户数', value: '0', icon: 'User', color: '#E6A23C'}
 ])
 
 const fetchStats = async () => {
@@ -335,7 +345,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   border: 1px solid #f0f0f0;
   transition: all 0.3s;
 }
@@ -347,7 +357,7 @@ onMounted(() => {
 .clickable-stat:hover {
   transform: translateY(-5px);
   border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
 }
 
 .stat-icon {
@@ -398,7 +408,7 @@ onMounted(() => {
 
 .nav-card:hover {
   border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
   transform: translateY(-5px);
 }
 

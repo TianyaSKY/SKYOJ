@@ -1,13 +1,14 @@
 # SKYOJ
 
-SKYOJ 是一个基于 Vue3 + Flask + MySQL + Docker 构建的在线评测系统（Online Judge）。它不仅支持传统的 ACM 判题模式，还针对教学场景设计了面向对象（OOP）测试模式和数据科学竞赛（Kaggle）模式。
+SKYOJ 是一个基于 Vue3 + Flask + MySQL + Docker 构建的在线评测系统（Online Judge）。它不仅支持传统的 ACM
+判题模式，还针对教学场景设计了面向对象（OOP）测试模式和数据科学竞赛（Kaggle）模式。
 
 ## 🌟 核心特性
 
 - **多模式判题**：
-  - **ACM 模式**：标准输入输出比对。
-  - **OOP 模式**：基于单元测试（unittest/pytest）的代码片段评测。
-  - **Kaggle 模式**：基于 CSV 文件的结果评分。
+    - **ACM 模式**：标准输入输出比对。
+    - **OOP 模式**：基于单元测试（unittest/pytest）的代码片段评测。
+    - **Kaggle 模式**：基于 CSV 文件的结果评分。
 - **智能助手 (LLM)**：集成 DeepSeek 等大模型，支持思维链（Thinking）推理，辅助学生理解题目与代码。
 - **容器化隔离**：所有用户提交的代码均在独立的 Docker 容器中运行，确保系统安全。
 - **全栈部署**：提供完整的 Docker Compose 配置，实现一键本地或服务器部署。
@@ -32,6 +33,7 @@ SKYOJ/
 ## 🚀 快速开始
 
 ### 启动步骤
+
 1. **克隆仓库**
    ```bash
    git clone https://github.com/your-repo/SKYOJ.git
@@ -42,8 +44,8 @@ SKYOJ/
    docker-compose up --build
    ```
 3. **访问系统**
-   - 前端：`http://localhost`
-   - 后端 API：`http://localhost:5000/api`
+    - 前端：`http://localhost`
+    - 后端 API：`http://localhost:5000/api`
 
 ## 📈 当前进度
 
@@ -55,4 +57,5 @@ SKYOJ/
 - [ ] **管理后台**：教师端 UI 交互完善中。
 
 ## 📄 开源协议
+
 [MIT License](LICENSE)

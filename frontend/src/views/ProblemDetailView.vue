@@ -1,10 +1,12 @@
 <template>
-  <div class="problem-detail-container" :class="{ 'scrollable-container': isKaggle }">
+  <div :class="{ 'scrollable-container': isKaggle }" class="problem-detail-container">
     <!-- Exam Header (if in exam) -->
     <div v-if="examId" class="exam-status-bar">
-      <el-button :icon="ArrowLeft" @click="backToExam" size="small" round>返回考试题单</el-button>
+      <el-button :icon="ArrowLeft" round size="small" @click="backToExam">返回考试题单</el-button>
       <div class="exam-badge">
-        <el-icon><Timer /></el-icon>
+        <el-icon>
+          <Timer/>
+        </el-icon>
         <span>正在进行考试模式</span>
       </div>
     </div>
@@ -18,10 +20,16 @@
               <h2 class="problem-title">#{{ problem.id }} {{ problem.title }}</h2>
               <div class="problem-meta">
                 <el-tooltip content="数据科学竞赛模式，提交 CSV 预测结果，基于 Metric 评分。" placement="top">
-                  <el-tag size="small" type="success" effect="light">Kaggle</el-tag>
+                  <el-tag effect="light" size="small" type="success">Kaggle</el-tag>
                 </el-tooltip>
-                <el-tooltip content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)" placement="top">
-                  <el-tag size="small" type="info" effect="plain"><el-icon><Timer /></el-icon> {{ problem.time_limit }}ms</el-tag>
+                <el-tooltip content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)"
+                            placement="top">
+                  <el-tag effect="plain" size="small" type="info">
+                    <el-icon>
+                      <Timer/>
+                    </el-icon>
+                    {{ problem.time_limit }}ms
+                  </el-tag>
                 </el-tooltip>
               </div>
             </div>
@@ -40,17 +48,19 @@
         </template>
         <div class="upload-area">
           <el-upload
-            class="upload-demo"
-            drag
-            action="#"
-            :auto-upload="false"
-            :limit="1"
-            accept=".csv"
-            :on-change="handleFileChange"
-            :on-remove="handleFileRemove"
-            :file-list="fileList"
+              :auto-upload="false"
+              :file-list="fileList"
+              :limit="1"
+              :on-change="handleFileChange"
+              :on-remove="handleFileRemove"
+              accept=".csv"
+              action="#"
+              class="upload-demo"
+              drag
           >
-            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <el-icon class="el-icon--upload">
+              <upload-filled/>
+            </el-icon>
             <div class="el-upload__text">
               将 CSV 文件拖到此处，或 <em>点击上传</em>
             </div>
@@ -61,7 +71,8 @@
             </template>
           </el-upload>
           <div class="upload-actions">
-            <el-button type="primary" size="large" round :loading="submitting" @click="handleSubmitKaggle" :disabled="!selectedFile">
+            <el-button :disabled="!selectedFile" :loading="submitting" round size="large" type="primary"
+                       @click="handleSubmitKaggle">
               提交 CSV 结果
             </el-button>
           </div>
@@ -77,18 +88,33 @@
           <div class="problem-header">
             <h2 class="problem-title">#{{ problem.id }} {{ problem.title }}</h2>
             <div class="problem-meta">
-              <el-tooltip content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)" placement="top">
-                <el-tag size="small" type="info" effect="plain"><el-icon><Timer /></el-icon> {{ problem.time_limit }}ms</el-tag>
+              <el-tooltip content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)"
+                          placement="top">
+                <el-tag effect="plain" size="small" type="info">
+                  <el-icon>
+                    <Timer/>
+                  </el-icon>
+                  {{ problem.time_limit }}ms
+                </el-tag>
               </el-tooltip>
-              <el-tooltip content="程序运行可使用的最大内存限制，超过此限制将被判定为 MLE (Memory Limit Exceeded)" placement="top">
-                <el-tag size="small" type="info" effect="plain"><el-icon><Monitor /></el-icon> {{ problem.memory_limit }}MB</el-tag>
+              <el-tooltip content="程序运行可使用的最大内存限制，超过此限制将被判定为 MLE (Memory Limit Exceeded)"
+                          placement="top">
+                <el-tag effect="plain" size="small" type="info">
+                  <el-icon>
+                    <Monitor/>
+                  </el-icon>
+                  {{ problem.memory_limit }}MB
+                </el-tag>
               </el-tooltip>
               <el-tooltip :content="getTypeDescription(problem.type)" placement="top">
-                <el-tag size="small" :type="getTypeTag(problem.type)" effect="light">{{ problem.type?.toUpperCase() }}</el-tag>
+                <el-tag :type="getTypeTag(problem.type)" effect="light" size="small">{{
+                    problem.type?.toUpperCase()
+                  }}
+                </el-tag>
               </el-tooltip>
             </div>
           </div>
-          <el-divider />
+          <el-divider/>
           <div class="problem-content">
             <div class="markdown-body" v-html="renderedContent"></div>
           </div>
@@ -100,56 +126,58 @@
         <div class="editor-container">
           <div class="editor-toolbar">
             <div class="toolbar-left">
-              <el-select v-model="language" placeholder="Language" size="default" class="lang-select">
+              <el-select v-model="language" class="lang-select" placeholder="Language" size="default">
                 <el-option
-                  v-for="opt in availableLanguageOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
+                    v-for="opt in availableLanguageOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
                 />
               </el-select>
 
               <!-- Settings Popover -->
-              <el-popover placement="bottom" :width="300" trigger="click" popper-class="editor-settings-popover">
+              <el-popover :width="300" placement="bottom" popper-class="editor-settings-popover" trigger="click">
                 <template #reference>
-                  <el-button :icon="Setting" circle size="default" class="settings-btn" />
+                  <el-button :icon="Setting" circle class="settings-btn" size="default"/>
                 </template>
                 <div class="settings-panel">
                   <h4 class="settings-title">编辑器设置</h4>
                   <el-form label-position="left" label-width="80px" size="small">
                     <el-form-item label="字体大小">
                       <el-select v-model="fontSize" @change="saveSettings">
-                        <el-option v-for="size in [12, 14, 16, 18, 20, 24]" :key="size" :label="size + 'px'" :value="size" />
+                        <el-option v-for="size in [12, 14, 16, 18, 20, 24]" :key="size" :label="size + 'px'"
+                                   :value="size"/>
                       </el-select>
                     </el-form-item>
                     <el-form-item label="字体家族">
                       <el-select v-model="fontFamily" @change="saveSettings">
-                        <el-option label="Fira Code" value="'Fira Code', monospace" />
-                        <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace" />
-                        <el-option label="Source Code Pro" value="'Source Code Pro', monospace" />
-                        <el-option label="Courier New" value="'Courier New', monospace" />
+                        <el-option label="Fira Code" value="'Fira Code', monospace"/>
+                        <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace"/>
+                        <el-option label="Source Code Pro" value="'Source Code Pro', monospace"/>
+                        <el-option label="Courier New" value="'Courier New', monospace"/>
                       </el-select>
                     </el-form-item>
                     <el-form-item label="启用连字">
-                      <el-switch v-model="fontLigatures" @change="saveSettings" />
+                      <el-switch v-model="fontLigatures" @change="saveSettings"/>
                     </el-form-item>
                   </el-form>
                 </div>
               </el-popover>
             </div>
             <div class="toolbar-right">
-              <el-button type="primary" size="default" round :loading="submitting" @click="handleSubmit" class="submit-btn">
+              <el-button :loading="submitting" class="submit-btn" round size="default" type="primary"
+                         @click="handleSubmit">
                 提交代码
               </el-button>
             </div>
           </div>
           <div class="editor-wrapper">
             <vue-monaco-editor
-              v-model:value="code"
-              :language="language"
-              theme="vs-dark"
-              :options="editorOptions"
-              class="monaco-editor"
+                v-model:value="code"
+                :language="language"
+                :options="editorOptions"
+                class="monaco-editor"
+                theme="vs-dark"
             />
           </div>
         </div>
@@ -159,12 +187,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { getProblemDetail, submitSolution } from '@/api/problem'
-import { ElMessage } from 'element-plus'
-import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
-import { UploadFilled, ArrowLeft, Timer, Monitor, Setting } from '@element-plus/icons-vue'
+import {computed, onMounted, ref, watch} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {getProblemDetail, submitSolution} from '@/api/problem'
+import {ElMessage} from 'element-plus'
+import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import {ArrowLeft, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
 
 // Markdown and Highlighting
 import MarkdownIt from 'markdown-it'
@@ -231,7 +259,7 @@ const getTypeDescription = (type) => {
 
 const editorOptions = computed(() => ({
   automaticLayout: true,
-  minimap: { enabled: false },
+  minimap: {enabled: false},
   fontSize: fontSize.value,
   fontFamily: fontFamily.value,
   fontLigatures: fontLigatures.value,
@@ -246,10 +274,10 @@ const editorOptions = computed(() => ({
 }))
 
 const allLanguageOptions = [
-  { label: 'Python', value: 'python' },
-  { label: 'C++', value: 'cpp' },
-  { label: 'C', value: 'c' },
-  { label: 'Java', value: 'java' }
+  {label: 'Python', value: 'python'},
+  {label: 'C++', value: 'cpp'},
+  {label: 'C', value: 'c'},
+  {label: 'Java', value: 'java'}
 ]
 
 const availableLanguageOptions = computed(() => {
@@ -282,9 +310,10 @@ const md = new MarkdownIt({
     if (lang && hljs.getLanguage(lang)) {
       try {
         return '<pre class="hljs"><code>' +
-               hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-               '</code></pre>';
-      } catch (__) {}
+            hljs.highlight(str, {language: lang, ignoreIllegals: true}).value +
+            '</code></pre>';
+      } catch (__) {
+      }
     }
 
     return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
@@ -328,7 +357,8 @@ const handleSubmit = async () => {
     const res = await submitSolution({
       problem_id: parseInt(problemId),
       code: code.value,
-      language: language.value
+      language: language.value,
+      exam_id: examId.value || -1
     })
     ElMessage.success('Submission received!')
     router.push(`/submission/${res.submission_id}`)
@@ -370,10 +400,13 @@ const handleSubmitKaggle = async () => {
     const formData = new FormData()
     formData.append('problem_id', problemId)
     formData.append('file', selectedFile.value)
+    formData.append('code', 'Kaggle Submission')
+    formData.append('language', 'csv')
+    formData.append('exam_id', examId.value || -1)
 
     const res = await submitSolution(formData)
     ElMessage.success('File uploaded successfully!')
-    router.push(`/submission/${res.submission_id}`)
+    await router.push(`/submission/${res.submission_id}`)
   } catch (error) {
     ElMessage.error('Upload failed')
   } finally {
@@ -498,7 +531,9 @@ onMounted(() => {
   color: #ccc;
 }
 
-.lang-select { width: 120px; }
+.lang-select {
+  width: 120px;
+}
 
 .settings-btn {
   background-color: transparent;
@@ -548,7 +583,7 @@ onMounted(() => {
 .kaggle-layout .problem-card {
   border-radius: 12px;
   border: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .title-row {
@@ -560,7 +595,7 @@ onMounted(() => {
 .upload-card {
   border-radius: 12px;
   border: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .upload-area {

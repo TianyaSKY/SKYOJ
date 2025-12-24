@@ -4,37 +4,39 @@
       <template #header>
         <div class="card-header">
           <h2>考试管理</h2>
-          <el-button type="primary" :icon="Plus" @click="handleCreate">新增考试</el-button>
+          <el-button :icon="Plus" type="primary" @click="handleCreate">新增考试</el-button>
         </div>
       </template>
 
-      <el-table :data="exams" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="title" label="考试名称" min-width="200" />
-        <el-table-column prop="start_time" label="开始时间" width="180" />
-        <el-table-column prop="end_time" label="结束时间" width="180" />
+      <el-table v-loading="loading" :data="exams" stripe>
+        <el-table-column label="ID" prop="id" width="80"/>
+        <el-table-column label="考试名称" min-width="200" prop="title"/>
+        <el-table-column label="开始时间" prop="start_time" width="180"/>
+        <el-table-column label="结束时间" prop="end_time" width="180"/>
         <el-table-column label="状态" width="100">
           <template #default="scope">
             <el-tag :type="getExamStatus(scope.row).type">{{ getExamStatus(scope.row).label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="是否可见" width="100" align="center">
+        <el-table-column align="center" label="是否可见" width="100">
           <template #default="scope">
             <el-tag :type="scope.row.is_visible ? 'success' : 'info'">
               {{ scope.row.is_visible ? '可见' : '隐藏' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" align="center" fixed="right">
+        <el-table-column align="center" fixed="right" label="操作" width="280">
           <template #default="scope">
-            <el-button size="small" type="success" :icon="Monitor" @click="$router.push({ name: 'exam-monitor', params: { id: scope.row.id } })">监控</el-button>
-            <el-button size="small" :icon="Edit" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button :icon="Monitor" size="small" type="success"
+                       @click="$router.push({ name: 'exam-monitor', params: { id: scope.row.id } })">监控
+            </el-button>
+            <el-button :icon="Edit" size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-popconfirm
-              title="确定要删除这场考试吗？"
-              @confirm="handleDelete(scope.row.id)"
+                title="确定要删除这场考试吗？"
+                @confirm="handleDelete(scope.row.id)"
             >
               <template #reference>
-                <el-button size="small" type="danger" :icon="Delete">删除</el-button>
+                <el-button :icon="Delete" size="small" type="danger">删除</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -44,33 +46,33 @@
 
     <!-- Edit/Create Dialog -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="800px" @close="resetForm">
-      <el-form :model="form" label-position="top" ref="formRef" v-loading="dialogLoading">
+      <el-form ref="formRef" v-loading="dialogLoading" :model="form" label-position="top">
         <el-form-item label="考试名称" prop="title">
-          <el-input v-model="form.title" />
+          <el-input v-model="form.title"/>
         </el-form-item>
         <el-form-item label="考试描述" prop="description">
-          <el-input v-model="form.description" type="textarea" :rows="3" />
+          <el-input v-model="form.description" :rows="3" type="textarea"/>
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="开始时间" prop="start_time">
               <el-date-picker
-                v-model="form.start_time"
-                type="datetime"
-                placeholder="选择开始时间"
-                style="width: 100%"
-                value-format="YYYY-MM-DD HH:mm:ss"
+                  v-model="form.start_time"
+                  placeholder="选择开始时间"
+                  style="width: 100%"
+                  type="datetime"
+                  value-format="YYYY-MM-DD HH:mm:ss"
               />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="结束时间" prop="end_time">
               <el-date-picker
-                v-model="form.end_time"
-                type="datetime"
-                placeholder="选择结束时间"
-                style="width: 100%"
-                value-format="YYYY-MM-DD HH:mm:ss"
+                  v-model="form.end_time"
+                  placeholder="选择结束时间"
+                  style="width: 100%"
+                  type="datetime"
+                  value-format="YYYY-MM-DD HH:mm:ss"
               />
             </el-form-item>
           </el-col>
@@ -78,12 +80,12 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="考试密码 (可选)" prop="password">
-              <el-input v-model="form.password" placeholder="留空则无需密码" show-password />
+              <el-input v-model="form.password" placeholder="留空则无需密码" show-password/>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="对学生可见" prop="is_visible">
-              <el-switch v-model="form.is_visible" />
+              <el-switch v-model="form.is_visible"/>
             </el-form-item>
           </el-col>
         </el-row>
@@ -92,25 +94,25 @@
           <div class="problem-selector">
             <div class="selector-header">
               <el-input
-                v-model="problemSearchQuery"
-                placeholder="搜索题目..."
-                style="width: 200px"
-                size="small"
-                clearable
+                  v-model="problemSearchQuery"
+                  clearable
+                  placeholder="搜索题目..."
+                  size="small"
+                  style="width: 200px"
               />
             </div>
             <el-transfer
-              v-model="selectedProblemIds"
-              :data="allProblems"
-              :titles="['可选题目', '已选题目']"
-              :button-texts="['移除', '添加']"
-              :props="{
+                v-model="selectedProblemIds"
+                :button-texts="['移除', '添加']"
+                :data="allProblems"
+                :filter-method="filterMethod"
+                :props="{
                 key: 'id',
                 label: 'label'
               }"
-              filterable
-              :filter-method="filterMethod"
-              filter-placeholder="输入关键词搜索"
+                :titles="['可选题目', '已选题目']"
+                filter-placeholder="输入关键词搜索"
+                filterable
             >
               <template #default="{ option }">
                 <span>{{ option.id }} - {{ option.title }}</span>
@@ -121,18 +123,26 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">保存</el-button>
+        <el-button :loading="submitting" type="primary" @click="handleSubmit">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { getExamList, createExam, updateExam, deleteExam, getExamDetail, addExamProblem, removeExamProblem } from '@/api/exam'
-import { getProblemList } from '@/api/problem'
-import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, Monitor } from '@element-plus/icons-vue'
+import {computed, onMounted, ref} from 'vue'
+import {
+  addExamProblem,
+  createExam,
+  deleteExam,
+  getExamDetail,
+  getExamList,
+  removeExamProblem,
+  updateExam
+} from '@/api/exam'
+import {getProblemList} from '@/api/problem'
+import {ElMessage} from 'element-plus'
+import {Delete, Edit, Monitor, Plus} from '@element-plus/icons-vue'
 
 const exams = ref([])
 const loading = ref(false)
@@ -190,9 +200,9 @@ const getExamStatus = (exam) => {
   const start = new Date(exam.start_time)
   const end = new Date(exam.end_time)
 
-  if (now < start) return { label: '未开始', type: 'info' }
-  if (now > end) return { label: '已结束', type: 'danger' }
-  return { label: '进行中', type: 'success' }
+  if (now < start) return {label: '未开始', type: 'info'}
+  if (now > end) return {label: '已结束', type: 'danger'}
+  return {label: '进行中', type: 'success'}
 }
 
 const resetForm = () => {
@@ -224,7 +234,7 @@ const handleEdit = async (row) => {
 
   try {
     const detail = await getExamDetail(row.id)
-    form.value = { ...detail }
+    form.value = {...detail}
 
     // Parse problem_ids to selectedProblemIds array
     if (detail.problems && Array.isArray(detail.problems)) {
@@ -279,7 +289,7 @@ const handleSubmit = async () => {
       const promises = []
 
       for (const pid of toAdd) {
-        promises.push(addExamProblem(examId, { problem_id: pid, score: 100 }))
+        promises.push(addExamProblem(examId, {problem_id: pid, score: 100}))
       }
 
       for (const pid of toRemove) {
@@ -319,17 +329,21 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .problem-selector {
   width: 100%;
 }
+
 .selector-header {
   margin-bottom: 10px;
 }
+
 /* Adjust transfer panel width */
 :deep(.el-transfer-panel) {
   width: 300px;

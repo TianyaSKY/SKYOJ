@@ -7,45 +7,45 @@
         </div>
       </template>
       <el-form
-        ref="loginFormRef"
-        :model="loginForm"
-        :rules="loginRules"
-        label-position="top"
-        @submit.prevent="handleLogin"
+          ref="loginFormRef"
+          :model="loginForm"
+          :rules="loginRules"
+          label-position="top"
+          @submit.prevent="handleLogin"
       >
         <el-form-item label="Username" prop="username">
           <el-input
-            v-model="loginForm.username"
-            placeholder="Enter your username"
-            size="large"
-            :prefix-icon="User"
-            clearable
+              v-model="loginForm.username"
+              :prefix-icon="User"
+              clearable
+              placeholder="Enter your username"
+              size="large"
           />
         </el-form-item>
         <el-form-item label="Password" prop="password">
           <el-input
-            v-model="loginForm.password"
-            type="password"
-            placeholder="Enter your password"
-            size="large"
-            :prefix-icon="Lock"
-            show-password
-            clearable
+              v-model="loginForm.password"
+              :prefix-icon="Lock"
+              clearable
+              placeholder="Enter your password"
+              show-password
+              size="large"
+              type="password"
           />
         </el-form-item>
         <el-form-item>
           <div class="form-actions">
             <el-checkbox v-model="loginForm.rememberMe">Remember me</el-checkbox>
-            <el-link type="primary" :underline="false">Forgot password?</el-link>
+            <el-link :underline="false" type="primary">Forgot password?</el-link>
           </div>
         </el-form-item>
         <el-form-item>
           <el-button
-            type="primary"
-            class="login-button"
-            size="large"
-            native-type="submit"
-            :loading="loading"
+              :loading="loading"
+              class="login-button"
+              native-type="submit"
+              size="large"
+              type="primary"
           >
             Login
           </el-button>
@@ -60,11 +60,11 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
-import { useUserStore } from '@/stores/user'
+import {reactive, ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {ElMessage} from 'element-plus'
+import {Lock, User} from '@element-plus/icons-vue'
+import {useUserStore} from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -78,10 +78,10 @@ const loginForm = reactive({
 })
 
 const loginRules = reactive({
-  username: [{ required: true, message: 'Please enter your username', trigger: 'blur' }],
+  username: [{required: true, message: 'Please enter your username', trigger: 'blur'}],
   password: [
-    { required: true, message: 'Please enter your password', trigger: 'blur' },
-    { min: 6, message: 'Password must be at least 6 characters long', trigger: 'blur' },
+    {required: true, message: 'Please enter your password', trigger: 'blur'},
+    {min: 6, message: 'Password must be at least 6 characters long', trigger: 'blur'},
   ],
 })
 

@@ -1,56 +1,56 @@
 <template>
   <div class="exam-monitor-container">
     <!-- L1: 监控大屏主界面 -->
-    <el-page-header @back="$router.back()" class="mb-4">
+    <el-page-header class="mb-4" @back="$router.back()">
       <template #content>
         <span class="text-large font-600 mr-3"> 考试监控: {{ examTitle }} </span>
       </template>
       <template #extra>
         <div class="flex items-center">
-          <el-button :icon="Refresh" circle @click="fetchMonitorData" :loading="loading" />
-          <el-tag class="ml-2" :type="autoRefresh ? 'success' : 'info'">
+          <el-button :icon="Refresh" :loading="loading" circle @click="fetchMonitorData"/>
+          <el-tag :type="autoRefresh ? 'success' : 'info'" class="ml-2">
             {{ autoRefresh ? '自动刷新中' : '自动刷新关闭' }}
           </el-tag>
-          <el-switch v-model="autoRefresh" class="ml-2" />
+          <el-switch v-model="autoRefresh" class="ml-2"/>
         </div>
       </template>
     </el-page-header>
 
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card">
-          <el-statistic title="已参加人数" :value="participants?.length || 0" />
+        <el-card class="stat-card" shadow="never">
+          <el-statistic :value="participants?.length || 0" title="已参加人数"/>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card">
-          <el-statistic title="总提交数" :value="totalSubmissions" />
+        <el-card class="stat-card" shadow="never">
+          <el-statistic :value="totalSubmissions" title="总提交数"/>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card">
-          <el-statistic title="满分人数" :value="fullScoreCount" />
+        <el-card class="stat-card" shadow="never">
+          <el-statistic :value="fullScoreCount" title="满分人数"/>
         </el-card>
       </el-col>
     </el-row>
 
     <el-card shadow="never">
-      <el-table :data="participants || []" style="width: 100%" stripe v-loading="loading" border>
-        <el-table-column prop="username" label="考生" width="150" fixed />
+      <el-table v-loading="loading" :data="participants || []" border stripe style="width: 100%">
+        <el-table-column fixed label="考生" prop="username" width="150"/>
 
         <el-table-column
-          v-for="(problem, index) in problems"
-          :key="problem.problem_id"
-          :label="getProblemLabel(problem, index)"
-          align="center"
-          min-width="120"
+            v-for="(problem, index) in problems"
+            :key="problem.problem_id"
+            :label="getProblemLabel(problem, index)"
+            align="center"
+            min-width="120"
         >
           <template #default="scope">
             <div v-if="getSubmission(scope.row.user_id, problem.problem_id)" class="score-cell">
               <el-tag
-                :type="getScoreTagType(getSubmission(scope.row.user_id, problem.problem_id).score)"
-                class="score-tag"
-                @click="openLevel2(scope.row.user_id, problem.problem_id)"
+                  :type="getScoreTagType(getSubmission(scope.row.user_id, problem.problem_id).score)"
+                  class="score-tag"
+                  @click="openLevel2(scope.row.user_id, problem.problem_id)"
               >
                 {{ getSubmission(scope.row.user_id, problem.problem_id).score }}
               </el-tag>
@@ -59,7 +59,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="total_score" label="总分" width="100" align="center" fixed="right" sortable>
+        <el-table-column align="center" fixed="right" label="总分" prop="total_score" sortable width="100">
           <template #default="scope">
             <span class="font-bold text-primary">{{ scope.row.total_score }}</span>
           </template>
@@ -69,10 +69,10 @@
 
     <!-- L2: 二级界面 - 详细得分侧边栏 -->
     <el-drawer
-      v-model="drawerVisible"
-      title="提交详细得分"
-      size="450px"
-      destroy-on-close
+        v-model="drawerVisible"
+        destroy-on-close
+        size="450px"
+        title="提交详细得分"
     >
       <div v-if="detailLoading" v-loading="true" style="height: 200px"></div>
       <div v-else-if="currentSubmission">
@@ -83,7 +83,9 @@
               <el-tag :type="getStatusType(currentSubmission.status)">{{ currentSubmission.status }}</el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="最终得分">
-              <span class="score-large" :class="getScoreClass(currentSubmission.score)">{{ currentSubmission.score }}</span>
+              <span :class="getScoreClass(currentSubmission.score)" class="score-large">{{
+                  currentSubmission.score
+                }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="编程语言">{{ currentSubmission.language }}</el-descriptions-item>
             <el-descriptions-item label="提交时间">{{ formatTime(currentSubmission.created_at) }}</el-descriptions-item>
@@ -93,22 +95,22 @@
         <div class="detail-section mt-6">
           <h4>得分分析</h4>
           <el-alert
-            v-if="currentSubmission.status === 'Accepted'"
-            title="所有测试点已通过"
-            type="success"
-            :closable="false"
-            show-icon
+              v-if="currentSubmission.status === 'Accepted'"
+              :closable="false"
+              show-icon
+              title="所有测试点已通过"
+              type="success"
           />
           <el-alert
-            v-else
-            :title="`未完全通过: ${currentSubmission.status}`"
-            type="error"
-            :closable="false"
-            show-icon
+              v-else
+              :closable="false"
+              :title="`未完全通过: ${currentSubmission.status}`"
+              show-icon
+              type="error"
           />
           <!-- 这里预留给未来对接具体的测试点列表 -->
           <div class="mt-4 text-center">
-            <el-button type="primary" @click="openLevel3" :icon="View">查看解题代码</el-button>
+            <el-button :icon="View" type="primary" @click="openLevel3">查看解题代码</el-button>
           </div>
         </div>
       </div>
@@ -116,11 +118,11 @@
 
     <!-- L3: 三级界面 - 源代码查看器 -->
     <el-dialog
-      v-model="codeDialogVisible"
-      title="解题代码查看"
-      width="80%"
-      top="5vh"
-      append-to-body
+        v-model="codeDialogVisible"
+        append-to-body
+        title="解题代码查看"
+        top="5vh"
+        width="80%"
     >
       <el-row :gutter="20">
         <el-col :span="16">
@@ -130,28 +132,29 @@
                 <el-tag size="small">{{ currentSubmission?.language }}</el-tag>
 
                 <!-- Settings Popover -->
-                <el-popover placement="bottom" :width="300" trigger="click" popper-class="editor-settings-popover">
+                <el-popover :width="300" placement="bottom" popper-class="editor-settings-popover" trigger="click">
                   <template #reference>
-                    <el-button :icon="Setting" circle size="small" class="settings-btn" />
+                    <el-button :icon="Setting" circle class="settings-btn" size="small"/>
                   </template>
                   <div class="settings-panel">
                     <h4 class="settings-title">查看器设置</h4>
                     <el-form label-position="left" label-width="80px" size="small">
                       <el-form-item label="字体大小">
                         <el-select v-model="fontSize" @change="saveSettings">
-                          <el-option v-for="size in [12, 14, 16, 18, 20, 24]" :key="size" :label="size + 'px'" :value="size" />
+                          <el-option v-for="size in [12, 14, 16, 18, 20, 24]" :key="size" :label="size + 'px'"
+                                     :value="size"/>
                         </el-select>
                       </el-form-item>
                       <el-form-item label="字体家族">
                         <el-select v-model="fontFamily" @change="saveSettings">
-                          <el-option label="Fira Code" value="'Fira Code', monospace" />
-                          <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace" />
-                          <el-option label="Source Code Pro" value="'Source Code Pro', monospace" />
-                          <el-option label="Courier New" value="'Courier New', monospace" />
+                          <el-option label="Fira Code" value="'Fira Code', monospace"/>
+                          <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace"/>
+                          <el-option label="Source Code Pro" value="'Source Code Pro', monospace"/>
+                          <el-option label="Courier New" value="'Courier New', monospace"/>
                         </el-select>
                       </el-form-item>
                       <el-form-item label="启用连字">
-                        <el-switch v-model="fontLigatures" @change="saveSettings" />
+                        <el-switch v-model="fontLigatures" @change="saveSettings"/>
                       </el-form-item>
                     </el-form>
                   </div>
@@ -160,20 +163,20 @@
               <el-button size="small" @click="copyCode">复制代码</el-button>
             </div>
             <div class="code-viewer-wrapper">
-              <pre v-html="highlightedCode" class="hljs" :style="viewerStyle"></pre>
+              <pre :style="viewerStyle" class="hljs" v-html="highlightedCode"></pre>
             </div>
           </div>
         </el-col>
         <el-col :span="8">
-          <el-card shadow="never" class="ai-analysis-card">
+          <el-card class="ai-analysis-card" shadow="never">
             <template #header>
               <div class="flex justify-between items-center">
                 <span>AI 代码分析</span>
                 <el-button
-                  type="primary"
-                  size="small"
-                  :loading="aiLoading"
-                  @click="analyzeCode"
+                    :loading="aiLoading"
+                    size="small"
+                    type="primary"
+                    @click="analyzeCode"
                 >
                   开始分析
                 </el-button>
@@ -193,7 +196,7 @@
                 <p>{{ aiResult.suggestion }}</p>
               </div>
             </div>
-            <el-empty v-else description="点击按钮开始 AI 分析" />
+            <el-empty v-else description="点击按钮开始 AI 分析"/>
           </el-card>
         </el-col>
       </el-row>
@@ -202,13 +205,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { getExamMonitor, getSubmissionDetail } from '@/api/exam'
-import { getProblemDetail } from '@/api/problem'
-import { askLLM } from '@/api/llm'
-import { Refresh, View, Setting } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {getExamMonitor, getSubmissionDetail} from '@/api/exam'
+import {getProblemDetail} from '@/api/problem'
+import {askLLM} from '@/api/llm'
+import {Refresh, Setting, View} from '@element-plus/icons-vue'
+import {ElMessage} from 'element-plus'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/vs2015.css'
 
@@ -261,7 +264,7 @@ const highlightedCode = computed(() => {
   if (!currentSubmission.value?.code) return ''
   const lang = currentSubmission.value.language?.toLowerCase() || 'plaintext'
   try {
-    return hljs.highlight(currentSubmission.value.code, { language: lang }).value
+    return hljs.highlight(currentSubmission.value.code, {language: lang}).value
   } catch (e) {
     return hljs.highlightAuto(currentSubmission.value.code).value
   }
@@ -399,16 +402,49 @@ onUnmounted(() => clearInterval(refreshTimer))
   background-color: #f5f7fa;
   min-height: calc(100vh - 60px);
 }
-.mb-4 { margin-bottom: 20px; }
-.mt-6 { margin-top: 24px; }
-.stat-card { text-align: center; }
-.score-cell { display: flex; justify-content: center; }
-.score-tag { cursor: pointer; width: 60px; font-weight: bold; }
-.font-bold { font-weight: bold; }
-.text-primary { color: var(--el-color-primary); }
-.text-success { color: var(--el-color-success); }
-.text-warning { color: var(--el-color-warning); }
-.text-danger { color: var(--el-color-danger); }
+
+.mb-4 {
+  margin-bottom: 20px;
+}
+
+.mt-6 {
+  margin-top: 24px;
+}
+
+.stat-card {
+  text-align: center;
+}
+
+.score-cell {
+  display: flex;
+  justify-content: center;
+}
+
+.score-tag {
+  cursor: pointer;
+  width: 60px;
+  font-weight: bold;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.text-primary {
+  color: var(--el-color-primary);
+}
+
+.text-success {
+  color: var(--el-color-success);
+}
+
+.text-warning {
+  color: var(--el-color-warning);
+}
+
+.text-danger {
+  color: var(--el-color-danger);
+}
 
 /* L2 Styles */
 .detail-section h4 {
@@ -416,6 +452,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   padding-left: 8px;
   border-left: 4px solid var(--el-color-primary);
 }
+
 .score-large {
   font-size: 24px;
   font-weight: 800;
@@ -427,6 +464,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   border-radius: 4px;
   overflow: hidden;
 }
+
 .code-toolbar {
   display: flex;
   justify-content: space-between;
@@ -435,26 +473,31 @@ onUnmounted(() => clearInterval(refreshTimer))
   background: #f8f9fa;
   border-bottom: 1px solid var(--el-border-color);
 }
+
 .toolbar-left {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .settings-btn {
   background-color: transparent;
   border: none;
   color: #888;
   transition: color 0.3s;
 }
+
 .settings-btn:hover {
   color: var(--el-color-primary);
   background-color: #ecf5ff;
 }
+
 .code-viewer-wrapper {
   background: #1e1e1e;
   max-height: 65vh;
   overflow: auto;
 }
+
 .hljs {
   margin: 0;
   padding: 16px;
@@ -466,6 +509,7 @@ onUnmounted(() => clearInterval(refreshTimer))
 .settings-panel {
   padding: 10px;
 }
+
 .settings-title {
   margin: 0 0 16px;
   font-size: 1rem;
@@ -477,14 +521,17 @@ onUnmounted(() => clearInterval(refreshTimer))
 .ai-analysis-card {
   height: 100%;
 }
+
 .ai-section {
   margin-bottom: 16px;
 }
+
 .ai-label {
   font-weight: bold;
   margin-bottom: 4px;
   color: #606266;
 }
+
 .ai-result p {
   font-size: 14px;
   line-height: 1.6;

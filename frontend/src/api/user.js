@@ -5,30 +5,30 @@ import request from '@/utils/request'
  * The user is identified by the token sent in the request header.
  */
 export function getUserSubmissions(userId = null) {
-  return request({
-    url: userId ? `/user/${userId}/submissions` : '/user/submissions',
-    method: 'get'
-  })
+    return request({
+        url: userId ? `/user/${userId}/submissions` : '/user/submissions',
+        method: 'get'
+    })
 }
 
 export function register(data) {
-  return request({
-    url: '/auth/register',
-    method: 'post',
-    data
-  })
+    return request({
+        url: '/auth/register',
+        method: 'post',
+        data
+    })
 }
 
 export function getUserProfile(userId) {
-  return request({
-    url: `/user/${userId}/profile`,
-    method: 'get'
-  })
+    return request({
+        url: `/user/${userId}/profile`,
+        method: 'get'
+    })
 }
 
 export function getAllUsers() {
-  return request({
-    url: '/user/all',
-    method: 'get'
-  })
+    return request({
+        url: '/user/all',
+        method: 'get'
+    })
 }

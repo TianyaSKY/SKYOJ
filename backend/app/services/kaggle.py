@@ -1,21 +1,21 @@
 import os
 
 from app.models.problem import Problem
-from app.services.judge_service import client, IMAGE_NAME, create_tar_stream
+from app.services.judge_service import client, IMAGE_NAME, create_tar_stream, create_tar_from_path
 
 
 def run_kaggle_judge(submission_id, user_csv_content, problem_id):
     """
     Kaggle 模式判题逻辑
     约定:
-    - 教师提供: score.py (评分脚本) 和 truth.csv (标准答案)
+    - 教师提供: main.py (评分脚本) 和 truth.csv (标准答案)
     - 学生提供: CSV 内容
     - 评分脚本需读取 truth.csv 和 submission.csv，并将最终分数打印到标准输出的最后一行
     """
     problem = Problem.query.get(problem_id)
     problem_dir = f"uploads/problems/{problem_id}"
 
-    teacher_files = ['score.py', 'truth.csv']
+    teacher_files = ['main.py', 'truth.csv']
     for f_name in teacher_files:
         if not os.path.exists(os.path.join(problem_dir, f_name)):
             return "System Error", 0, f"Missing teacher file: {f_name}"
@@ -34,6 +34,7 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
 
         # 1. 上传学生提交的 CSV
         student_tar = create_tar_stream('submission.csv', user_csv_content)
+        student_tar = create_tar_from_path(os.path.abspath(user_csv_content), 'submission.csv')
         container.put_archive('/app', student_tar)
 
         # 2. 上传教师的评分脚本和真值表
@@ -45,7 +46,7 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
         # 3. 运行评分脚本
         # Kaggle 评分脚本可能涉及大量计算，给予较长超时
         time_limit = getattr(problem, 'time_limit', 30)
-        run_result = container.exec_run(f"sh -c 'timeout {time_limit}s python3 score.py'")
+        run_result = container.exec_run(f"sh -c 'timeout {time_limit}s python3 main.py'")
         output = run_result.output.decode('utf-8').strip()
 
         if run_result.exit_code != 0:

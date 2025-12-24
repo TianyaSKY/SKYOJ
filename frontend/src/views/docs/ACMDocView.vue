@@ -5,11 +5,16 @@
         <h1>ACM 模式评测指南</h1>
 
         <h2>1. 提交方法</h2>
-        <p>在 ACM 模式下，你需要提交一份完整的源代码文件（如 <code>.cpp</code>, <code>.py</code>, <code>.java</code>）。程序必须从<strong>标准输入 (stdin)</strong> 读取数据，并将结果输出到<strong>标准输出 (stdout)</strong>。</p>
+        <p>在 ACM 模式下，你需要提交一份完整的源代码文件（如 <code>.cpp</code>, <code>.py</code>, <code>.java</code>）。程序必须从<strong>标准输入
+          (stdin)</strong> 读取数据，并将结果输出到<strong>标准输出 (stdout)</strong>。</p>
         <ul>
-          <li><strong>C++</strong>: 使用 <code>cin</code> / <code>cout</code> 或 <code>scanf</code> / <code>printf</code>。</li>
+          <li><strong>C++</strong>: 使用 <code>cin</code> / <code>cout</code> 或 <code>scanf</code> /
+            <code>printf</code>。
+          </li>
           <li><strong>Python</strong>: 使用 <code>input()</code> 读取，<code>print()</code> 输出。</li>
-          <li><strong>Java</strong>: 使用 <code>Scanner</code> 或 <code>BufferedReader</code> 读取，<code>System.out.println</code> 输出。</li>
+          <li><strong>Java</strong>: 使用 <code>Scanner</code> 或 <code>BufferedReader</code> 读取，<code>System.out.println</code>
+            输出。
+          </li>
         </ul>
 
         <h2>2. 判分逻辑</h2>
@@ -58,24 +63,41 @@ while True: pass # 死循环</code></pre>
   margin: 0 auto;
   padding: 20px;
 }
+
 .markdown-body {
   line-height: 1.6;
 }
+
 h1, h2, h3 {
   margin-top: 24px;
   margin-bottom: 16px;
   font-weight: 600;
   line-height: 1.25;
 }
-h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
-h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
-h3 { font-size: 1.25em; }
+
+h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: .3em;
+}
+
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: .3em;
+}
+
+h3 {
+  font-size: 1.25em;
+}
+
 pre {
   background-color: #f6f8fa;
   padding: 16px;
   border-radius: 6px;
   overflow: auto;
 }
+
 code {
   font-family: monospace;
 }

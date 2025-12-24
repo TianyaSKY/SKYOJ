@@ -1,7 +1,8 @@
 import os
-import pandas as pd
-import numpy as np
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
 from sqlalchemy import create_engine, Column, Integer, String, Text, Enum, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -10,6 +11,7 @@ DB_URI = 'mysql+pymysql://root:root@localhost:3306/oj_db'
 BASE_PROBLEM_PATH = '../backend/uploads/problems'
 
 Base = declarative_base()
+
 
 class Problem(Base):
     __tablename__ = 'problems'
@@ -24,13 +26,15 @@ class Problem(Base):
     template_code = Column(Text)
     created_at = Column(DateTime, default=datetime.now)
 
+
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
+
 def get_kaggle_problems():
     problems = []
-    
+
     # 1. 房价预测 (Regression - RMSE)
     problems.append({
         "title": "房价预测挑战赛",
@@ -74,8 +78,8 @@ except:
         )
     })
 
-    
     return problems
+
 
 def seed_kaggle():
     engine = create_engine(DB_URI)
@@ -88,7 +92,7 @@ def seed_kaggle():
             title=data['title'],
             content=data['desc'],
             type='kaggle',
-            language='python', # Kaggle 评分脚本通常用 Python
+            language='python',  # Kaggle 评分脚本通常用 Python
             time_limit=30,
             memory_limit=512
         )
@@ -102,13 +106,14 @@ def seed_kaggle():
         # 生成真值数据和评分脚本
         df_truth, score_script = data['gen_data']()
         df_truth.to_csv(os.path.join(prob_dir, "truth.csv"), index=False)
-        
+
         with open(os.path.join(prob_dir, "score.py"), "w", encoding="utf-8") as f:
             f.write(score_script)
 
     session.commit()
     session.close()
     print("Kaggle problems seeded successfully.")
+
 
 if __name__ == "__main__":
     seed_kaggle()

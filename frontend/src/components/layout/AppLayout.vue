@@ -1,16 +1,16 @@
 <template>
   <div class="common-layout">
     <el-container direction="vertical">
-      <div v-if="sysStore.info" class="sys-info-bar" :class="{ 'warning-mode': sysStore.warning }">
+      <div v-if="sysStore.info" :class="{ 'warning-mode': sysStore.warning }" class="sys-info-bar">
         <div class="scrolling-text">
           {{ sysStore.info }}
         </div>
       </div>
       <el-header class="header-container">
-        <NavBar />
+        <NavBar/>
       </el-header>
       <el-main class="main-container">
-        <router-view />
+        <router-view/>
       </el-main>
       <el-footer class="footer-container">
         <p>&copy; {{ new Date().getFullYear() }} {{ sysStore.title }}. All rights reserved.</p>
@@ -21,8 +21,8 @@
 
 <script setup>
 import NavBar from './NavBar.vue'
-import { useSysStore } from '@/stores/sys'
-import { onMounted } from 'vue'
+import {useSysStore} from '@/stores/sys'
+import {onMounted} from 'vue'
 
 const sysStore = useSysStore()
 

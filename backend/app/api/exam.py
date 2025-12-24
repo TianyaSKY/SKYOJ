@@ -1,14 +1,15 @@
 import hashlib
-from flask import Blueprint, request, jsonify, current_app
+from datetime import datetime
+
 from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db, User
 from app.utils.auth_tools import token_required, encode_auth_token
-from datetime import datetime
-from sqlalchemy import func
+from flask import Blueprint, request, jsonify, current_app
 
 exam_bp = Blueprint('exam', __name__)
+
 
 def hash_exam_password(password):
     """使用 SECRET_KEY 对考试密码进行简单哈希"""
@@ -17,6 +18,7 @@ def hash_exam_password(password):
     secret = current_app.config.get('SECRET_KEY', 'skyoj_secret_key')
     return hashlib.sha256((password + secret).encode()).hexdigest()
 
+
 # --- 考试管理 (CRUD) ---
 
 @exam_bp.route('/', methods=['POST'])
@@ -24,7 +26,7 @@ def hash_exam_password(password):
 def create_exam():
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-    
+
     data = request.get_json()
     try:
         raw_password = data.get('password')
@@ -45,6 +47,7 @@ def create_exam():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+
 @exam_bp.route('/', methods=['GET'])
 @token_required
 def get_exams():
@@ -54,13 +57,14 @@ def get_exams():
         exams = Exam.query.filter_by(is_visible=True).all()
     return jsonify([e.to_dict() for e in exams]), 200
 
+
 @exam_bp.route('/<int:exam_id>', methods=['GET'])
 @token_required
 def get_exam_detail(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     data = exam.to_dict()
     data['has_password'] = bool(exam.password)
-    
+
     problems = ExamProblem.query.filter_by(exam_id=exam_id).all()
     data['problems'] = [{
         "problem_id": p.problem_id,
@@ -70,6 +74,7 @@ def get_exam_detail(exam_id):
     } for p in problems]
     return jsonify(data), 200
 
+
 @exam_bp.route('/<int:exam_id>/enter', methods=['POST'])
 @token_required
 def enter_exam(exam_id):
@@ -77,7 +82,7 @@ def enter_exam(exam_id):
     进入考试接口：验证密码并返回带有 exam_id 的新 Token
     """
     exam = Exam.query.get_or_404(exam_id)
-    
+
     # 检查考试是否已开始
     now = datetime.utcnow()
     if now < exam.start_time:
@@ -91,19 +96,20 @@ def enter_exam(exam_id):
         input_password = data.get('password')
         if hash_exam_password(input_password) != exam.password:
             return jsonify({"error": "Incorrect password"}), 401
-    
+
     # 生成包含 exam_id 的新 Token
     new_token = encode_auth_token(
         user_id=request.current_user.id,
         role=request.current_user.role,
         exam_id=exam_id
     )
-    
+
     return jsonify({
         "message": "Successfully entered exam",
         "token": new_token,
         "exam_id": exam_id
     }), 200
+
 
 @exam_bp.route('/exit', methods=['POST'])
 @token_required
@@ -120,6 +126,7 @@ def exit_exam():
         "message": "Successfully exited exam",
         "token": new_token
     }), 200
+
 
 @exam_bp.route('/status', methods=['GET'])
 @token_required
@@ -143,8 +150,8 @@ def get_my_exam_status():
     for ep in exam_problems:
         # 获取该用户对该题目的最后一次提交记录
         last_submission = Submission.query.filter_by(
-            exam_id=exam_id, 
-            user_id=user_id, 
+            exam_id=exam_id,
+            user_id=user_id,
             problem_id=ep.problem_id
         ).order_by(Submission.created_at.desc()).first()
 
@@ -160,6 +167,7 @@ def get_my_exam_status():
 
     return jsonify(result), 200
 
+
 @exam_bp.route('/<int:exam_id>/monitor', methods=['GET'])
 @token_required
 def get_exam_monitor(exam_id):
@@ -170,7 +178,7 @@ def get_exam_monitor(exam_id):
         return jsonify({"error": "Permission denied"}), 403
 
     exam = Exam.query.get_or_404(exam_id)
-    
+
     # 1. 获取考试题目列表，用于表头
     exam_problems = ExamProblem.query.filter_by(exam_id=exam_id).all()
     problem_headers = [{
@@ -215,7 +223,7 @@ def get_exam_monitor(exam_id):
                     "status": "Not Attempted",
                     "score": 0
                 }
-        
+
         monitor_data.append(user_status)
 
     # 按总分降序排列
@@ -227,38 +235,41 @@ def get_exam_monitor(exam_id):
         "users": monitor_data
     }), 200
 
+
 @exam_bp.route('/<int:exam_id>', methods=['PUT'])
 @token_required
 def update_exam(exam_id):
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-    
+
     exam = Exam.query.get_or_404(exam_id)
     data = request.get_json()
-    
+
     if 'title' in data: exam.title = data['title']
     if 'description' in data: exam.description = data['description']
     if 'start_time' in data: exam.start_time = datetime.fromisoformat(data['start_time'])
     if 'end_time' in data: exam.end_time = datetime.fromisoformat(data['end_time'])
     if 'is_visible' in data: exam.is_visible = data['is_visible']
-    
+
     if 'password' in data:
         raw_password = data['password']
         exam.password = hash_exam_password(raw_password) if raw_password else None
-    
+
     db.session.commit()
     return jsonify(exam.to_dict()), 200
+
 
 @exam_bp.route('/<int:exam_id>', methods=['DELETE'])
 @token_required
 def delete_exam(exam_id):
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-    
+
     exam = Exam.query.get_or_404(exam_id)
     db.session.delete(exam)
     db.session.commit()
     return jsonify({"message": "Exam deleted"}), 200
+
 
 # --- 考试题目管理 ---
 
@@ -267,7 +278,7 @@ def delete_exam(exam_id):
 def add_problem_to_exam(exam_id):
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-    
+
     data = request.get_json()
     new_ep = ExamProblem(
         exam_id=exam_id,
@@ -279,12 +290,13 @@ def add_problem_to_exam(exam_id):
     db.session.commit()
     return jsonify({"message": "Problem added to exam"}), 201
 
+
 @exam_bp.route('/<int:exam_id>/problems/<int:problem_id>', methods=['DELETE'])
 @token_required
 def remove_problem_from_exam(exam_id, problem_id):
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-    
+
     ep = ExamProblem.query.filter_by(exam_id=exam_id, problem_id=problem_id).first_or_404()
     db.session.delete(ep)
     db.session.commit()

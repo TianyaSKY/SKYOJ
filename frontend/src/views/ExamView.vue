@@ -5,30 +5,30 @@
       <p class="exam-info">查看所有进行中或未开始的考试</p>
     </div>
 
-    <el-card shadow="never" class="exam-content">
+    <el-card class="exam-content" shadow="never">
       <el-table
-        v-loading="loading"
-        :data="filteredExams"
-        style="width: 100%"
-        stripe
+          v-loading="loading"
+          :data="filteredExams"
+          stripe
+          style="width: 100%"
       >
-        <el-table-column prop="title" label="考试名称" min-width="200">
+        <el-table-column label="考试名称" min-width="200" prop="title">
           <template #default="scope">
-            <el-link type="primary" :underline="false" @click="handleEnterExam(scope.row)">
+            <el-link :underline="false" type="primary" @click="handleEnterExam(scope.row)">
               {{ scope.row.title }}
             </el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="start_time" label="开始时间" width="200" align="center" />
-        <el-table-column prop="end_time" label="结束时间" width="200" align="center" />
-        <el-table-column label="状态" width="120" align="center">
+        <el-table-column align="center" label="开始时间" prop="start_time" width="200"/>
+        <el-table-column align="center" label="结束时间" prop="end_time" width="200"/>
+        <el-table-column align="center" label="状态" width="120">
           <template #default="scope">
             <el-tag :type="getExamStatus(scope.row).type" size="small">{{ getExamStatus(scope.row).text }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" align="center">
+        <el-table-column align="center" label="操作" width="120">
           <template #default="scope">
-            <el-button type="primary" size="small" @click="handleEnterExam(scope.row)">进入考试</el-button>
+            <el-button size="small" type="primary" @click="handleEnterExam(scope.row)">进入考试</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -37,15 +37,15 @@
     <!-- Password Dialog -->
     <el-dialog v-model="passwordDialogVisible" title="请输入考试密码" width="350px">
       <el-input
-        v-model="passwordInput"
-        type="password"
-        show-password
-        placeholder="请输入密码"
-        @keyup.enter="handlePasswordSubmit"
+          v-model="passwordInput"
+          placeholder="请输入密码"
+          show-password
+          type="password"
+          @keyup.enter="handlePasswordSubmit"
       />
       <template #footer>
         <el-button @click="passwordDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handlePasswordSubmit" :loading="submittingPassword">
+        <el-button :loading="submittingPassword" type="primary" @click="handlePasswordSubmit">
           确认
         </el-button>
       </template>
@@ -54,10 +54,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { getExamList, enterExam } from '@/api/exam'
-import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
+import {computed, onMounted, ref} from 'vue'
+import {enterExam, getExamList} from '@/api/exam'
+import {ElMessage} from 'element-plus'
+import {useRouter} from 'vue-router'
 
 const loading = ref(false)
 const allExams = ref([])
@@ -87,11 +87,11 @@ const getExamStatus = (exam) => {
   const end = new Date(exam.end_time)
 
   if (now < start) {
-    return { text: '未开始', type: 'info' }
+    return {text: '未开始', type: 'info'}
   } else if (now >= start && now <= end) {
-    return { text: '进行中', type: 'success' }
+    return {text: '进行中', type: 'success'}
   } else {
-    return { text: '已结束', type: 'danger' }
+    return {text: '已结束', type: 'danger'}
   }
 }
 

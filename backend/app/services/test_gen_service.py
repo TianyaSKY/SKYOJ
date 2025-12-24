@@ -1,11 +1,13 @@
+import io
 import os
 import shutil
 import tarfile
-import io
+
 from app.services.judge_service import client, create_tar_stream
 
 # 使用专门的生成沙箱镜像
 GEN_IMAGE_NAME = "skyoj-generator"
+
 
 def run_test_generation(problem_id, code):
     """
@@ -33,13 +35,13 @@ def run_test_generation(problem_id, code):
         # 运行脚本，工作目录设为 /app/output
         # 脚本应该将生成的测试文件直接写在当前目录
         exec_result = container.exec_run("python3 ../generator.py", workdir="/app/output")
-        
+
         if exec_result.exit_code != 0:
             return False, f"Execution Error: {exec_result.output.decode('utf-8')}"
 
         # 从容器中获取生成的测试文件
         bits, stat = container.get_archive('/app/output')
-        
+
         # 准备宿主机存储路径
         problem_dir = os.path.join("uploads/problems", str(problem_id))
         if os.path.exists(problem_dir):
@@ -51,10 +53,10 @@ def run_test_generation(problem_id, code):
         for chunk in bits:
             tar_data.write(chunk)
         tar_data.seek(0)
-        
+
         with tarfile.open(fileobj=tar_data) as tar:
             tar.extractall(path=problem_dir)
-            
+
         # get_archive 会包含 'output' 这一层目录，我们需要把里面的文件移出来
         extracted_output_dir = os.path.join(problem_dir, 'output')
         if os.path.exists(extracted_output_dir):

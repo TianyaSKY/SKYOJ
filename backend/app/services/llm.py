@@ -1,20 +1,22 @@
 import json
 from typing import Optional, Dict, Any
+
 from openai import OpenAI
 
+
 def ask_llm(
-    api_key: str,
-    api_url: str,
-    model_name: str,
-    system_setting: str,
-    prompt: str,
-    output_format: Optional[Dict[str, Any]] = None
+        api_key: str,
+        api_url: str,
+        model_name: str,
+        system_setting: str,
+        prompt: str,
+        output_format: Optional[Dict[str, Any]] = None
 ) -> Optional[Dict[str, Any]]:
     """
     基于 OpenAI SDK 向 LLM 发送请求并获取 JSON 返回信息。
     支持 DeepSeek 等模型的推理过程 (reasoning_content) 过滤，仅返回最终结果。
     """
-    
+
     # 构造系统提示词，包含输出格式要求
     full_system_prompt = system_setting
     if output_format:
@@ -47,20 +49,20 @@ def ask_llm(
             kwargs["response_format"] = {"type": "json_object"}
 
         response = client.chat.completions.create(**kwargs)
-        
+
         # 获取最终回答内容
         content = response.choices[0].message.content
-        
+
         # 解析返回的 JSON 内容
         parsed_content = json.loads(content)
-        
+
         # 如果指定了 output_format，检查返回的 key 是否匹配
         if output_format:
             for key in output_format.keys():
                 if key not in parsed_content:
                     print(f"LLM 返回格式不匹配: 缺失键 {key}")
                     return None
-                    
+
         return parsed_content
 
     except Exception as e:

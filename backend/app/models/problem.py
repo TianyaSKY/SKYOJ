@@ -26,7 +26,8 @@ class Problem(db.Model):
     # We remove passive_deletes=True so SQLAlchemy handles the deletion of child records 
     # even if the database schema doesn't have ON DELETE CASCADE set up.
     submissions = db.relationship('Submission', backref=db.backref('problem', lazy=True), cascade="all, delete-orphan")
-    exam_problems = db.relationship('ExamProblem', backref=db.backref('problem', lazy=True), cascade="all, delete-orphan")
+    exam_problems = db.relationship('ExamProblem', backref=db.backref('problem', lazy=True),
+                                    cascade="all, delete-orphan")
 
     def __repr__(self):
         return f'<Problem {self.title}>'

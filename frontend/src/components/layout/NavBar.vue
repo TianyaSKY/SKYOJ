@@ -1,19 +1,19 @@
 <template>
   <el-menu
-    :default-active="activeIndex"
-    class="el-menu-demo"
-    mode="horizontal"
-    :ellipsis="false"
-    router
+      :default-active="activeIndex"
+      :ellipsis="false"
+      class="el-menu-demo"
+      mode="horizontal"
+      router
   >
     <el-menu-item index="/">
       <img
-        style="width: 100px"
-        src="@/assets/logo.svg"
-        alt="SKYOJ Logo"
+          alt="SKYOJ Logo"
+          src="@/assets/logo.svg"
+          style="width: 100px"
       />
     </el-menu-item>
-    <div class="flex-grow" />
+    <div class="flex-grow"/>
     <el-menu-item index="/">首页</el-menu-item>
     <el-menu-item index="/problems">题库</el-menu-item>
     <el-menu-item index="/datasets">公开数据集</el-menu-item>
@@ -25,7 +25,7 @@
             {{ username.charAt(0).toUpperCase() }}
           </el-avatar>
           <span class="username">{{ username }}</span>
-          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          <el-icon class="el-icon--right"><ArrowDown/></el-icon>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -44,10 +44,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { ArrowDown } from '@element-plus/icons-vue'
+import {computed} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {useUserStore} from '@/stores/user'
+import {ArrowDown} from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -77,21 +77,25 @@ const handleCommand = (command) => {
 .flex-grow {
   flex-grow: 1;
 }
+
 .user-actions {
   display: flex;
   align-items: center;
   padding: 0 20px;
 }
+
 .el-dropdown-link {
   cursor: pointer;
   display: flex;
   align-items: center;
   outline: none;
 }
+
 .username {
   margin-left: 8px;
   font-weight: 500;
 }
+
 .user-avatar-nav {
   background-color: var(--el-color-primary);
   color: white;

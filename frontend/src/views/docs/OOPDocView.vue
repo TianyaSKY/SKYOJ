@@ -24,8 +24,10 @@
         <h2>3. 注意事项</h2>
         <ul>
           <li><strong>类名与包名</strong>：请严格遵守题目要求的类名和包名结构。</li>
-          <li><strong>访问修饰符</strong>：注意 <code>public</code>, <code>private</code>, <code>protected</code> 的使用。</li>
-          <li><strong>不要包含 main 函数</strong>：除非题目明确要求，否则不要提交包含 <code>main</code> 入口的代码，以免冲突。</li>
+          <li><strong>访问修饰符</strong>：注意 <code>public</code>, <code>private</code>, <code>protected</code> 的使用。
+          </li>
+          <li><strong>不要包含 main 函数</strong>：除非题目明确要求，否则不要提交包含 <code>main</code> 入口的代码，以免冲突。
+          </li>
         </ul>
 
         <h2>4. 评分示例</h2>
@@ -63,24 +65,41 @@
   margin: 0 auto;
   padding: 20px;
 }
+
 .markdown-body {
   line-height: 1.6;
 }
+
 h1, h2, h3 {
   margin-top: 24px;
   margin-bottom: 16px;
   font-weight: 600;
   line-height: 1.25;
 }
-h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
-h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
-h3 { font-size: 1.25em; }
+
+h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: .3em;
+}
+
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: .3em;
+}
+
+h3 {
+  font-size: 1.25em;
+}
+
 pre {
   background-color: #f6f8fa;
   padding: 16px;
   border-radius: 6px;
   overflow: auto;
 }
+
 code {
   font-family: monospace;
 }

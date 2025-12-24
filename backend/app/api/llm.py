@@ -1,12 +1,12 @@
-import os
-from flask import Blueprint, jsonify, request
 from app.models.sysdict import SysDict
 from app.services.judge_service import save_non_acm_script
 from app.services.llm import ask_llm
 from app.services.test_gen_service import run_test_generation
 from app.utils.auth_tools import token_required
+from flask import Blueprint, jsonify, request
 
 llm_bp = Blueprint('llm', __name__)
+
 
 @llm_bp.route('/ask', methods=['POST'])
 @token_required
@@ -49,7 +49,6 @@ def call_llm():
     return jsonify(result), 200
 
 
-
 @llm_bp.route('/execute-test-generation', methods=['POST'])
 @token_required
 def execute_test_generation():
@@ -61,10 +60,10 @@ def execute_test_generation():
     code = data.get('code')
     problem_type = data.get('type')
     language = data.get('language', 'python')
-    
+
     if not problem_id or not code:
         return jsonify({"error": "problem_id and code are required"}), 400
-    
+
     # 如果不是 ACM 类型，直接保存代码文件
     if problem_type and problem_type != 'acm':
         success, message = save_non_acm_script(problem_id, code, problem_type, language)
@@ -75,7 +74,7 @@ def execute_test_generation():
 
     # ACM 类型则运行脚本生成数据
     success, message = run_test_generation(problem_id, code)
-    
+
     if success:
         return jsonify({"message": message}), 200
     else:

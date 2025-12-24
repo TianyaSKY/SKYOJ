@@ -1,9 +1,9 @@
 import os
-import time
 import re
 
 from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream
+
 
 def natural_sort_key(s):
     """
@@ -12,6 +12,7 @@ def natural_sort_key(s):
     """
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split('([0-9]+)', s)]
+
 
 def run_acm_judge(submission_id, user_code, problem_id, language='python'):
     # 多语言配置
@@ -88,14 +89,14 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
             # 运行命令: ./main < input.txt
             # 增加超时保护
             time_limit_ms = getattr(problem, 'time_limit', 1000)
-            time_limit_s = max(1, time_limit_ms // 1000) # 转换为秒，至少1秒
-            
+            time_limit_s = max(1, time_limit_ms // 1000)  # 转换为秒，至少1秒
+
             # 使用 timeout 命令包装运行指令
             run_cmd = f"sh -c 'timeout {time_limit_s}s {lang_config['run']} < input.txt'"
 
             # 执行
             result = container.exec_run(run_cmd)
-            
+
             # 检查是否超时 (timeout 命令在超时时通常返回 124)
             if result.exit_code == 124:
                 logs.append(f"Test Case {case_name}: Time Limit Exceeded")
@@ -122,7 +123,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
 
     # 3. 按比例计算分数
     final_score = (passed_count / total_cases) * 100
-    
+
     # 状态判定逻辑
     if any("Time Limit Exceeded" in log for log in logs):
         final_status = "Time Limit Exceeded"

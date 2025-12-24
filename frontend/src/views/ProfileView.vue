@@ -9,8 +9,8 @@
         <div class="user-details">
           <h2 class="username">{{ targetUser.username }}</h2>
           <div class="user-meta">
-            <el-tag size="small" effect="plain">{{ targetUser.role || 'User' }}</el-tag>
-            <span class="join-date" v-if="targetUser.created_at">
+            <el-tag effect="plain" size="small">{{ targetUser.role || 'User' }}</el-tag>
+            <span v-if="targetUser.created_at" class="join-date">
               Joined on {{ formatDate(targetUser.created_at) }}
             </span>
           </div>
@@ -22,54 +22,64 @@
     <el-card class="heatmap-card mb-4" shadow="hover">
       <template #header>
         <div class="card-header">
-          <h3 class="header-title"><el-icon><Calendar /></el-icon> Activity</h3>
+          <h3 class="header-title">
+            <el-icon>
+              <Calendar/>
+            </el-icon>
+            Activity
+          </h3>
         </div>
       </template>
-      <submission-heatmap :submissions="submissions" v-loading="loading" />
+      <submission-heatmap v-loading="loading" :submissions="submissions"/>
     </el-card>
 
     <!-- Submissions Table -->
     <el-card class="submissions-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <h3 class="header-title"><el-icon><List /></el-icon> Submission History</h3>
+          <h3 class="header-title">
+            <el-icon>
+              <List/>
+            </el-icon>
+            Submission History
+          </h3>
         </div>
       </template>
 
       <el-table
-        :data="submissions"
-        style="width: 100%"
-        v-loading="loading"
-        stripe
-        :default-sort="{ prop: 'created_at', order: 'descending' }"
+          v-loading="loading"
+          :data="submissions"
+          :default-sort="{ prop: 'created_at', order: 'descending' }"
+          stripe
+          style="width: 100%"
       >
-        <el-table-column prop="id" label="#" width="80" align="center" />
+        <el-table-column align="center" label="#" prop="id" width="80"/>
 
-        <el-table-column prop="problem_title" label="Problem" min-width="200">
+        <el-table-column label="Problem" min-width="200" prop="problem_title">
           <template #default="scope">
-            <el-link type="primary" :underline="false" @click="$router.push(`/problem/${scope.row.problem_id}`)">
+            <el-link :underline="false" type="primary" @click="$router.push(`/problem/${scope.row.problem_id}`)">
               <span class="problem-link">{{ scope.row.problem_id }}. {{ scope.row.problem_title }}</span>
             </el-link>
           </template>
         </el-table-column>
 
-        <el-table-column prop="status" label="Status" width="140" align="center">
+        <el-table-column align="center" label="Status" prop="status" width="140">
           <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)" effect="light" size="small" class="status-tag">
+            <el-tag :type="getStatusType(scope.row.status)" class="status-tag" effect="light" size="small">
               {{ scope.row.status }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="score" label="Score" width="80" align="center">
+        <el-table-column align="center" label="Score" prop="score" width="80">
           <template #default="scope">
             <span :class="getScoreClass(scope.row.score)" class="score-text">{{ scope.row.score }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="language" label="Lang" width="100" align="center" />
+        <el-table-column align="center" label="Lang" prop="language" width="100"/>
 
-        <el-table-column prop="exam_id" label="Exam" width="100" align="center">
+        <el-table-column align="center" label="Exam" prop="exam_id" width="100">
           <template #default="scope">
             <el-tag v-if="scope.row.exam_id !== null && scope.row.exam_id !== -1" size="small" type="info">
               ID: {{ scope.row.exam_id }}
@@ -78,15 +88,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="created_at" label="Time" min-width="160" align="center">
+        <el-table-column align="center" label="Time" min-width="160" prop="created_at">
           <template #default="scope">
             {{ formatTime(scope.row.created_at) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="Action" width="100" align="center" fixed="right">
+        <el-table-column align="center" fixed="right" label="Action" width="100">
           <template #default="scope">
-            <el-button size="small" type="primary" plain @click="$router.push(`/submission/${scope.row.id}`)">
+            <el-button plain size="small" type="primary" @click="$router.push(`/submission/${scope.row.id}`)">
               Details
             </el-button>
           </template>
@@ -97,12 +107,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { getUserSubmissions, getUserProfile } from '@/api/user'
-import { ElMessage } from 'element-plus'
-import { List, Calendar } from '@element-plus/icons-vue'
+import {computed, onMounted, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {useUserStore} from '@/stores/user'
+import {getUserProfile, getUserSubmissions} from '@/api/user'
+import {ElMessage} from 'element-plus'
+import {Calendar, List} from '@element-plus/icons-vue'
 import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
 
 const route = useRoute()
@@ -237,9 +247,17 @@ onMounted(() => {
   font-weight: bold;
 }
 
-.text-success { color: var(--el-color-success); }
-.text-warning { color: var(--el-color-warning); }
-.text-danger { color: var(--el-color-danger); }
+.text-success {
+  color: var(--el-color-success);
+}
+
+.text-warning {
+  color: var(--el-color-warning);
+}
+
+.text-danger {
+  color: var(--el-color-danger);
+}
 
 .problem-link {
   font-weight: 500;

@@ -1,14 +1,13 @@
+import io
 import os
 import shutil
 import zipfile
-import io
-
-from flask import Blueprint, request, jsonify, send_file
-from werkzeug.utils import secure_filename
 
 from app.models.problem import Problem
 from app.models.user import db
 from app.utils.auth_tools import token_required
+from flask import Blueprint, request, jsonify, send_file
+from werkzeug.utils import secure_filename
 
 problem_bp = Blueprint('problem', __name__)
 UPLOAD_BASE_DIR = "uploads/problems"
@@ -25,7 +24,7 @@ def create_problem():
     new_problem = Problem(
         title=data.get('title'),
         content=data.get('content'),
-        language=data.get('language'), # 前端传过来的是逗号分隔的字符串
+        language=data.get('language'),  # 前端传过来的是逗号分隔的字符串
         type=data.get('type'),  # 'acm', 'oop', 'kaggle'
         time_limit=data.get('time_limit', 1000),
         memory_limit=data.get('memory_limit', 128),
@@ -95,12 +94,12 @@ def delete_problem(problem_id):
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
     problem = Problem.query.get_or_404(problem_id)
-    
+
     # 删除关联的测试用例目录
     problem_dir = os.path.join(UPLOAD_BASE_DIR, str(problem_id))
     if os.path.exists(problem_dir):
         shutil.rmtree(problem_dir)
-        
+
     db.session.delete(problem)
     db.session.commit()
     return jsonify({"message": "Problem deleted successfully"}), 200
@@ -153,7 +152,7 @@ def delete_test_cases(problem_id):
     """
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
-    
+
     problem_dir = os.path.join(UPLOAD_BASE_DIR, str(problem_id))
     if os.path.exists(problem_dir):
         # 清空目录下的所有内容，但保留目录本身
@@ -190,7 +189,7 @@ def download_test_cases(problem_id):
                 # 计算在压缩包内的相对路径
                 arcname = os.path.relpath(file_path, problem_dir)
                 zf.write(file_path, arcname)
-    
+
     memory_file.seek(0)
     return send_file(
         memory_file,
