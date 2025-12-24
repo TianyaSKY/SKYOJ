@@ -33,7 +33,6 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
         )
 
         # 1. 上传学生提交的 CSV
-        student_tar = create_tar_stream('submission.csv', user_csv_content)
         student_tar = create_tar_from_path(os.path.abspath(user_csv_content), 'submission.csv')
         container.put_archive('/app', student_tar)
 
@@ -62,7 +61,7 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
         try:
             final_score = float(lines[-1])
             log_output = "\n".join(lines[:-1]) if len(lines) > 1 else "Score calculated."
-            return "Accepted", final_score, log_output
+            return "Accepted" if final_score == 100 else "Wrong Answer", final_score, log_output
         except ValueError:
             return "Runtime Error", 0, f"Scoring script did not return a valid number at the last line.\nOutput: {output}"
 
