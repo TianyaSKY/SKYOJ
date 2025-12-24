@@ -14,3 +14,10 @@ export function updateSysInfo(data) {
     data
   })
 }
+
+export function getSysStatistics() {
+  return request({
+    url: '/sys/statistics',
+    method: 'get'
+  })
+}

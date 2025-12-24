@@ -31,9 +31,10 @@ class ExamProblem(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=False)
-    problem_id = db.Column(db.Integer, db.ForeignKey('problems.id'), nullable=False)
+    problem_id = db.Column(db.Integer, db.ForeignKey('problems.id', ondelete='CASCADE'), nullable=False)
     display_id = db.Column(db.String(10))  # 考试中的题号，如 A, B, C
     score = db.Column(db.Integer, default=100)  # 该题在本次考试中的分数
 
     exam = db.relationship('Exam', backref=db.backref('problems', lazy='dynamic', cascade="all, delete-orphan"))
-    problem = db.relationship('Problem')
+    # problem 关系已在 Problem 模型中通过 backref 定义，此处可省略或保持一致
+    # problem = db.relationship('Problem')

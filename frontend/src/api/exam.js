@@ -69,6 +69,13 @@ export function enterExam(id, password) {
   })
 }
 
+export function exitExam() {
+  return request({
+    url: '/exams/exit',
+    method: 'post'
+  })
+}
+
 export function getMyExamStatus() {
   return request({
     url: '/exams/status',

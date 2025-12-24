@@ -4,13 +4,15 @@
     <el-card class="user-card mb-4" shadow="hover">
       <div class="user-profile">
         <el-avatar :size="80" :src="userAvatar" class="user-avatar">
-          {{ user.username?.charAt(0).toUpperCase() }}
+          {{ targetUser.username?.charAt(0).toUpperCase() }}
         </el-avatar>
         <div class="user-details">
-          <h2 class="username">{{ user.username }}</h2>
+          <h2 class="username">{{ targetUser.username }}</h2>
           <div class="user-meta">
-            <el-tag size="small" effect="plain">{{ user.role || 'User' }}</el-tag>
-            <!-- Add more user info here if available, e.g., email, join date -->
+            <el-tag size="small" effect="plain">{{ targetUser.role || 'User' }}</el-tag>
+            <span class="join-date" v-if="targetUser.created_at">
+              Joined on {{ formatDate(targetUser.created_at) }}
+            </span>
           </div>
         </div>
       </div>
@@ -67,6 +69,15 @@
 
         <el-table-column prop="language" label="Lang" width="100" align="center" />
 
+        <el-table-column prop="exam_id" label="Exam" width="100" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.exam_id !== null && scope.row.exam_id !== -1" size="small" type="info">
+              ID: {{ scope.row.exam_id }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="created_at" label="Time" min-width="160" align="center">
           <template #default="scope">
             {{ formatTime(scope.row.created_at) }}
@@ -86,20 +97,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { getUserSubmissions } from '@/api/user'
+import { getUserSubmissions, getUserProfile } from '@/api/user'
 import { ElMessage } from 'element-plus'
 import { List, Calendar } from '@element-plus/icons-vue'
 import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
 
+const route = useRoute()
 const userStore = useUserStore()
-const user = computed(() => userStore.user || {})
-// Use empty string to trigger slot content if no avatar URL
-const userAvatar = computed(() => userStore.user?.avatar || '')
 
+const targetUser = ref({})
 const submissions = ref([])
 const loading = ref(false)
+
+const userId = computed(() => route.params.id)
+const userAvatar = computed(() => targetUser.value.avatar || '')
 
 const getStatusType = (status) => {
   if (!status) return 'info'
@@ -121,20 +135,40 @@ const formatTime = (isoString) => {
   return new Date(isoString).toLocaleString()
 }
 
-const fetchSubmissions = async () => {
+const formatDate = (isoString) => {
+  if (!isoString) return ''
+  return new Date(isoString).toLocaleDateString()
+}
+
+const fetchData = async () => {
   loading.value = true
   try {
-    const data = await getUserSubmissions()
-    submissions.value = data
+    const id = userId.value
+    if (id) {
+      // Fetch specific user profile and submissions
+      const profile = await getUserProfile(id)
+      targetUser.value = profile
+      const subs = await getUserSubmissions(id)
+      submissions.value = subs
+    } else {
+      // Fetch current user profile and submissions
+      targetUser.value = userStore.user || {}
+      const subs = await getUserSubmissions()
+      submissions.value = subs
+    }
   } catch (error) {
-    ElMessage.error('Failed to load submissions')
+    ElMessage.error('Failed to load profile data')
   } finally {
     loading.value = false
   }
 }
 
+watch(() => route.params.id, () => {
+  fetchData()
+})
+
 onMounted(() => {
-  fetchSubmissions()
+  fetchData()
 })
 </script>
 
@@ -164,6 +198,17 @@ onMounted(() => {
   margin: 0;
   font-size: 1.8rem;
   font-weight: 600;
+}
+
+.user-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.join-date {
+  font-size: 0.9rem;
+  color: #909399;
 }
 
 .user-avatar {

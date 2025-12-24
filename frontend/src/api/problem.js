@@ -65,3 +65,18 @@ export function uploadTestCases(id, formData) {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
+
+export function downloadTestCases(id) {
+  return request({
+    url: `/problems/${id}/test_cases`,
+    method: 'get',
+    responseType: 'blob'
+  })
+}
+
+export function deleteAllTestCases(id) {
+  return request({
+    url: `/problems/${id}/test_cases`,
+    method: 'delete'
+  })
+}

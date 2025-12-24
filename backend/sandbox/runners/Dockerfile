@@ -18,8 +18,9 @@ RUN sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/source
 # 设置系统语言环境为 UTF-8
 ENV LANG=C.UTF-8
 
-# 复制并安装 Python 依赖 (在切换用户前以 root 身份安装)
-COPY ../requirements.txt /tmp/requirements.txt
+# 复制并安装 Python 依赖
+# 注意：在构建时，需要将 context 设置在 backend/sandbox 目录，或者将 requirements.txt 复制到 runners 目录下
+COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r /tmp/requirements.txt
 
 # 创建非 root 用户以提高安全性

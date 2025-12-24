@@ -7,6 +7,7 @@
           <div class="status-icon">
             <el-icon v-if="submission.status === 'Accepted'" color="#67C23A" :size="50"><CircleCheckFilled /></el-icon>
             <el-icon v-else-if="submission.status === 'Wrong Answer'" color="#F56C6C" :size="50"><CircleCloseFilled /></el-icon>
+            <el-icon v-else-if="isPending" class="is-loading" color="#409EFF" :size="50"><Loading /></el-icon>
             <el-icon v-else color="#E6A23C" :size="50"><QuestionFilled /></el-icon>
           </div>
           <div class="status-text">
@@ -70,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { getSubmissionDetail } from '@/api/problem'
 import { ElMessage } from 'element-plus'
@@ -82,12 +83,14 @@ import {
   Clock,
   List,
   Document,
-  CopyDocument
+  CopyDocument,
+  Loading
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const submissionId = route.params.id
 const loading = ref(false)
+let timer = null
 
 const submission = ref({
   id: submissionId,
@@ -97,6 +100,11 @@ const submission = ref({
   code: '',
   language: 'python',
   created_at: ''
+})
+
+const isPending = computed(() => {
+  const pendingStatuses = ['Pending', 'Judging', 'Compiling', 'Loading...']
+  return pendingStatuses.includes(submission.value.status)
 })
 
 const editorOptions = {
@@ -114,6 +122,7 @@ const getStatusClass = (status) => {
   const s = status.toLowerCase()
   if (s === 'accepted') return 'status-success'
   if (s === 'wrong answer' || s.includes('error')) return 'status-danger'
+  if (['pending', 'judging', 'compiling'].includes(s)) return 'status-info'
   return 'status-warning'
 }
 
@@ -137,20 +146,45 @@ const copyCode = async () => {
   }
 }
 
-const fetchSubmission = async () => {
-  loading.value = true
+const fetchSubmission = async (silent = false) => {
+  if (!silent) loading.value = true
   try {
     const data = await getSubmissionDetail(submissionId)
     submission.value = data
+
+    if (isPending.value) {
+      startPolling()
+    } else {
+      stopPolling()
+    }
   } catch (error) {
     ElMessage.error('Failed to load submission details')
+    stopPolling()
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
+  }
+}
+
+const startPolling = () => {
+  if (timer) return
+  timer = setInterval(() => {
+    fetchSubmission(true)
+  }, 2000)
+}
+
+const stopPolling = () => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
   }
 }
 
 onMounted(() => {
   fetchSubmission()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
 
@@ -186,6 +220,7 @@ onMounted(() => {
 .status-success { color: var(--el-color-success); }
 .status-danger { color: var(--el-color-danger); }
 .status-warning { color: var(--el-color-warning); }
+.status-info { color: var(--el-color-primary); }
 
 .meta-info {
   display: flex;
@@ -246,5 +281,14 @@ onMounted(() => {
 .monaco-editor {
   width: 100%;
   height: 100%;
+}
+
+.is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

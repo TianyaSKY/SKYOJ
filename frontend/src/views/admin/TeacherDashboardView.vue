@@ -1,119 +1,200 @@
 <template>
   <div class="teacher-dashboard-container">
     <div class="dashboard-header">
-      <h2>教师工作台</h2>
-      <p class="subtitle">欢迎回来，这里是您的教学管理中心。</p>
+      <div class="header-left">
+        <h1 class="page-title">教师工作台</h1>
+        <p class="page-desc">欢迎回来，这里是您的教学管理中心。</p>
+      </div>
+      <div class="header-right">
+        <el-button type="primary" :icon="Plus" @click="$router.push({ name: 'problem-admin' })">新增题目</el-button>
+        <el-button type="success" :icon="Timer" @click="$router.push({ name: 'exam-admin' })">创建考试</el-button>
+      </div>
     </div>
 
+    <!-- Stats Overview -->
+    <el-row :gutter="20" class="stats-row">
+      <el-col :span="6" v-for="(stat, index) in stats" :key="stat.label">
+        <div
+          class="stat-card"
+          :class="{ 'clickable-stat': index === 3 }"
+          @click="index === 3 ? userListVisible = true : null"
+        >
+          <div class="stat-icon" :style="{ color: stat.color, backgroundColor: stat.color + '15' }">
+            <el-icon :size="24"><component :is="stat.icon" /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stat.value }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <h3 class="section-title">核心管理</h3>
     <el-row :gutter="20" class="dashboard-cards">
       <!-- 题目管理卡片 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card shadow="hover" class="dashboard-card" @click="$router.push({ name: 'problem-admin' })">
-          <div class="card-content">
-            <el-icon class="card-icon" :size="40" color="#409EFF"><List /></el-icon>
-            <h3>题目管理</h3>
-            <p>创建、编辑和删除题目，管理测试数据。</p>
+        <div class="nav-card" @click="$router.push({ name: 'problem-admin' })">
+          <div class="nav-icon" style="color: #409EFF; background-color: #ecf5ff">
+            <el-icon :size="32"><List /></el-icon>
           </div>
-        </el-card>
+          <h3>题目管理</h3>
+          <p>创建、编辑和删除题目，管理测试数据与 SPJ 脚本。</p>
+          <div class="nav-footer">
+            <span>进入管理 <el-icon><ArrowRight /></el-icon></span>
+          </div>
+        </div>
       </el-col>
 
       <!-- 考试管理卡片 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card shadow="hover" class="dashboard-card" @click="$router.push({ name: 'exam-admin' })">
-          <div class="card-content">
-            <el-icon class="card-icon" :size="40" color="#F56C6C"><Timer /></el-icon>
-            <h3>考试管理</h3>
-            <p>创建考试、设置密码及管理考试题目。</p>
+        <div class="nav-card" @click="$router.push({ name: 'exam-admin' })">
+          <div class="nav-icon" style="color: #F56C6C; background-color: #fef0f0">
+            <el-icon :size="32"><Timer /></el-icon>
           </div>
-        </el-card>
+          <h3>考试管理</h3>
+          <p>组织在线考试、设置访问权限及监控实时进度。</p>
+          <div class="nav-footer">
+            <span>进入管理 <el-icon><ArrowRight /></el-icon></span>
+          </div>
+        </div>
       </el-col>
 
       <!-- 系统设置卡片 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card shadow="hover" class="dashboard-card" @click="openSysSettings">
-          <div class="card-content">
-            <el-icon class="card-icon" :size="40" color="#E6A23C"><Setting /></el-icon>
-            <h3>系统设置</h3>
-            <p>修改网站标题、公告栏信息及 LLM 智能体配置。</p>
+        <div class="nav-card" @click="openSysSettings">
+          <div class="nav-icon" style="color: #E6A23C; background-color: #fdf6ec">
+            <el-icon :size="32"><Setting /></el-icon>
           </div>
-        </el-card>
+          <h3>系统设置</h3>
+          <p>配置网站公告、练习模式及 LLM 智能体 API 密钥。</p>
+          <div class="nav-footer">
+            <span>打开设置 <el-icon><ArrowRight /></el-icon></span>
+          </div>
+        </div>
       </el-col>
 
       <!-- 教师手册卡片 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card shadow="hover" class="dashboard-card" @click="$router.push({ name: 'doc-teacher-manual' })">
-          <div class="card-content">
-            <el-icon class="card-icon" :size="40" color="#67C23A"><Document /></el-icon>
-            <h3>教师手册</h3>
-            <p>查看题目录入指南、SPJ 编写示例及推荐代码。</p>
+        <div class="nav-card" @click="$router.push({ name: 'doc-teacher-manual' })">
+          <div class="nav-icon" style="color: #67C23A; background-color: #f0f9eb">
+            <el-icon :size="32"><Document /></el-icon>
           </div>
-        </el-card>
+          <h3>教师手册</h3>
+          <p>查阅录入指南、AICase 使用说明及评分示例。</p>
+          <div class="nav-footer">
+            <span>查看文档 <el-icon><ArrowRight /></el-icon></span>
+          </div>
+        </div>
       </el-col>
     </el-row>
 
-    <div class="quick-actions">
-      <h3>快捷入口</h3>
-      <el-button type="primary" plain @click="$router.push({ name: 'problem-admin' })">新增题目</el-button>
-      <el-button type="danger" plain @click="$router.push({ name: 'exam-admin' })">新增考试</el-button>
-      <el-button type="warning" plain @click="openSysSettings">系统设置</el-button>
-      <el-button type="success" plain @click="$router.push({ name: 'doc-teacher-manual' })">查看 SPJ 示例</el-button>
-    </div>
+    <!-- User List Dialog -->
+    <el-dialog v-model="userListVisible" title="所有用户" width="800px">
+      <el-table :data="users" v-loading="usersLoading" stripe>
+        <el-table-column prop="id" label="ID" width="80" align="center" />
+        <el-table-column prop="username" label="用户名" min-width="150">
+          <template #default="scope">
+            <div class="user-cell">
+              <el-avatar :size="24" class="mr-2">{{ scope.row.username.charAt(0).toUpperCase() }}</el-avatar>
+              <span>{{ scope.row.username }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="role" label="角色" width="120">
+          <template #default="scope">
+            <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'info'" size="small">
+              {{ scope.row.role }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" align="center">
+          <template #default="scope">
+            <el-button type="primary" link @click="viewUserProfile(scope.row.id)">查看主页</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
 
     <!-- System Settings Dialog -->
-    <el-dialog v-model="sysDialogVisible" title="系统设置" width="600px">
-      <el-tabs type="border-card">
+    <el-dialog v-model="sysDialogVisible" title="系统全局配置" width="700px" class="settings-dialog">
+      <el-tabs type="border-card" class="settings-tabs">
         <el-tab-pane label="基础设置">
-          <el-form :model="sysForm" label-width="100px" class="mt-4">
-            <el-form-item label="网站标题">
-              <el-input v-model="sysForm.title" placeholder="例如: SKYOJ" />
-            </el-form-item>
-            <el-form-item label="公告信息">
+          <el-form :model="sysForm" label-position="top" class="mt-4">
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="网站标题">
+                  <el-input v-model="sysForm.title" placeholder="例如: SKYOJ" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="运行模式">
+                  <div class="mode-switches">
+                    <el-switch v-model="sysForm.practice" active-text="练习模式" />
+                    <el-tooltip content="关闭后学生只能访问考试，无法自由练习" placement="top">
+                      <el-icon class="info-icon"><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </div>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-form-item label="公告内容">
               <el-input v-model="sysForm.info" type="textarea" :rows="3" placeholder="顶部滚动显示的公告内容" />
             </el-form-item>
-            <el-form-item label="警告模式">
-              <el-switch v-model="sysForm.warning" active-text="开启" inactive-text="关闭" />
-              <div class="form-tip">开启后公告栏将显示为红色警告样式</div>
-            </el-form-item>
-            <el-form-item label="练习模式">
-              <el-switch v-model="sysForm.practice" active-text="开启" inactive-text="关闭" />
-              <div class="form-tip">关闭后学生只能进行考试 限制访问功能</div>
+            <el-form-item label="公告样式">
+              <el-radio-group v-model="sysForm.warning">
+                <el-radio :label="false">普通 (蓝色)</el-radio>
+                <el-radio :label="true">警告 (红色)</el-radio>
+              </el-radio-group>
             </el-form-item>
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="智能体配置 (LLM)">
-          <el-form :model="sysForm" label-width="100px" class="mt-4">
-            <el-form-item label="API 接口">
+        <el-tab-pane label="AI 智能体 (LLM)">
+          <el-alert title="配置后可启用 AI 辅助出题、AICase 自动生成测试数据等功能。" type="info" show-icon :closable="false" class="mb-4" />
+          <el-form :model="sysForm" label-position="top" class="mt-4">
+            <el-form-item label="API Endpoint">
               <el-input v-model="sysForm.llm_api_url" placeholder="https://api.openai.com/v1" />
-              <div class="form-tip">LLM 服务的基础 URL</div>
             </el-form-item>
-            <el-form-item label="API 模型">
-              <el-input v-model="sysForm.llm_model_name" placeholder="gpt-3.5-turbo" />
-              <div class="form-tip">使用的模型名称</div>
-            </el-form-item>
-            <el-form-item label="API 密钥">
-              <el-input v-model="sysForm.llm_api_key" type="password" show-password placeholder="sk-..." />
-              <div class="form-tip">用于身份验证的 API Key</div>
-            </el-form-item>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="模型名称">
+                  <el-input v-model="sysForm.llm_model_name" placeholder="gpt-4o" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="API Key">
+                  <el-input v-model="sysForm.llm_api_key" type="password" show-password placeholder="sk-..." />
+                </el-form-item>
+              </el-col>
+            </el-row>
           </el-form>
         </el-tab-pane>
       </el-tabs>
 
       <template #footer>
-        <el-button @click="sysDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveSysSettings" :loading="sysSubmitting">保存</el-button>
+        <div class="dialog-footer">
+          <el-button @click="sysDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleSaveSysSettings" :loading="sysSubmitting">保存全局配置</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { List, Document, User, Setting, Timer } from '@element-plus/icons-vue'
-import { getSysInfo, updateSysInfo } from '@/api/sys'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  List, Document, Setting, Timer, Plus, ArrowRight,
+  InfoFilled, Collection, Monitor, User
+} from '@element-plus/icons-vue'
+import { getSysInfo, updateSysInfo, getSysStatistics } from '@/api/sys'
+import { getAllUsers } from '@/api/user'
 import { useSysStore } from '@/stores/sys'
 import { ElMessage } from 'element-plus'
 
+const router = useRouter()
 const sysStore = useSysStore()
 const sysDialogVisible = ref(false)
 const sysSubmitting = ref(false)
@@ -127,10 +208,54 @@ const sysForm = ref({
   llm_api_key: ''
 })
 
+const userListVisible = ref(false)
+const users = ref([])
+const usersLoading = ref(false)
+
+const stats = ref([
+  { label: '总题目数', value: '0', icon: 'Collection', color: '#409EFF' },
+  { label: '活跃考试', value: '0', icon: 'Timer', color: '#F56C6C' },
+  { label: '今日提交', value: '0', icon: 'Monitor', color: '#67C23A' },
+  { label: '总用户数', value: '0', icon: 'User', color: '#E6A23C' }
+])
+
+const fetchStats = async () => {
+  try {
+    const data = await getSysStatistics()
+    if (data) {
+      stats.value[0].value = data.total_problems || 0
+      stats.value[1].value = data.exams_in_period || 0
+      stats.value[2].value = data.today_submissions || 0
+      stats.value[3].value = data.total_users || 0
+    }
+  } catch (error) {
+    console.error('Failed to fetch stats')
+  }
+}
+
+const fetchUsers = async () => {
+  usersLoading.value = true
+  try {
+    users.value = await getAllUsers()
+  } catch (error) {
+    ElMessage.error('获取用户列表失败')
+  } finally {
+    usersLoading.value = false
+  }
+}
+
+const viewUserProfile = (userId) => {
+  userListVisible.value = false
+  router.push(`/profile/${userId}`)
+}
+
+watch(userListVisible, (newVal) => {
+  if (newVal) fetchUsers()
+})
+
 const openSysSettings = async () => {
   sysDialogVisible.value = true
   try {
-    // Fetch latest info to populate form
     const res = await getSysInfo()
     if (res) {
       sysForm.value = {
@@ -154,7 +279,6 @@ const handleSaveSysSettings = async () => {
     await updateSysInfo(sysForm.value)
     ElMessage.success('系统配置已更新')
     sysDialogVisible.value = false
-    // Refresh global store
     sysStore.fetchSysInfo()
   } catch (error) {
     ElMessage.error('更新失败')
@@ -162,100 +286,199 @@ const handleSaveSysSettings = async () => {
     sysSubmitting.value = false
   }
 }
+
+onMounted(() => {
+  fetchStats()
+})
 </script>
 
 <style scoped>
 .teacher-dashboard-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 40px 20px;
 }
 
 .dashboard-header {
-  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
 }
 
-.dashboard-header h2 {
-  font-size: 28px;
-  color: #303133;
-  margin-bottom: 10px;
+.page-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px;
 }
 
-.subtitle {
-  color: #909399;
-  font-size: 16px;
+.page-desc {
+  color: #888;
+  font-size: 1.1rem;
 }
 
+.header-right {
+  display: flex;
+  gap: 12px;
+}
+
+/* Stats Row */
+.stats-row {
+  margin-bottom: 40px;
+}
+
+.stat-card {
+  background: #fff;
+  padding: 24px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s;
+}
+
+.clickable-stat {
+  cursor: pointer;
+}
+
+.clickable-stat:hover {
+  transform: translateY(-5px);
+  border-color: var(--el-color-primary-light-5);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #888;
+  font-weight: 500;
+}
+
+.section-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 24px;
+}
+
+/* Nav Cards */
 .dashboard-cards {
   margin-bottom: 40px;
 }
 
-.dashboard-card {
-  cursor: pointer;
+.nav-card {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 20px;
+  padding: 32px;
   height: 100%;
   transition: all 0.3s;
-  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
 }
 
-.dashboard-card:hover {
+.nav-card:hover {
+  border-color: var(--el-color-primary-light-5);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
   transform: translateY(-5px);
 }
 
-.card-content {
+.nav-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  padding: 20px 0;
+  justify-content: center;
+  margin-bottom: 24px;
 }
 
-.card-icon {
-  margin-bottom: 15px;
+.nav-card h3 {
+  font-size: 1.3rem;
+  margin: 0 0 12px;
+  color: #1a1a1a;
 }
 
-.card-content h3 {
-  margin: 10px 0;
-  font-size: 18px;
-  color: #303133;
+.nav-card p {
+  color: #666;
+  line-height: 1.6;
+  margin: 0 0 24px;
+  font-size: 0.95rem;
+  flex-grow: 1;
 }
 
-.card-content p {
-  color: #606266;
-  font-size: 14px;
-  line-height: 1.5;
+.nav-footer {
+  padding-top: 20px;
+  border-top: 1px solid #f5f5f5;
+  color: var(--el-color-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
-.disabled-card {
-  cursor: not-allowed;
-  opacity: 0.7;
-  background-color: #f5f7fa;
+.nav-footer span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.disabled-card:hover {
-  transform: none;
+/* User List Cell */
+.user-cell {
+  display: flex;
+  align-items: center;
 }
 
-.quick-actions {
-  background-color: #fff;
-  padding: 20px;
+.mr-2 {
+  margin-right: 8px;
+}
+
+/* Settings Dialog */
+.settings-tabs {
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  overflow: hidden;
 }
 
-.quick-actions h3 {
-  margin-bottom: 20px;
-  font-size: 18px;
-  color: #303133;
+.mode-switches {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
 }
 
-.form-tip {
-  font-size: 12px;
+.info-icon {
   color: #909399;
-  line-height: 1.2;
-  margin-top: 5px;
+  cursor: help;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
 }
 
 .mt-4 {
-  margin-top: 1rem;
+  margin-top: 16px;
+}
+
+.dialog-footer {
+  padding-top: 10px;
 }
 </style>

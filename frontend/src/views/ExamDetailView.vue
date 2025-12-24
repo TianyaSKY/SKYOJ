@@ -84,6 +84,9 @@
           <el-button type="info" plain style="width: 100%; margin-top: 10px" @click="fetchStatus">
             刷新状态
           </el-button>
+          <el-button type="danger" plain style="width: 100%; margin-top: 10px" @click="handleExitExam">
+            退出考试
+          </el-button>
         </el-card>
 
         <el-alert
@@ -104,8 +107,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getExamDetail, getMyExamStatus } from '@/api/exam'
-import { ElMessage } from 'element-plus'
+import { getExamDetail, getMyExamStatus, exitExam } from '@/api/exam'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 
 const route = useRoute()
@@ -180,7 +183,43 @@ const updateRemainingTime = () => {
     remainingTime.value = end.diff(now, 'second')
   } else {
     remainingTime.value = 0
-    if (timer) clearInterval(timer)
+    if (timer) {
+      clearInterval(timer)
+      timer = null
+      handleExamEnd()
+    }
+  }
+}
+
+const handleExamEnd = async () => {
+  ElMessageBox.alert('考试已结束，系统将自动退出考试模式。', '提示', {
+    confirmButtonText: '确定',
+    callback: async () => {
+      await performExit()
+    }
+  })
+}
+
+const handleExitExam = () => {
+  ElMessageBox.confirm('确定要退出考试吗？退出后将无法继续在考试模式下提交。', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    await performExit()
+  })
+}
+
+const performExit = async () => {
+  try {
+    const res = await exitExam()
+    if (res.token) {
+      localStorage.setItem('token', res.token)
+    }
+    ElMessage.success('已退出考试')
+    router.push('/exam')
+  } catch (error) {
+    ElMessage.error('退出考试失败')
   }
 }
 

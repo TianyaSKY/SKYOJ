@@ -15,11 +15,17 @@
 
       <el-table :data="problems" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="title" label="标题" min-width="200" />
-        <el-table-column prop="type" label="类型" width="100" />
-        <el-table-column prop="language" label="语言" width="100">
+        <el-table-column prop="title" label="标题" min-width="200">
           <template #default="scope">
-            <el-tag size="small">{{ scope.row.language || 'All' }}</el-tag>
+            <el-link type="primary" @click="goToProblem(scope.row.id)">{{ scope.row.title }}</el-link>
+          </template>
+        </el-table-column>
+        <el-table-column prop="type" label="类型" width="100" />
+        <el-table-column prop="language" label="语言" width="150">
+          <template #default="scope">
+            <el-tag v-for="lang in (scope.row.language ? scope.row.language.split(',') : ['All'])" :key="lang" size="small" style="margin-right: 4px">
+              {{ lang.trim() }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="280" align="center" fixed="right">
@@ -58,8 +64,14 @@
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item label="语言" prop="language">
-              <el-select v-model="form.language" placeholder="请选择语言">
+            <el-form-item label="允许语言" prop="language">
+              <el-select
+                v-model="languageArray"
+                multiple
+                collapse-tags
+                placeholder="请选择允许的语言"
+                style="width: 100%"
+              >
                 <el-option label="Python" value="python" />
                 <el-option label="C++" value="cpp" />
                 <el-option label="C" value="c" />
@@ -82,7 +94,7 @@
           <div class="editor-container mini-editor" v-if="dialogVisible">
             <vue-monaco-editor
               v-model:value="form.template_code"
-              :language="form.language || 'python'"
+              :language="languageArray[0] || 'python'"
               theme="vs-dark"
               :options="miniEditorOptions"
             />
@@ -108,16 +120,38 @@
                 <div class="el-upload__tip">请上传包含输入输出文件的 ZIP 包。</div>
               </template>
             </el-upload>
-            <el-button
-              type="success"
-              size="small"
-              class="mt-2"
-              @click="handleUploadTestCases"
-              :loading="uploadingTestCases"
-              :disabled="!selectedTestCaseFile"
-            >
-              上传测试点
-            </el-button>
+            <div class="mt-2">
+              <el-button
+                type="success"
+                size="small"
+                @click="handleUploadTestCases"
+                :loading="uploadingTestCases"
+                :disabled="!selectedTestCaseFile"
+              >
+                上传测试点
+              </el-button>
+              <el-button
+                type="info"
+                size="small"
+                :icon="Download"
+                @click="handleDownloadTestCases"
+                :loading="downloadingTestCases"
+              >
+                下载所有测试点
+              </el-button>
+              <el-popconfirm title="确定要删除所有测试点吗？" @confirm="handleDeleteAllTestCases">
+                <template #reference>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    :icon="Delete"
+                    :loading="deletingTestCases"
+                  >
+                    删除所有测试点
+                  </el-button>
+                </template>
+              </el-popconfirm>
+            </div>
           </el-form-item>
         </div>
         <div v-else>
@@ -180,7 +214,7 @@
               placeholder="例如：生成 10 组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
             />
           </el-form-item>
-          <row :gutter="20">
+          <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="测试点个数">
                 <el-input-number v-model="testDataForm.count" :min="1" :max="50" />
@@ -194,7 +228,7 @@
                 />
               </el-form-item>
             </el-col>
-          </row>
+          </el-row>
         </el-form>
       </div>
 
@@ -258,7 +292,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   getProblemList,
   createProblem,
@@ -266,12 +301,15 @@ import {
   deleteProblem,
   getProblemDetail,
   uploadTestCases,
+  downloadTestCases,
+  deleteAllTestCases,
 } from '@/api/problem'
 import { askLLM, executeAndSubmitTestData } from '@/api/llm'
 import { ElMessage } from 'element-plus'
-import { Plus, Edit, Delete, MagicStick, Cpu, Loading } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, MagicStick, Cpu, Loading, Download } from '@element-plus/icons-vue'
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 
+const router = useRouter()
 const problems = ref([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -328,6 +366,8 @@ const miniEditorOptions = {
 const testCaseFileList = ref([])
 const selectedTestCaseFile = ref(null)
 const uploadingTestCases = ref(false)
+const downloadingTestCases = ref(false)
+const deletingTestCases = ref(false)
 
 const form = ref({
   title: '',
@@ -337,6 +377,12 @@ const form = ref({
   time_limit: 1000,
   memory_limit: 128,
   template_code: '',
+})
+
+const languageArray = ref(['python'])
+
+watch(languageArray, (newVal) => {
+  form.value.language = newVal.join(',')
 })
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑题目' : '新增题目'))
@@ -362,6 +408,7 @@ const resetForm = () => {
     memory_limit: 128,
     template_code: '',
   }
+  languageArray.value = ['python']
   currentProblemId.value = null
 
   // Reset test case upload
@@ -419,6 +466,7 @@ const generateProblem = async () => {
         memory_limit: res.memory_limit || 128,
         template_code: res.template_code || '',
       }
+      languageArray.value = (res.language || 'python').split(',').map(s => s.trim())
       aiDialogVisible.value = false
       dialogVisible.value = true
       ElMessage.success('题目已生成，请预览并确认')
@@ -442,10 +490,13 @@ const handleEdit = async (row) => {
 
   try {
     const detail = await getProblemDetail(row.id)
-    form.value = { ...detail }
-    if (!form.value.language) {
-      form.value.language = 'python'
+    // Ensure template_code is a string to avoid Monaco Editor \"Illegal argument\" error
+    form.value = {
+      ...detail,
+      template_code: detail.template_code || '',
+      language: detail.language || 'python'
     }
+    languageArray.value = (detail.language || 'python').split(',').map(s => s.trim())
   } catch (error) {
     ElMessage.error('获取题目详情失败')
     dialogVisible.value = false
@@ -524,15 +575,15 @@ const handleGenerateScript = async () => {
         role: '自动化测试专家',
         task: '编写一个单元测试脚本，用于验证学生提交的代码实现。',
         rule: `【重要】脚本必须包含/导入学生的代码。
-        - 对于 C++: 使用 #include "solution.cpp"
+        - 对于 C++: 使用 #include \"solution.cpp\"
         - 对于 Java: 假设学生类在同包下直接调用，或使用 import Solution;
         - 对于 Python: 使用 from solution import *
         严禁在脚本中自行实现题目要求的类，必须测试外部导入的实现。最后一行必须只打印一个 0-100 的整数分数。`,
       },
       kaggle: {
         role: '数据科学竞赛裁判',
-        task: '编写一个评估脚本，用于对比学生的预测结果和已有的标准答案。',
-        rule: '【重要】严禁在脚本中生成随机数据或创建 truth.csv。脚本应假设当前目录下已存在 truth.csv（老师上传）和 submission.csv（学生上传）。脚本只需读取这两个文件，计算指标（如 Accuracy/MSE），最后一行只打印一个 0-100 的整数分数。',
+        task: '编写一个评估脚本，用于对比学生的预测结果 and 已有的标准答案。',
+        rule: '【重要】严禁在脚本中生成随机数据 or 创建 truth.csv。脚本应假设当前目录下已存在 truth.csv（老师上传）和 submission.csv（学生上传）。脚本只需读取这两个文件，计算指标（如 Accuracy/MSE），最后一行只打印一个 0-100 的整数分数。',
       },
     }
 
@@ -559,7 +610,7 @@ const handleGenerateScript = async () => {
       },
     })
 
-    generatedScript.value = res.code
+    generatedScript.value = res.code || ''
     generatedLanguage.value = res.language || (currentProblem.value.type === 'oop' ? (currentProblem.value.language || 'java') : 'python')
     aiStep.value = 1
   } catch (error) {
@@ -622,6 +673,42 @@ const handleUploadTestCases = async () => {
   }
 }
 
+const handleDownloadTestCases = async () => {
+  downloadingTestCases.value = true
+  try {
+    const blob = await downloadTestCases(currentProblemId.value)
+    const url = window.URL.createObjectURL(new Blob([blob]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `problem_${currentProblemId.value}_testcases.zip`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('下载开始')
+  } catch (error) {
+    ElMessage.error('下载失败')
+  } finally {
+    downloadingTestCases.value = false
+  }
+}
+
+const handleDeleteAllTestCases = async () => {
+  deletingTestCases.value = true
+  try {
+    await deleteAllTestCases(currentProblemId.value)
+    ElMessage.success('所有测试点已删除')
+  } catch (error) {
+    ElMessage.error('删除失败')
+  } finally {
+    deletingTestCases.value = false
+  }
+}
+
+const goToProblem = (id) => {
+  router.push({ name: 'problem-detail', params: { id } })
+}
+
 onMounted(() => {
   fetchProblems()
 })
@@ -643,6 +730,8 @@ onMounted(() => {
 }
 .mt-2 {
   margin-top: 10px;
+  display: flex;
+  gap: 10px;
 }
 .test-cases-section {
   margin-top: 20px;

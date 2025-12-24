@@ -10,7 +10,7 @@ class Submission(db.Model):
 
     # 外键关联：关联到用户和题目
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    problem_id = db.Column(db.Integer, db.ForeignKey('problems.id'), nullable=False)
+    problem_id = db.Column(db.Integer, db.ForeignKey('problems.id', ondelete='CASCADE'), nullable=False)
     
     # 考试关联
     exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=True)
@@ -32,7 +32,8 @@ class Submission(db.Model):
 
     # 建立模型间的关系，方便查询
     user = db.relationship('User', backref=db.backref('submissions', lazy=True))
-    problem = db.relationship('Problem', backref=db.backref('submissions', lazy=True))
+    # problem 关系已在 Problem 模型中通过 backref 定义，此处可省略或保持一致
+    # problem = db.relationship('Problem', backref=db.backref('submissions', lazy=True))
     exam = db.relationship('Exam', backref=db.backref('submissions', lazy=True))
 
     def __repr__(self):

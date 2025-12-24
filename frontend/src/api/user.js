@@ -4,9 +4,9 @@ import request from '@/utils/request'
  * Get the submission history for the currently logged-in user.
  * The user is identified by the token sent in the request header.
  */
-export function getUserSubmissions() {
+export function getUserSubmissions(userId = null) {
   return request({
-    url: '/user/submissions', // Assumes the blueprint is mounted at /user
+    url: userId ? `/user/${userId}/submissions` : '/user/submissions',
     method: 'get'
   })
 }
@@ -16,5 +16,19 @@ export function register(data) {
     url: '/auth/register',
     method: 'post',
     data
+  })
+}
+
+export function getUserProfile(userId) {
+  return request({
+    url: `/user/${userId}/profile`,
+    method: 'get'
+  })
+}
+
+export function getAllUsers() {
+  return request({
+    url: '/user/all',
+    method: 'get'
   })
 }

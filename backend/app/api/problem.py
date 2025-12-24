@@ -25,7 +25,7 @@ def create_problem():
     new_problem = Problem(
         title=data.get('title'),
         content=data.get('content'),
-        language=data.get('language'),
+        language=data.get('language'), # 前端传过来的是逗号分隔的字符串
         type=data.get('type'),  # 'acm', 'oop', 'kaggle'
         time_limit=data.get('time_limit', 1000),
         memory_limit=data.get('memory_limit', 128),
@@ -48,7 +48,9 @@ def get_problems():
         "id": p.id,
         "title": p.title,
         "type": p.type,
-        "language":p.language
+        "language": p.language,
+        "time_limit": p.time_limit,
+        "memory_limit": p.memory_limit
     } for p in problems]), 200
 
 

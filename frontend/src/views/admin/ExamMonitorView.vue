@@ -126,10 +126,42 @@
         <el-col :span="16">
           <div class="code-container">
             <div class="code-toolbar">
-              <el-tag size="small">{{ currentSubmission?.language }}</el-tag>
+              <div class="toolbar-left">
+                <el-tag size="small">{{ currentSubmission?.language }}</el-tag>
+
+                <!-- Settings Popover -->
+                <el-popover placement="bottom" :width="300" trigger="click" popper-class="editor-settings-popover">
+                  <template #reference>
+                    <el-button :icon="Setting" circle size="small" class="settings-btn" />
+                  </template>
+                  <div class="settings-panel">
+                    <h4 class="settings-title">查看器设置</h4>
+                    <el-form label-position="left" label-width="80px" size="small">
+                      <el-form-item label="字体大小">
+                        <el-select v-model="fontSize" @change="saveSettings">
+                          <el-option v-for="size in [12, 14, 16, 18, 20, 24]" :key="size" :label="size + 'px'" :value="size" />
+                        </el-select>
+                      </el-form-item>
+                      <el-form-item label="字体家族">
+                        <el-select v-model="fontFamily" @change="saveSettings">
+                          <el-option label="Fira Code" value="'Fira Code', monospace" />
+                          <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace" />
+                          <el-option label="Source Code Pro" value="'Source Code Pro', monospace" />
+                          <el-option label="Courier New" value="'Courier New', monospace" />
+                        </el-select>
+                      </el-form-item>
+                      <el-form-item label="启用连字">
+                        <el-switch v-model="fontLigatures" @change="saveSettings" />
+                      </el-form-item>
+                    </el-form>
+                  </div>
+                </el-popover>
+              </div>
               <el-button size="small" @click="copyCode">复制代码</el-button>
             </div>
-            <pre class="code-viewer"><code>{{ currentSubmission?.code }}</code></pre>
+            <div class="code-viewer-wrapper">
+              <pre v-html="highlightedCode" class="hljs" :style="viewerStyle"></pre>
+            </div>
           </div>
         </el-col>
         <el-col :span="8">
@@ -175,8 +207,10 @@ import { useRoute } from 'vue-router'
 import { getExamMonitor, getSubmissionDetail } from '@/api/exam'
 import { getProblemDetail } from '@/api/problem'
 import { askLLM } from '@/api/llm'
-import { Refresh, View } from '@element-plus/icons-vue'
+import { Refresh, View, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/vs2015.css'
 
 const route = useRoute()
 const examId = route.params.id
@@ -193,6 +227,23 @@ const detailLoading = ref(false)
 const currentSubmission = ref(null)
 const currentProblem = ref(null)
 
+// Viewer Settings (Sync with ProblemDetailView)
+const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
+const fontFamily = ref(localStorage.getItem('editorFontFamily') || "'Fira Code', 'Courier New', monospace")
+const fontLigatures = ref(localStorage.getItem('editorFontLigatures') !== 'false')
+
+const saveSettings = () => {
+  localStorage.setItem('editorFontSize', fontSize.value)
+  localStorage.setItem('editorFontFamily', fontFamily.value)
+  localStorage.setItem('editorFontLigatures', fontLigatures.value)
+}
+
+const viewerStyle = computed(() => ({
+  fontSize: fontSize.value + 'px',
+  fontFamily: fontFamily.value,
+  fontVariantLigatures: fontLigatures.value ? 'normal' : 'none'
+}))
+
 const autoRefresh = ref(false)
 let refreshTimer = null
 
@@ -204,6 +255,16 @@ const fullScoreCount = computed(() => {
   if (!participants.value.length || !problems.value.length) return 0
   const maxPossible = problems.value.reduce((sum, p) => sum + (p.max_score || 0), 0)
   return participants.value.filter(u => u.total_score >= maxPossible).length
+})
+
+const highlightedCode = computed(() => {
+  if (!currentSubmission.value?.code) return ''
+  const lang = currentSubmission.value.language?.toLowerCase() || 'plaintext'
+  try {
+    return hljs.highlight(currentSubmission.value.code, { language: lang }).value
+  } catch (e) {
+    return hljs.highlightAuto(currentSubmission.value.code).value
+  }
 })
 
 const fetchMonitorData = async () => {
@@ -374,16 +435,43 @@ onUnmounted(() => clearInterval(refreshTimer))
   background: #f8f9fa;
   border-bottom: 1px solid var(--el-border-color);
 }
-.code-viewer {
-  margin: 0;
-  padding: 16px;
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-btn {
+  background-color: transparent;
+  border: none;
+  color: #888;
+  transition: color 0.3s;
+}
+.settings-btn:hover {
+  color: var(--el-color-primary);
+  background-color: #ecf5ff;
+}
+.code-viewer-wrapper {
   background: #1e1e1e;
-  color: #d4d4d4;
   max-height: 65vh;
   overflow: auto;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 14px;
+}
+.hljs {
+  margin: 0;
+  padding: 16px;
   line-height: 1.5;
+  background: transparent;
+}
+
+/* Settings Panel */
+.settings-panel {
+  padding: 10px;
+}
+.settings-title {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
 }
 
 .ai-analysis-card {

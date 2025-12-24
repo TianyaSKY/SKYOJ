@@ -92,6 +92,12 @@ const router = createRouter({
       component: () => import('../views/ProfileView.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/profile/:id',
+      name: 'user-profile',
+      component: () => import('../views/ProfileView.vue'),
+      meta: { requiresAuth: true }
+    },
     // Documentation Routes
     {
       path: '/docs/acm',
