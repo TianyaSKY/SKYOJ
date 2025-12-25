@@ -1,4 +1,5 @@
 import os
+import threading
 
 from app.models.dataset import Dataset
 from app.models.user import db
@@ -8,11 +9,38 @@ from werkzeug.utils import secure_filename
 
 dataset_bp = Blueprint('dataset', __name__)
 
+# 限制最大上传大小为 500MB
+MAX_DATASET_SIZE = 500 * 1024 * 1024
+
+
+def async_save_file(app_context, file_data, file_path, dataset_id):
+    """异步保存文件并更新数据库状态（如果需要）"""
+    with app_context:
+        try:
+            with open(file_path, 'wb') as f:
+                f.write(file_data)
+            # 这里可以添加后续处理逻辑，如解压、校验等
+        except Exception as e:
+            print(f"Error in async_save_file: {e}")
+
 
 @dataset_bp.route('', methods=['GET'])
 def get_datasets():
-    datasets = Dataset.query.all()
-    return jsonify([d.to_dict() for d in datasets])
+    page = request.args.get('page', type=int)
+    page_size = request.args.get('page_size', type=int)
+
+    if page and page_size:
+        pagination = Dataset.query.order_by(Dataset.id.desc()).paginate(page=page, per_page=page_size, error_out=False)
+        datasets = pagination.items
+        return jsonify({
+            "total": pagination.total,
+            "page": pagination.page,
+            "page_size": pagination.per_page,
+            "datasets": [d.to_dict() for d in datasets]
+        }), 200
+
+    datasets = Dataset.query.order_by(Dataset.id.desc()).all()
+    return jsonify([d.to_dict() for d in datasets]), 200
 
 
 @dataset_bp.route('', methods=['POST'])
@@ -29,39 +57,57 @@ def upload_dataset():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
+    # 检查文件大小 (从 Content-Length 获取，或者读取一部分检查)
+    # 注意：request.content_length 可能不可靠，取决于客户端
+    file.seek(0, os.SEEK_END)
+    size_bytes = file.tell()
+    file.seek(0)  # 重置指针
+
+    if size_bytes > MAX_DATASET_SIZE:
+        return jsonify({'error': f'File too large. Maximum size is {MAX_DATASET_SIZE // (1024 * 1024)}MB.You file size is {size_bytes // (1024 * 1024)}'}), 413
+
     name = request.form.get('name')
     description = request.form.get('description')
 
     filename = secure_filename(file.filename)
-    # 确保 UPLOAD_FOLDER 配置存在，或者使用默认路径
     upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
     upload_dir = os.path.join(upload_folder, 'datasets')
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
 
     file_path = os.path.join(upload_dir, filename)
-    file.save(file_path)
 
-    # Calculate file size
-    size_bytes = os.path.getsize(file_path)
+    # 格式化文件大小显示
     if size_bytes < 1024:
-        file_size = f"{size_bytes} B"
+        file_size_str = f"{size_bytes} B"
     elif size_bytes < 1024 * 1024:
-        file_size = f"{size_bytes / 1024:.2f} KB"
+        file_size_str = f"{size_bytes / 1024:.2f} KB"
     else:
-        file_size = f"{size_bytes / (1024 * 1024):.2f} MB"
+        file_size_str = f"{size_bytes / (1024 * 1024):.2f} MB"
 
+    # 先创建数据库记录
     dataset = Dataset(
         name=name,
         description=description,
         file_path=file_path,
-        file_size=file_size,
+        file_size=file_size_str,
         uploader_id=request.current_user.id
     )
     db.session.add(dataset)
     db.session.commit()
 
-    return jsonify(dataset.to_dict()), 201
+    # 异步保存文件
+    file_data = file.read()
+    thread = threading.Thread(
+        target=async_save_file,
+        args=(current_app.app_context(), file_data, file_path, dataset.id)
+    )
+    thread.start()
+
+    return jsonify({
+        "message": "Upload started",
+        "dataset": dataset.to_dict()
+    }), 202
 
 
 @dataset_bp.route('/<int:id>', methods=['DELETE'])

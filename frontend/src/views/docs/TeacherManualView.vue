@@ -2,11 +2,26 @@
   <div class="teacher-manual-container">
     <div class="markdown-body">
       <h1>教师操作手册 (内部文档)</h1>
-      <p>本文档仅供教师查阅，包含 ACM、OOP、Kaggle 题目的录入指南，以及判题脚本（打分）的示例代码和推荐解答代码格式。</p>
+      <p>本文档仅供教师查阅，包含 AI 辅助出题、ACM/OOP/Kaggle 题目的录入指南，以及判题脚本（打分）的示例代码。</p>
 
-      <h2>1. 题目录入指南</h2>
+      <h2>1. AI 辅助出题</h2>
+      <p>SKYOJ 深度集成了大语言模型，可以帮助教师快速生成高质量的编程题目。</p>
+      <ul>
+        <li><strong>操作路径</strong>: 题目管理 -> 点击右上角 <strong>"AI 生成题目"</strong>。</li>
+        <li><strong>配置项</strong>:
+          <ul>
+            <li><strong>题目背景/方向</strong>: 描述你想要的题目主题（如：字符串处理、动态规划、面向对象设计等）。</li>
+            <li><strong>难度</strong>: 选择简单、中等或困难。</li>
+          </ul>
+        </li>
+        <li><strong>生成结果</strong>: AI 会自动生成题目名称、Markdown 格式的描述、初始模板代码、建议的判题模式（ACM/OOP/Kaggle）及资源限制。教师可以在预览后进行二次修改。</li>
+      </ul>
 
-      <h3>1.1 基础配置</h3>
+      <hr>
+
+      <h2>2. 题目录入指南</h2>
+
+      <h3>2.1 基础配置</h3>
       <ul>
         <li><strong>标题</strong>: 题目名称。</li>
         <li><strong>类型</strong>:
@@ -21,43 +36,37 @@
         <li><strong>默认模板代码</strong>: 提供给学生的初始代码框架。</li>
       </ul>
 
-      <h3>1.2 ACM 模式题目</h3>
+      <h3>2.2 ACM 模式题目</h3>
       <p>ACM 模式通常为标准输入输出判题，适用于算法竞赛。</p>
       <ul>
         <li><strong>描述信息</strong>: 包含题目描述、输入描述、输出描述、样例等。</li>
         <li><strong>测试数据</strong>:
           <ul>
-            <li>上传 <code>.zip</code> 压缩包。</li>
-            <li>包内文件结构应为平铺（无文件夹），成对出现：<code>1.in</code>, <code>1.out</code>, <code>2.in</code>, <code>2.out</code>...
-            </li>
+            <li>手动上传：上传 <code>.zip</code> 压缩包，包内文件应为 <code>1.in</code>, <code>1.out</code> 等成对出现。</li>
+            <li>AI 生成：使用 <strong>AICase</strong> 工具自动生成。</li>
           </ul>
         </li>
       </ul>
 
-      <h3>1.3 OOP 模式题目 (面向对象设计)</h3>
+      <h3>2.3 OOP 模式题目 (面向对象设计)</h3>
       <p>OOP 模式侧重于类的设计、接口实现与代码复用。</p>
       <ul>
-        <li><strong>判题机制</strong>: 教师需上传单元测试文件（如 Java 的 JUnit 测试类，Python 的 <code>unittest</code>
-          文件）。
-        </li>
-        <li><strong>AICase 工具</strong>: 推荐使用管理后台的 "AICase" 功能。它可以根据题目描述自动生成测试脚本，并自动完成测试点的部署。
+        <li><strong>判题机制</strong>: 教师需上传单元测试文件（如 Java 的 JUnit 测试类，Python 的 <code>unittest</code> 文件）。</li>
+        <li><strong>AICase 工具</strong>: 强烈推荐使用 <strong>AICase</strong>。它可以根据题目描述自动生成测试脚本，并自动完成测试点的部署。
         </li>
       </ul>
 
-      <h3>1.4 Kaggle 模式题目 (数据科学/机器学习)</h3>
+      <h3>2.4 Kaggle 模式题目 (数据科学/机器学习)</h3>
       <p>Kaggle 模式用于数据分析与模型预测任务。</p>
       <ul>
-        <li><strong>数据集</strong>: 教师需在题目描述中提供 <code>train.csv</code> 和 <code>test.csv</code> 的下载链接。
-        </li>
+        <li><strong>数据集托管</strong>: 教师可以先在 <strong>"数据集"</strong> 页面上传 <code>train.csv</code> 和 <code>test.csv</code>，然后复制下载链接填入题目描述中。</li>
         <li><strong>评分标准</strong>: 教师需上传 <code>truth.csv</code> (包含测试集 ID 和正确标签)。</li>
-        <li><strong>判题脚本</strong>: 使用 "AICase" 生成或手动编写 Python 脚本，读取 <code>truth.csv</code> 和学生提交的
-          <code>submission.csv</code> 计算得分。
-        </li>
+        <li><strong>判题脚本</strong>: 使用 <strong>AICase</strong> 生成或手动编写 Python 脚本，读取 <code>truth.csv</code> 和学生提交的 <code>submission.csv</code> 计算得分。</li>
       </ul>
 
       <hr>
 
-      <h2>2. AICase 自动化工具</h2>
+      <h2>3. AICase 自动化工具</h2>
       <p>在题目管理页面，点击题目右侧的 <strong>"AICase"</strong> 按钮，可以进入 AI 辅助测试数据生成流程：</p>
       <ol>
         <li><strong>配置方向</strong>: 输入对测试数据的具体要求（如：数据规模、边界条件）。</li>
@@ -67,7 +76,7 @@
 
       <hr>
 
-      <h2>3. 打分示例代码 (Special Judge / Checker)</h2>
+      <h2>4. 打分示例代码 (Special Judge / Checker)</h2>
       <p>当标准对比（diff）无法满足需求时，需要编写评估脚本。脚本最后一行必须输出 0-100 的整数分数。</p>
 
       <h3>Python OOP 示例</h3>

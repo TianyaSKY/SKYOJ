@@ -12,6 +12,8 @@ from app.api.problem import problem_bp
 from app.api.submission import submission_bp
 from app.api.sys_dict import sys_dict_bp
 from app.api.user import user_bp
+from app.api.search import search_bp
+from app.api.plagiarism import plagiarism_bp
 from app.models.sysdict import SysDict
 from app.models.user import db
 from app.utils.sys_dict import sys_dict_kv
@@ -69,6 +71,8 @@ app.register_blueprint(dataset_bp, url_prefix='/api/datasets')
 app.register_blueprint(sys_dict_bp, url_prefix='/api/sys')
 app.register_blueprint(exam_bp, url_prefix='/api/exams')
 app.register_blueprint(llm_bp, url_prefix='/api/llm')
+app.register_blueprint(search_bp, url_prefix='/api/search')
+app.register_blueprint(plagiarism_bp, url_prefix='/api/plagiarism')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

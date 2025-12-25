@@ -65,6 +65,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-container">
+        <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- Upload Dialog -->
@@ -87,7 +99,7 @@
             <el-button type="primary">选择文件</el-button>
             <template #tip>
               <div class="el-upload__tip">
-                请上传 ZIP, CSV, JSON 等格式的文件。
+                请上传 ZIP, CSV, JSON 等格式的文件，最大限制 500MB。
               </div>
             </template>
           </el-upload>
@@ -115,9 +127,14 @@ import {Delete, Download, Link, Upload} from '@element-plus/icons-vue'
 const userStore = useUserStore()
 const datasets = ref([])
 const loading = ref(false)
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
 const uploadDialogVisible = ref(false)
 const uploading = ref(false)
 const uploadRef = ref(null)
+
+const MAX_SIZE_MB = 500
 
 const uploadForm = ref({
   name: '',
@@ -130,13 +147,33 @@ const isTeacher = computed(() => userStore.user?.role === 'teacher')
 const fetchDatasets = async () => {
   loading.value = true
   try {
-    const response = await getDatasetList()
-    datasets.value = response.data || response
+    const res = await getDatasetList({
+      page: currentPage.value,
+      page_size: pageSize.value
+    })
+    if (res.datasets) {
+      datasets.value = res.datasets
+      total.value = res.total
+    } else {
+      datasets.value = res.data || res
+      total.value = datasets.value.length
+    }
   } catch (error) {
     ElMessage.error('获取数据集列表失败')
   } finally {
     loading.value = false
   }
+}
+
+const handleSizeChange = (val) => {
+  pageSize.value = val
+  currentPage.value = 1
+  fetchDatasets()
+}
+
+const handleCurrentChange = (val) => {
+  currentPage.value = val
+  fetchDatasets()
 }
 
 const handleDownload = (row) => {
@@ -171,6 +208,13 @@ const handleDelete = async (row) => {
 }
 
 const handleFileChange = (file) => {
+  const isLtLimit = file.size / 1024 / 1024 < MAX_SIZE_MB
+  if (!isLtLimit) {
+    ElMessage.error(`上传文件大小不能超过 ${MAX_SIZE_MB}MB!`)
+    uploadRef.value?.clearFiles()
+    uploadForm.value.file = null
+    return
+  }
   uploadForm.value.file = file.raw
 }
 
@@ -193,9 +237,12 @@ const handleUpload = async () => {
     formData.append('file', uploadForm.value.file)
 
     await uploadDataset(formData)
-    ElMessage.success('上传成功！')
+    ElMessage.success('上传已开始，请稍后刷新列表查看')
     uploadDialogVisible.value = false
-    fetchDatasets()
+    // 延迟刷新，给异步保存一点时间
+    setTimeout(() => {
+      fetchDatasets()
+    }, 1000)
   } catch (error) {
     ElMessage.error('上传失败')
   } finally {
@@ -222,5 +269,11 @@ onMounted(() => {
 
 .header-title {
   margin: 0;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 </style>

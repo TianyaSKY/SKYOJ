@@ -16,6 +16,11 @@
             style="width: 350px"
         />
         <div class="filter-group">
+          <el-switch
+              v-model="isSemanticSearch"
+              active-text="语义搜索"
+              style="margin-right: 15px"
+          />
           <el-select v-model="typeFilter" clearable placeholder="题目类型" style="width: 140px">
             <el-option label="ACM" value="acm"/>
             <el-option label="Kaggle" value="kaggle"/>
@@ -26,7 +31,7 @@
 
       <el-table
           v-loading="loading"
-          :data="paginatedProblems"
+          :data="filteredProblems"
           :header-cell-style="{ background: '#f8f9fa', color: '#606266', fontWeight: 'bold' }"
           class="problem-table"
           style="width: 100%"
@@ -120,16 +125,18 @@
 <script setup>
 import {computed, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
-import {getProblemList} from '@/api/problem'
+import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
 
 const loading = ref(false)
-const allProblems = ref([])
+const problems = ref([])
+const semanticSearchResults = ref([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
 const typeFilter = ref('')
+const isSemanticSearch = ref(false)
 
 const capitalize = (str) => {
   if (!str) return ''
@@ -150,11 +157,31 @@ const getTypeTag = (type) => {
   return map[type.toLowerCase()] || 'info'
 }
 
+const performSemanticSearch = async () => {
+  if (!searchQuery.value) {
+    semanticSearchResults.value = []
+    return
+  }
+  loading.value = true
+  try {
+    const data = await searchProblems({ query: searchQuery.value })
+    semanticSearchResults.value = data
+    // Reset pagination
+    currentPage.value = 1
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('语义搜索失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 // Filter problems based on search query and type
 const filteredProblems = computed(() => {
-  let result = allProblems.value
+  const useSemantic = isSemanticSearch.value && searchQuery.value
+  let result = useSemantic ? semanticSearchResults.value : problems.value
 
-  if (searchQuery.value) {
+  if (!useSemantic && searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(p =>
         (p.title && p.title.toLowerCase().includes(query)) ||
@@ -169,27 +196,43 @@ const filteredProblems = computed(() => {
   return result
 })
 
-// Paginate the filtered results
-const paginatedProblems = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredProblems.value.slice(start, end)
+let debounceTimer = null
+watch(searchQuery, (newVal) => {
+  if (isSemanticSearch.value) {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    if (newVal) {
+      loading.value = true
+      debounceTimer = setTimeout(() => {
+        performSemanticSearch()
+      }, 500)
+    } else {
+      semanticSearchResults.value = []
+      loading.value = false
+    }
+  }
 })
 
-// Update total when filter changes
-watch(filteredProblems, (newVal) => {
-  total.value = newVal.length
-  if (currentPage.value > Math.ceil(total.value / pageSize.value) && total.value > 0) {
-    currentPage.value = 1
+watch(isSemanticSearch, (val) => {
+  if (val && searchQuery.value) {
+    performSemanticSearch()
   }
 })
 
 const fetchProblems = async () => {
   loading.value = true
   try {
-    const data = await getProblemList()
-    allProblems.value = data
-    total.value = data.length
+    const res = await getProblemList({
+      page: currentPage.value,
+      page_size: pageSize.value
+    })
+    if (res.problems) {
+      problems.value = res.problems
+      total.value = res.total
+    } else {
+      // Fallback for non-paginated response
+      problems.value = res
+      total.value = res.length
+    }
   } catch (error) {
     console.error(error)
     ElMessage.error('获取题目列表失败')
@@ -200,10 +243,13 @@ const fetchProblems = async () => {
 
 const handleSizeChange = (val) => {
   pageSize.value = val
+  currentPage.value = 1
+  fetchProblems()
 }
 
 const handleCurrentChange = (val) => {
   currentPage.value = val
+  fetchProblems()
 }
 
 onMounted(() => {
@@ -244,6 +290,11 @@ onMounted(() => {
   margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
   align-items: center;
 }
 

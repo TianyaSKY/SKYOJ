@@ -35,7 +35,7 @@
     <h3 class="section-title">核心管理</h3>
     <el-row :gutter="20" class="dashboard-cards">
       <!-- 题目管理卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'problem-admin' })">
           <div class="nav-icon" style="color: #409EFF; background-color: #ecf5ff">
             <el-icon :size="32">
@@ -51,7 +51,7 @@
       </el-col>
 
       <!-- 考试管理卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'exam-admin' })">
           <div class="nav-icon" style="color: #F56C6C; background-color: #fef0f0">
             <el-icon :size="32">
@@ -66,16 +66,48 @@
         </div>
       </el-col>
 
-      <!-- 系统设置卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24">
-        <div class="nav-card" @click="openSysSettings">
+      <!-- 提交管理卡片 -->
+      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
+        <div class="nav-card" @click="$router.push({ name: 'submission-admin' })">
+          <div class="nav-icon" style="color: #67C23A; background-color: #f0f9eb">
+            <el-icon :size="32">
+              <Monitor/>
+            </el-icon>
+          </div>
+          <h3>提交管理</h3>
+          <p>查看所有学生的提交记录，进行多维度筛选及代码查重。</p>
+          <div class="nav-footer">
+            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
+          </div>
+        </div>
+      </el-col>
+
+      <!-- 查重管理卡片 -->
+      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
+        <div class="nav-card" @click="$router.push({ name: 'plagiarism-admin' })">
           <div class="nav-icon" style="color: #E6A23C; background-color: #fdf6ec">
+            <el-icon :size="32">
+              <Search/>
+            </el-icon>
+          </div>
+          <h3>查重管理</h3>
+          <p>查看代码查重日志，管理相似度报告及批量查重任务。</p>
+          <div class="nav-footer">
+            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
+          </div>
+        </div>
+      </el-col>
+
+      <!-- 系统设置卡片 -->
+      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
+        <div class="nav-card" @click="openSysSettings">
+          <div class="nav-icon" style="color: #909399; background-color: #f4f4f5">
             <el-icon :size="32">
               <Setting/>
             </el-icon>
           </div>
           <h3>系统设置</h3>
-          <p>配置网站公告、练习模式及 LLM 智能体 API 密钥。</p>
+          <p>配置网站标题、公告、运行模式及 AI 智能体 API 密钥。</p>
           <div class="nav-footer">
             <span>打开设置 <el-icon><ArrowRight/></el-icon></span>
           </div>
@@ -83,17 +115,17 @@
       </el-col>
 
       <!-- 教师手册卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24">
+      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'doc-teacher-manual' })">
-          <div class="nav-icon" style="color: #67C23A; background-color: #f0f9eb">
+          <div class="nav-icon" style="color: #7232dd; background-color: #f2edfe">
             <el-icon :size="32">
-              <Document/>
+              <Reading/>
             </el-icon>
           </div>
           <h3>教师手册</h3>
-          <p>查阅录入指南、AICase 使用说明及评分示例。</p>
+          <p>查看平台使用指南，了解如何高效管理题目、考试与查重。</p>
           <div class="nav-footer">
-            <span>查看文档 <el-icon><ArrowRight/></el-icon></span>
+            <span>立即查看 <el-icon><ArrowRight/></el-icon></span>
           </div>
         </div>
       </el-col>
@@ -183,6 +215,22 @@
             </el-row>
           </el-form>
         </el-tab-pane>
+
+        <el-tab-pane label="高级维护">
+          <el-alert :closable="false" class="mb-4" show-icon
+                    title="危险操作区，请谨慎操作。" type="warning"/>
+          <div class="maintenance-actions">
+            <div class="action-item">
+              <div class="action-info">
+                <h4>重建搜索索引</h4>
+                <p>当语义搜索结果不准确或新增题目未被索引时使用。</p>
+              </div>
+              <el-button :loading="rebuildLoading" type="warning" @click="handleRebuildIndex">
+                立即重建
+              </el-button>
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
 
       <template #footer>
@@ -198,16 +246,17 @@
 <script setup>
 import {onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
-import {ArrowRight, Document, InfoFilled, List, Plus, Setting, Timer} from '@element-plus/icons-vue'
-import {getSysInfo, getSysStatistics, updateSysInfo} from '@/api/sys'
+import {ArrowRight, InfoFilled, List, Plus, Search, Setting, Timer, Monitor, Reading} from '@element-plus/icons-vue'
+import {getSysInfo, getSysStatistics, rebuildIndex, updateSysInfo} from '@/api/sys'
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
-import {ElMessage} from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 
 const router = useRouter()
 const sysStore = useSysStore()
 const sysDialogVisible = ref(false)
 const sysSubmitting = ref(false)
+const rebuildLoading = ref(false)
 const sysForm = ref({
   title: '',
   info: '',
@@ -294,6 +343,29 @@ const handleSaveSysSettings = async () => {
     ElMessage.error('更新失败')
   } finally {
     sysSubmitting.value = false
+  }
+}
+
+const handleRebuildIndex = async () => {
+  try {
+    await ElMessageBox.confirm(
+        '重建索引可能需要一些时间，期间搜索功能可能受影响。是否继续？',
+        '确认重建索引',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+    )
+    rebuildLoading.value = true
+    await rebuildIndex()
+    ElMessage.success('索引重建任务已提交')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('重建索引失败')
+    }
+  } finally {
+    rebuildLoading.value = false
   }
 }
 
@@ -490,5 +562,33 @@ onMounted(() => {
 
 .dialog-footer {
   padding-top: 10px;
+}
+
+.maintenance-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+
+.action-info h4 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: #303133;
+}
+
+.action-info p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #909399;
 }
 </style>

@@ -7,6 +7,9 @@
       </template>
       <template #extra>
         <div class="flex items-center">
+          <el-button :loading="plagiarismLoading" type="warning" @click="handleCheckExamPlagiarism">
+            全场查重
+          </el-button>
           <el-button :icon="Refresh" :loading="loading" circle @click="fetchMonitorData"/>
           <el-tag :type="autoRefresh ? 'success' : 'info'" class="ml-2">
             {{ autoRefresh ? '自动刷新中' : '自动刷新关闭' }}
@@ -77,7 +80,12 @@
       <div v-if="detailLoading" v-loading="true" style="height: 200px"></div>
       <div v-else-if="currentSubmission">
         <div class="detail-section">
-          <h4>基本信息</h4>
+          <div class="flex justify-between items-center mb-4">
+            <h4>基本信息</h4>
+            <el-button :loading="singlePlagiarismLoading" size="small" type="warning" @click="handleCheckSinglePlagiarism">
+              单次查重
+            </el-button>
+          </div>
           <el-descriptions :column="1" border>
             <el-descriptions-item label="状态">
               <el-tag :type="getStatusType(currentSubmission.status)">{{ currentSubmission.status }}</el-tag>
@@ -207,11 +215,16 @@
 <script setup>
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
-import {getExamMonitor, getSubmissionDetail} from '@/api/exam'
+import {
+  checkExamPlagiarism,
+  checkSubmissionPlagiarism,
+  getExamMonitor,
+  getSubmissionDetail
+} from '@/api/exam'
 import {getProblemDetail} from '@/api/problem'
 import {askLLM} from '@/api/llm'
 import {Refresh, Setting, View} from '@element-plus/icons-vue'
-import {ElMessage} from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/vs2015.css'
 
@@ -229,6 +242,10 @@ const codeDialogVisible = ref(false)
 const detailLoading = ref(false)
 const currentSubmission = ref(null)
 const currentProblem = ref(null)
+
+// Plagiarism State
+const plagiarismLoading = ref(false)
+const singlePlagiarismLoading = ref(false)
 
 // Viewer Settings (Sync with ProblemDetailView)
 const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
@@ -360,6 +377,44 @@ const analyzeCode = async () => {
     ElMessage.error('AI 分析失败')
   } finally {
     aiLoading.value = false
+  }
+}
+
+const handleCheckExamPlagiarism = async () => {
+  try {
+    await ElMessageBox.confirm(
+        '确定要对整场考试进行查重吗？这可能需要一些时间。',
+        '全场查重确认',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+    )
+    plagiarismLoading.value = true
+    const res = await checkExamPlagiarism(examId)
+    ElMessage.success('查重任务已提交')
+    console.log('Plagiarism result:', res)
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('查重失败')
+    }
+  } finally {
+    plagiarismLoading.value = false
+  }
+}
+
+const handleCheckSinglePlagiarism = async () => {
+  if (!currentSubmission.value?.id) return
+  try {
+    singlePlagiarismLoading.value = true
+    const res = await checkSubmissionPlagiarism(currentSubmission.value.id)
+    ElMessage.success('单次查重任务已提交')
+    console.log('Single plagiarism result:', res)
+  } catch (error) {
+    ElMessage.error('查重失败')
+  } finally {
+    singlePlagiarismLoading.value = false
   }
 }
 

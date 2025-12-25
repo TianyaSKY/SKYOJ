@@ -8,6 +8,14 @@ export function getProblemList(params) {
     })
 }
 
+export function searchProblems(params) {
+    return request({
+        url: '/search',
+        method: 'get',
+        params
+    })
+}
+
 export function getProblemDetail(id) {
     return request({
         url: `/problems/${id}`,

@@ -102,3 +102,23 @@ export function getSubmissionDetail(id) {
         method: 'get'
     })
 }
+
+/**
+ * 查重单次提交
+ */
+export function checkSubmissionPlagiarism(id) {
+    return request({
+        url: `/submissions/${id}/check_plagiarism`,
+        method: 'post'
+    })
+}
+
+/**
+ * 查重整场考试
+ */
+export function checkExamPlagiarism(id) {
+    return request({
+        url: `/exams/${id}/check_plagiarism`,
+        method: 'post'
+    })
+}

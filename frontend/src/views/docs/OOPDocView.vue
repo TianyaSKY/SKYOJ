@@ -34,25 +34,22 @@
         <p>题目：实现一个 <code>Rectangle</code> 类，包含 <code>getArea()</code> 方法。</p>
 
         <h3>💯 满分</h3>
-        <pre><code>class Rectangle {
-    private int width, height;
-    public Rectangle(int w, int h) {
-        this.width = w;
-        this.height = h;
-    }
-    public int getArea() {
-        return width * height;
-    }
-}</code></pre>
-        <p>系统测试：<code>new Rectangle(3, 4).getArea()</code> 返回 <code>12</code>。测试通过。</p>
+        <pre><code>class Rectangle:
+    def __init__(self, w, h):
+        self.width = w
+        self.height = h
+
+    def getArea(self):
+        return self.width * self.height
+</code></pre>
+        <p>系统测试：<code>Rectangle(3, 4).getArea()</code> 返回 <code>12</code>。测试通过。</p>
 
         <h3>⚠️ 部分分 / 零分</h3>
-        <pre><code>class Rectangle {
-    // ... 构造函数 ...
-    public int getArea() {
-        return width + height; // 逻辑错误
-    }
-}</code></pre>
+        <pre><code>class Rectangle:
+    # ... 构造函数 ...
+    def getArea(self):
+        return self.width + self.height # 逻辑错误
+</code></pre>
         <p>系统测试：期望 <code>12</code>，实际返回 <code>7</code>。测试失败。</p>
       </div>
     </el-card>

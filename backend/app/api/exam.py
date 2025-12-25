@@ -5,8 +5,10 @@ from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db, User
+from app.services.plagiarism_service import start_plagiarism_check_task
 from app.utils.auth_tools import token_required, encode_auth_token
 from flask import Blueprint, request, jsonify, current_app
+from sqlalchemy import func
 
 exam_bp = Blueprint('exam', __name__)
 
@@ -301,3 +303,36 @@ def remove_problem_from_exam(exam_id, problem_id):
     db.session.delete(ep)
     db.session.commit()
     return jsonify({"message": "Problem removed from exam"}), 200
+
+
+@exam_bp.route('/<int:exam_id>/check_plagiarism', methods=['POST'])
+@token_required
+def check_exam_plagiarism(exam_id):
+    """
+    针对某场考试的所有人每一题的最后一次提交记录进行查重（教师手动触发）
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+
+    # 获取该考试中每个用户对每个题目的最后一次提交 ID
+    subquery = db.session.query(
+        Submission.user_id,
+        Submission.problem_id,
+        func.max(Submission.id).label('max_id')
+    ).filter(Submission.exam_id == exam_id).group_by(
+        Submission.user_id,
+        Submission.problem_id
+    ).subquery()
+
+    submission_ids = [row.max_id for row in db.session.query(subquery.c.max_id).all()]
+    
+    if not submission_ids:
+        return jsonify({"message": "No submissions found for this exam"}), 200
+
+    app = current_app._get_current_object()
+    start_plagiarism_check_task(app, submission_ids)
+
+    return jsonify({
+        "message": f"Plagiarism check started for {len(submission_ids)} final submissions in exam #{exam_id}.",
+        "count": len(submission_ids)
+    }), 202

@@ -4,9 +4,11 @@ import shutil
 import zipfile
 
 from app.models.problem import Problem
+from app.models.submission import Submission
 from app.models.user import db
+from app.services.plagiarism_service import start_plagiarism_check_task
 from app.utils.auth_tools import token_required
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
 
 problem_bp = Blueprint('problem', __name__)
@@ -42,7 +44,27 @@ def create_problem():
 
 @problem_bp.route('/', methods=['GET'])
 def get_problems():
-    problems = Problem.query.all()
+    page = request.args.get('page', type=int)
+    page_size = request.args.get('page_size', type=int)
+
+    if page and page_size:
+        pagination = Problem.query.order_by(Problem.id.desc()).paginate(page=page, per_page=page_size, error_out=False)
+        problems = pagination.items
+        return jsonify({
+            "total": pagination.total,
+            "page": pagination.page,
+            "page_size": pagination.per_page,
+            "problems": [{
+                "id": p.id,
+                "title": p.title,
+                "type": p.type,
+                "language": p.language,
+                "time_limit": p.time_limit,
+                "memory_limit": p.memory_limit
+            } for p in problems]
+        }), 200
+
+    problems = Problem.query.order_by(Problem.id.desc()).all()
     return jsonify([{
         "id": p.id,
         "title": p.title,
@@ -197,3 +219,27 @@ def download_test_cases(problem_id):
         as_attachment=True,
         download_name=f'problem_{problem_id}_test_cases.zip'
     )
+
+
+@problem_bp.route('/<int:problem_id>/check_plagiarism', methods=['POST'])
+@token_required
+def check_problem_plagiarism(problem_id):
+    """
+    针对某道题目的所有提交进行查重（教师手动触发）
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+
+    # 获取该题目的所有提交 ID
+    submission_ids = [s.id for s in Submission.query.filter_by(problem_id=problem_id).all()]
+    
+    if not submission_ids:
+        return jsonify({"message": "No submissions found for this problem"}), 200
+
+    app = current_app._get_current_object()
+    start_plagiarism_check_task(app, submission_ids)
+
+    return jsonify({
+        "message": f"Plagiarism check started for {len(submission_ids)} submissions.",
+        "count": len(submission_ids)
+    }), 202

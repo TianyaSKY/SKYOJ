@@ -81,4 +81,15 @@ h2 {
 h3 {
   font-size: 1.25em;
 }
+
+pre {
+  background-color: #f6f8fa;
+  padding: 16px;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+code {
+  font-family: monospace;
+}
 </style>

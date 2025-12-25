@@ -21,3 +21,10 @@ export function getSysStatistics() {
         method: 'get'
     })
 }
+
+export function rebuildIndex() {
+    return request({
+        url: '/search/rebuild',
+        method: 'post'
+    })
+}

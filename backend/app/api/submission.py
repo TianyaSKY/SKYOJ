@@ -5,8 +5,9 @@ from threading import Thread
 from app.models.exam import Exam
 from app.models.problem import Problem
 from app.models.submission import Submission
-from app.models.user import db
+from app.models.user import db, User
 from app.services.judge_service import judge_submission
+from app.services.plagiarism_service import start_plagiarism_check_task
 from app.utils.auth_tools import token_required
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
@@ -105,12 +106,75 @@ def submit_code():
     }), 202
 
 
+@submission_bp.route('', methods=['GET'])
+@token_required
+def list_submissions():
+    """
+    获取提交列表，支持多种筛选
+    """
+    problem_id = request.args.get('problem_id', type=int)
+    user_id = request.args.get('user_id', type=int)
+    exam_id = request.args.get('exam_id', type=int)
+    status = request.args.get('status')
+    username = request.args.get('username')
+    
+    query = Submission.query
+
+    # 权限控制：学生只能看自己的提交，除非是特定题目的公共提交（如果系统有此设定）
+    # 这里默认教师可以看所有，学生只能看自己的
+    if request.current_user.role == 'student':
+        query = query.filter(Submission.user_id == request.current_user.id)
+    elif user_id:
+        query = query.filter(Submission.user_id == user_id)
+    
+    if username:
+        query = query.join(User).filter(User.username.like(f"%{username}%"))
+
+    if problem_id:
+        query = query.filter(Submission.problem_id == problem_id)
+    
+    if exam_id:
+        query = query.filter(Submission.exam_id == exam_id)
+    
+    if status:
+        query = query.filter(Submission.status == status)
+
+    # 分页
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    pagination = query.order_by(Submission.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    submissions = pagination.items
+
+    return jsonify({
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": page,
+        "submissions": [{
+            "id": s.id,
+            "user_id": s.user_id,
+            "username": s.user.username,
+            "problem_id": s.problem_id,
+            "exam_id": s.exam_id,
+            "status": s.status,
+            "score": s.score,
+            "language": s.language,
+            "created_at": s.created_at.isoformat()
+        } for s in submissions]
+    }), 200
+
+
 @submission_bp.route('/<int:submission_id>', methods=['GET'])
 @token_required
 def get_submission(submission_id, *args, **kwargs):
     submission = Submission.query.get(submission_id)
     if not submission:
         return jsonify({"error": "Submission not found"}), 404
+    
+    # 权限检查
+    if request.current_user.role == 'student' and submission.user_id != request.current_user.id:
+        return jsonify({"error": "Permission denied"}), 403
+
     return jsonify({
         "id": submission.id,
         "status": submission.status,
@@ -121,3 +185,22 @@ def get_submission(submission_id, *args, **kwargs):
         "exam_id": submission.exam_id,
         "created_at": submission.created_at.isoformat()
     }), 200
+
+
+@submission_bp.route('/<int:submission_id>/check_plagiarism', methods=['POST'])
+@token_required
+def check_single_submission_plagiarism(submission_id):
+    """
+    针对单个提交记录进行查重（教师手动触发）
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+
+    submission = Submission.query.get_or_404(submission_id)
+    
+    app = current_app._get_current_object()
+    start_plagiarism_check_task(app, [submission.id])
+
+    return jsonify({
+        "message": f"Plagiarism check started for submission #{submission_id}."
+    }), 202

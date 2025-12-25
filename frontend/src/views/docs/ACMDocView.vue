@@ -39,8 +39,11 @@
         <h3>💯 满分 (Accepted)</h3>
         <p>题目：计算 A + B。</p>
         <pre><code># Python
-a, b = map(int, input().split())
-print(a + b)</code></pre>
+import sys
+
+for line in sys.stdin:
+    a, b = map(int, line.split())
+    print(a + b)</code></pre>
         <p>输入：<code>1 2</code><br>输出：<code>3</code> (与答案一致)</p>
 
         <h3>⚠️ 零分 (Wrong Answer)</h3>

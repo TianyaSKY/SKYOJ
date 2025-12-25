@@ -72,6 +72,24 @@ const router = createRouter({
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
+            path: '/admin/submissions',
+            name: 'submission-admin',
+            component: () => import('../views/admin/SubmissionAdminView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
+            path: '/admin/plagiarism',
+            name: 'plagiarism-admin',
+            component: () => import('../views/admin/PlagiarismLogView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
+            path: '/admin/plagiarism/compare',
+            name: 'code-compare',
+            component: () => import('../views/admin/CodeCompareView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
             path: '/rank',
             name: 'rank',
             component: () => import('../views/HomeView.vue') // Temporary

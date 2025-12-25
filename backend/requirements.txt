@@ -8,3 +8,5 @@ requests
 urllib3
 PyJWT
 openai
+torch
+sentence-transformers
