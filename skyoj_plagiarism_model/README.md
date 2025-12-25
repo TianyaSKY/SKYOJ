@@ -1,3 +1,5 @@
+### 由于模型文件过大 完整文件请移步[谷歌网盘](https://drive.google.com/file/d/1ZD8O-ZbWe_UFhll7QHWW9K2CvWb5qxPJ/view?usp=sharing)
+
 ---
 tags:
 - sentence-transformers

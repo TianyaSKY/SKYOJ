@@ -39,8 +39,6 @@ def ask_llm(
             "stream": False  # API 接口通常不需要流式返回给前端
         }
 
-        # 如果是 DeepSeek 等支持推理的模型，可以尝试开启 thinking (根据具体 API 供应商支持情况)
-        # 这里默认不开启 extra_body 以保持通用性，如果需要可以根据 model_name 判断添加
         if "deepseek" in model_name.lower():
             kwargs["extra_body"] = {"enable_thinking": False}
 
