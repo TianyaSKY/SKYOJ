@@ -15,9 +15,9 @@
     <el-row :gutter="20" class="stats-row">
       <el-col v-for="(stat, index) in stats" :key="stat.label" :span="6">
         <div
-            :class="{ 'clickable-stat': index === 3 }"
+            :class="{ 'clickable-stat': index === 2 || index === 3 }"
             class="stat-card"
-            @click="index === 3 ? userListVisible = true : null"
+            @click="handleStatClick(index)"
         >
           <div :style="{ color: stat.color, backgroundColor: stat.color + '15' }" class="stat-icon">
             <el-icon :size="24">
@@ -60,22 +60,6 @@
           </div>
           <h3>考试管理</h3>
           <p>组织在线考试、设置访问权限及监控实时进度。</p>
-          <div class="nav-footer">
-            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
-          </div>
-        </div>
-      </el-col>
-
-      <!-- 提交管理卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
-        <div class="nav-card" @click="$router.push({ name: 'submission-admin' })">
-          <div class="nav-icon" style="color: #67C23A; background-color: #f0f9eb">
-            <el-icon :size="32">
-              <Monitor/>
-            </el-icon>
-          </div>
-          <h3>提交管理</h3>
-          <p>查看所有学生的提交记录，进行多维度筛选及代码查重。</p>
           <div class="nav-footer">
             <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
           </div>
@@ -300,6 +284,14 @@ const fetchUsers = async () => {
     ElMessage.error('获取用户列表失败')
   } finally {
     usersLoading.value = false
+  }
+}
+
+const handleStatClick = (index) => {
+  if (index === 2) {
+    router.push({ name: 'submission-admin' })
+  } else if (index === 3) {
+    userListVisible.value = true
   }
 }
 

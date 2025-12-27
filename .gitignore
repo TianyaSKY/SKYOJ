@@ -12,3 +12,4 @@ backend/uploads/problems/*
 backend/uploads/submissions/*
 !backend/uploads/submissions/.gitkeep
 mysql_data/
+

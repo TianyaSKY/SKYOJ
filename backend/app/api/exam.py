@@ -1,13 +1,15 @@
 import hashlib
+import io
+import csv
 from datetime import datetime
 
 from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db, User
-from app.services.plagiarism_service import start_plagiarism_check_task
+from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required, encode_auth_token
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file
 from sqlalchemy import func
 
 exam_bp = Blueprint('exam', __name__)
@@ -57,7 +59,17 @@ def get_exams():
         exams = Exam.query.all()
     else:
         exams = Exam.query.filter_by(is_visible=True).all()
-    return jsonify([e.to_dict() for e in exams]), 200
+    
+    result = []
+    for e in exams:
+        d = e.to_dict()
+        # 获取题目数
+        d['problem_count'] = ExamProblem.query.filter_by(exam_id=e.id).count()
+        # 获取提交次数
+        d['submission_count'] = Submission.query.filter_by(exam_id=e.id).count()
+        result.append(d)
+        
+    return jsonify(result), 200
 
 
 @exam_bp.route('/<int:exam_id>', methods=['GET'])
@@ -92,12 +104,14 @@ def enter_exam(exam_id):
     if now > exam.end_time:
         return jsonify({"error": "Exam has already ended"}), 403
 
-    # 验证密码
-    if exam.password:
-        data = request.get_json()
-        input_password = data.get('password')
-        if hash_exam_password(input_password) != exam.password:
-            return jsonify({"error": "Incorrect password"}), 401
+    # 如果 Token 中的 exam_id 与当前考试 ID 一致，则跳过密码验证
+    if getattr(request, 'exam_id', -1) != exam_id:
+        # 验证密码
+        if exam.password:
+            data = request.get_json(silent=True) or {}
+            input_password = data.get('password')
+            if hash_exam_password(input_password) != exam.password:
+                return jsonify({"error": "Incorrect password"}), 401
 
     # 生成包含 exam_id 的新 Token
     new_token = encode_auth_token(
@@ -238,6 +252,61 @@ def get_exam_monitor(exam_id):
     }), 200
 
 
+@exam_bp.route('/<int:exam_id>/rank', methods=['GET'])
+@token_required
+def get_exam_rank(exam_id):
+    """
+    获取 ACM 模式滚榜数据
+    """
+    exam = Exam.query.get_or_404(exam_id)
+    exam_problems = ExamProblem.query.filter_by(exam_id=exam_id).all()
+    problem_ids = [ep.problem_id for ep in exam_problems]
+    
+    # 获取该考试的所有提交记录
+    submissions = Submission.query.filter(
+        Submission.exam_id == exam_id,
+        Submission.problem_id.in_(problem_ids)
+    ).order_by(Submission.created_at.asc()).all()
+
+    rank_data = {}
+    for sub in submissions:
+        if sub.user_id not in rank_data:
+            rank_data[sub.user_id] = {
+                "user_id": sub.user_id,
+                "username": sub.user.username,
+                "solved": 0,
+                "penalty": 0,
+                "problems": {pid: {"solved": False, "failed_attempts": 0, "time": 0} for pid in problem_ids}
+            }
+        
+        user_rank = rank_data[sub.user_id]
+        prob_stats = user_rank["problems"].get(sub.problem_id)
+        if not prob_stats or prob_stats["solved"]:
+            continue
+
+        if sub.status == 'Accepted':
+            prob_stats["solved"] = True
+            # 计算时间（秒）
+            time_diff = int((sub.created_at - exam.start_time).total_seconds())
+            prob_stats["time"] = time_diff
+            user_rank["solved"] += 1
+            # 罚时 = 通过时间 + 错误尝试次数 * 20分钟(1200秒)
+            user_rank["penalty"] += time_diff + prob_stats["failed_attempts"] * 1200
+        elif sub.status not in ['Pending', 'Compile Error']:
+            # 编译错误通常不计入罚时
+            prob_stats["failed_attempts"] += 1
+
+    # 转换为列表并排序：解题数降序，罚时升序
+    sorted_rank = list(rank_data.values())
+    sorted_rank.sort(key=lambda x: (-x["solved"], x["penalty"]))
+
+    return jsonify({
+        "exam_title": exam.title,
+        "problems": [{"problem_id": ep.problem_id, "display_id": ep.display_id} for ep in exam_problems],
+        "rank": sorted_rank
+    }), 200
+
+
 @exam_bp.route('/<int:exam_id>', methods=['PUT'])
 @token_required
 def update_exam(exam_id):
@@ -330,9 +399,67 @@ def check_exam_plagiarism(exam_id):
         return jsonify({"message": "No submissions found for this exam"}), 200
 
     app = current_app._get_current_object()
-    start_plagiarism_check_task(app, submission_ids)
+    plagiarism_service.start_check_task(app, submission_ids)
 
     return jsonify({
         "message": f"Plagiarism check started for {len(submission_ids)} final submissions in exam #{exam_id}.",
         "count": len(submission_ids)
     }), 202
+
+
+@exam_bp.route('/<int:exam_id>/export_scores', methods=['GET'])
+@token_required
+def export_exam_scores(exam_id):
+    """
+    导出考试成绩为 CSV 文件（教师权限）
+    """
+    if request.current_user.role != 'teacher':
+        return jsonify({"error": "Permission denied"}), 403
+
+    exam = Exam.query.get_or_404(exam_id)
+    exam_problems = ExamProblem.query.filter_by(exam_id=exam_id).order_by(ExamProblem.display_id).all()
+    
+    # 获取所有在该考试中有提交记录的用户
+    user_ids = db.session.query(Submission.user_id).filter(Submission.exam_id == exam_id).distinct().all()
+    user_ids = [uid[0] for uid in user_ids]
+
+    # 准备 CSV 数据
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 表头
+    header = ['User ID', 'Username']
+    for ep in exam_problems:
+        header.append(f'{ep.display_id} (Max: {ep.score})')
+    header.append('Total Score')
+    writer.writerow(header)
+
+    # 数据行
+    for uid in user_ids:
+        user = User.query.get(uid)
+        row = [user.id, user.username]
+        total_score = 0
+        
+        for ep in exam_problems:
+            last_sub = Submission.query.filter_by(
+                exam_id=exam_id,
+                user_id=uid,
+                problem_id=ep.problem_id
+            ).order_by(Submission.created_at.desc()).first()
+            
+            score = last_sub.score if last_sub else 0
+            row.append(score)
+            total_score += score
+            
+        row.append(total_score)
+        writer.writerow(row)
+
+    output.seek(0)
+    filename = f"exam_{exam_id}_scores_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+    
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8-sig')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=filename
+    )

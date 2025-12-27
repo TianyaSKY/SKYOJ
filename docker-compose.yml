@@ -27,6 +27,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/uploads:/app/uploads
       - ./skyoj_plagiarism_model:/skyoj_plagiarism_model
+      - ./skyoj_searching_model:/skyoj_searching_model
     depends_on:
       - mysql
     networks:

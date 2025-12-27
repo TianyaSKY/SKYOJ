@@ -6,7 +6,7 @@ import zipfile
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db
-from app.services.plagiarism_service import start_plagiarism_check_task
+from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
 from flask import Blueprint, request, jsonify, send_file, current_app
 from werkzeug.utils import secure_filename
@@ -237,7 +237,7 @@ def check_problem_plagiarism(problem_id):
         return jsonify({"message": "No submissions found for this problem"}), 200
 
     app = current_app._get_current_object()
-    start_plagiarism_check_task(app, submission_ids)
+    plagiarism_service.start_check_task(app, submission_ids)
 
     return jsonify({
         "message": f"Plagiarism check started for {len(submission_ids)} submissions.",

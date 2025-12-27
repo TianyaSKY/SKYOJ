@@ -48,6 +48,12 @@ const router = createRouter({
             meta: {requiresAuth: true}
         },
         {
+            path: '/exam/:id/rank',
+            name: 'exam-rank',
+            component: () => import('../views/ExamRankView.vue'),
+            meta: {requiresAuth: true}
+        },
+        {
             path: '/admin/dashboard',
             name: 'teacher-dashboard',
             component: () => import('../views/admin/TeacherDashboardView.vue'),
@@ -153,30 +159,32 @@ router.beforeEach(async (to, from, next) => {
 
     const user = userStore.user || JSON.parse(localStorage.getItem('user') || '{}')
     const isTeacher = user.role === 'teacher'
+    const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
 
     // Exam Mode Logic
-    // If practice mode is OFF (i.e., Exam Mode is ON)
-    if (sysStore.practice === false || sysStore.practice === 'False') {
-        // If user is NOT a teacher
+    if (!isPracticeMode) {
+        // If practice mode is OFF (i.e., Exam Mode is ON)
         if (!isTeacher) {
-            // Allow access to login/register
-            if (to.name === 'login' || to.name === 'register') {
-                next()
+            // Restrict access to specific practice-related routes
+            const restrictedRoutes = ['problems', 'datasets']
+            if (restrictedRoutes.includes(to.name)) {
+                next({name: 'exam'})
                 return
             }
-            // Allow access to exam page and problem details (assuming problem details are needed during exam)
-            // But we might want to restrict problem details to only those in the exam if we had exam-specific logic.
-            // For now, we just force them to /exam if they try to go elsewhere (like home, datasets, etc.)
-            // Exception: They need to be able to view the problem detail page to solve it.
-            const allowedExamRoutes = ['exam', 'exam-detail', 'problem-detail', 'submission-detail', 'login', 'register']
-
-            if (!allowedExamRoutes.includes(to.name)) {
-                // If they are logged in, send to exam. If not, send to login.
-                if (token) {
-                    next({name: 'exam'})
-                } else {
-                    next({name: 'login'})
-                }
+            
+            // If trying to access a problem detail, check if it's within an exam context
+            if (to.name === 'problem-detail' && !to.query.exam_id) {
+                next({name: 'exam'})
+                return
+            }
+        }
+    } else {
+        // If practice mode is ON
+        if (!isTeacher) {
+            // Restrict access to exam-related routes
+            const examRoutes = ['exam', 'exam-detail', 'exam-rank']
+            if (examRoutes.includes(to.name)) {
+                next({name: 'home'})
                 return
             }
         }

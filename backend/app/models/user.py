@@ -11,6 +11,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     # role: enum('student', 'teacher')
     role = db.Column(db.Enum('student', 'teacher'), default='student')
+    avatar = db.Column(db.String(255))  # 头像 URL 或文件名
 
     def __repr__(self):
         return f'<User {self.username}>'

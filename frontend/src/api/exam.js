@@ -84,11 +84,32 @@ export function getMyExamStatus() {
 }
 
 /**
+ * 导出考试成绩 (CSV)
+ */
+export function exportExamScores(id) {
+    return request({
+        url: `/exams/${id}/export_scores`,
+        method: 'get',
+        responseType: 'blob' // 重要：处理文件流
+    })
+}
+
+/**
  * 获取考试监控数据（教师端）
  */
 export function getExamMonitor(id) {
     return request({
         url: `/exams/${id}/monitor`,
+        method: 'get'
+    })
+}
+
+/**
+ * 获取考试排名（滚榜数据）
+ */
+export function getExamRank(id) {
+    return request({
+        url: `/exams/${id}/rank`,
         method: 'get'
     })
 }

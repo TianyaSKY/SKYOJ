@@ -1,7 +1,14 @@
+import os
 import torch
+from pathlib import Path
 from sentence_transformers import SentenceTransformer, util
 from app.models.problem import Problem
 from app.models.user import db
+
+# 模型路径
+current_file = Path(__file__).resolve()
+PROJECT_ROOT = current_file.parents[3]
+MODEL_PATH = os.path.join(PROJECT_ROOT, "skyoj_searching_model")
 
 class SearchService:
     def __init__(self):
@@ -12,8 +19,12 @@ class SearchService:
 
     def _ensure_model_loaded(self):
         if self.model is None:
-            # Using BAAI/bge-small-zh-v1.5 for Chinese semantic search
-            self.model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+            if os.path.exists(MODEL_PATH):
+                print(f"Loading Search Model: {MODEL_PATH}")
+                self.model = SentenceTransformer(MODEL_PATH)
+            else:
+                print(f"Warning: Search model path {MODEL_PATH} not found. Using default.")
+                self.model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
 
     def rebuild_index(self):
         self._ensure_model_loaded()

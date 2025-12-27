@@ -32,3 +32,22 @@ export function getAllUsers() {
         method: 'get'
     })
 }
+
+export function uploadAvatar(formData) {
+    return request({
+        url: '/user/avatar',
+        method: 'post',
+        data: formData,
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    })
+}
+
+/**
+ * 获取头像文件
+ * @param {string} filename 头像文件名
+ */
+export function getAvatarUrl(filename) {
+    return `/user/avatars/${filename}`
+}

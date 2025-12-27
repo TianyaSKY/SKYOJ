@@ -3,7 +3,7 @@ from app.models.plagiarism import PlagiarismLog
 from app.models.submission import Submission
 from app.models.user import db
 from app.utils.auth_tools import token_required
-from app.services.plagiarism_service import start_plagiarism_check_task
+from app.services.plagiarism_service import plagiarism_service
 
 plagiarism_bp = Blueprint('plagiarism', __name__)
 
@@ -102,7 +102,7 @@ def trigger_batch_check():
         return jsonify({"error": "No submission_ids provided"}), 400
 
     app = current_app._get_current_object()
-    start_plagiarism_check_task(app, submission_ids)
+    plagiarism_service.start_check_task(app, submission_ids)
     
     return jsonify({"message": "Batch plagiarism check started"}), 202
 

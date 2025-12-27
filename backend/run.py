@@ -1,5 +1,6 @@
 ﻿import os
 import time
+import threading
 
 from flask import Flask
 from sqlalchemy.exc import OperationalError
@@ -17,6 +18,10 @@ from app.api.plagiarism import plagiarism_bp
 from app.models.sysdict import SysDict
 from app.models.user import db
 from app.utils.sys_dict import sys_dict_kv
+
+# 导入服务以进行初始化
+from app.services.search_service import search_service
+from app.services.plagiarism_service import plagiarism_service
 
 if os.path.exists('/.dockerenv'):
     db_host = 'mysql'
@@ -55,7 +60,27 @@ def init_db():
         print("Could not connect to MySQL after several retries.")
 
 
+def init_services():
+    """初始化搜索索引和查重模型"""
+    print("Initializing services (Search Index & Plagiarism Model)...")
+    try:
+        # 加载查重模型
+        plagiarism_service._ensure_model_loaded()
+        
+        # 建立搜索索引
+        with app.app_context():
+            search_service.rebuild_index()
+            
+        print("Services initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing services: {e}")
+
+
+# 初始化数据库
 init_db()
+
+# 异步初始化服务，避免阻塞启动
+threading.Thread(target=init_services).start()
 
 
 @app.route('/')

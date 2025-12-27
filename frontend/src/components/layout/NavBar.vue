@@ -6,17 +6,19 @@
       mode="horizontal"
       router
   >
-    <el-menu-item index="/">
-      <img
-          alt="SKYOJ Logo"
-          src="@/assets/logo.svg"
-          style="width: 100px"
-      />
+    <el-menu-item index="/" class="brand-item">
+      <span class="brand-title">{{ sysStore.title }}</span>
     </el-menu-item>
     <div class="flex-grow"/>
     <el-menu-item index="/">首页</el-menu-item>
-    <el-menu-item index="/problems">题库</el-menu-item>
-    <el-menu-item index="/datasets">公开数据集</el-menu-item>
+    <template v-if="isPracticeMode || isTeacher">
+      <el-menu-item index="/problems">题库</el-menu-item>
+      <el-menu-item index="/datasets">公开数据集</el-menu-item>
+    </template>
+    <el-menu-item v-if="!isPracticeMode" index="/exam" class="exam-menu-item">
+      <el-icon><Timer /></el-icon>
+      考试中心
+    </el-menu-item>
 
     <div class="user-actions">
       <el-dropdown v-if="isLoggedIn" @command="handleCommand">
@@ -47,19 +49,23 @@
 import {computed} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {useUserStore} from '@/stores/user'
-import {ArrowDown} from '@element-plus/icons-vue'
+import {useSysStore} from '@/stores/sys'
+import {ArrowDown, Timer} from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const sysStore = useSysStore()
 
 const activeIndex = computed(() => route.path)
 
 const isLoggedIn = computed(() => !!userStore.token)
 const username = computed(() => userStore.user?.username || 'User')
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
+const isPracticeMode = computed(() => sysStore.practice !== false && sysStore.practice !== 'False')
+
 // If backend provides avatar URL, use it; otherwise empty string to trigger slot content
-const userAvatar = computed(() => userStore.user?.avatar || '')
+const userAvatar = computed(() => userStore.user?.avatar ? `/api${userStore.user?.avatar}` : '')
 
 const handleCommand = (command) => {
   if (command === 'logout') {
@@ -76,6 +82,18 @@ const handleCommand = (command) => {
 <style scoped>
 .flex-grow {
   flex-grow: 1;
+}
+
+.brand-item {
+  opacity: 1 !important;
+  cursor: pointer;
+}
+
+.brand-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--el-color-primary);
+  letter-spacing: 1px;
 }
 
 .user-actions {
@@ -99,5 +117,10 @@ const handleCommand = (command) => {
 .user-avatar-nav {
   background-color: var(--el-color-primary);
   color: white;
+}
+
+.exam-menu-item {
+  color: var(--el-color-danger) !important;
+  font-weight: bold;
 }
 </style>

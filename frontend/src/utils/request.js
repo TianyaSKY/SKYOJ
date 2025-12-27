@@ -1,5 +1,5 @@
 import axios from 'axios'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import router from '@/router'
 
 const service = axios.create({
@@ -27,8 +27,8 @@ service.interceptors.response.use(
         return response.data
     },
     error => {
-        console.error('Request error:', error)
         if (error.response && error.response.status === 401) {
+          debugger
             ElMessageBox.confirm(
                 '登录状态已失效，您可以继续留在该页面，或者重新登录',
                 '系统提示',
@@ -42,8 +42,6 @@ service.interceptors.response.use(
                 localStorage.removeItem('user')
                 router.push('/login')
             })
-        } else {
-            ElMessage.error(error.message || 'Request failed')
         }
         return Promise.reject(error)
     }

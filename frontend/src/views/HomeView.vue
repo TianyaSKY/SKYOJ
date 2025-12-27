@@ -8,9 +8,28 @@
       </div>
       <div class="hero-content">
         <div class="hero-badge">Open Source Online Judge</div>
-        <h1 class="title">SKYOJ</h1>
+        <h1 class="title">{{ sysStore.title }}</h1>
         <p class="subtitle">一个开源的在线评测与知识共享平台</p>
-        <div class="hero-actions">
+
+        <!-- Exam Mode Alert Card -->
+        <div v-if="!isPracticeMode" class="exam-alert-card">
+          <div class="exam-alert-content">
+            <div class="exam-alert-icon">
+              <el-icon class="pulse-icon"><Timer /></el-icon>
+            </div>
+            <div class="exam-alert-text">
+              <h3>考试模式进行中</h3>
+              <p>当前系统已进入考试状态，练习功能暂时关闭。请各位同学点击下方按钮进入考试中心参加考试。</p>
+            </div>
+            <div class="exam-alert-action">
+              <el-button type="danger" size="large" @click="$router.push('/exam')" round class="exam-btn-glow">
+                进入考试中心 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-actions" v-if="isPracticeMode || isTeacher">
           <el-button class="action-btn primary-btn" round size="large" type="primary"
                      @click="$router.push('/problems')">
             开始编程
@@ -48,19 +67,19 @@
     <!-- About Section -->
     <div id="about-section" class="section-container">
       <div class="section-header">
-        <h2 class="section-title">关于 SKYOJ</h2>
+        <h2 class="section-title">关于 {{ sysStore.title }}</h2>
         <p class="section-subtitle">现代化、开源、易用的在线评测系统</p>
       </div>
       <el-row :gutter="60" align="middle">
         <el-col :md="12" :xs="24">
           <div class="about-content">
             <p class="about-text">
-              SKYOJ 是一个专为学生、教育工作者和编程爱好者设计的现代化开源在线评测系统（Online Judge）。
+              {{ sysStore.title }} 是一个专为学生、教育工作者和编程爱好者设计的现代化开源在线评测系统（Online Judge）。
               它提供了一个强大的平台，用于练习算法、举办比赛以及分享编程知识。
             </p>
             <p class="about-text">
               我们的使命是通过提供易于访问的工具和资源来普及计算机科学教育。
-              无论您是学习 Python 的初学者，还是解决复杂图论问题的专家，SKYOJ 都能为您的学习之旅提供支持。
+              无论您是学习 Python 的初学者，还是解决复杂图论问题的专家，{{ sysStore.title }} 都能为您的学习之旅提供支持。
             </p>
             <div class="features-grid">
               <div class="feature-card">
@@ -100,8 +119,8 @@
               </div>
               <div class="window-content">
                 <pre><code><span class="keyword">def</span> <span class="function">solve</span>():
-    <span class="comment"># Welcome to SKYOJ</span>
-    print(<span class="string">"Hello, SKYOJ!"</span>)
+    <span class="comment"># Welcome to {{ sysStore.title }}</span>
+    print(<span class="string">"Hello, {{ sysStore.title }}!"</span>)
 
 <span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:
     solve()</code></pre>
@@ -160,7 +179,16 @@
 </template>
 
 <script setup>
+import {computed} from 'vue'
 import {ArrowRight, DataAnalysis, MagicStick, Monitor, Timer} from '@element-plus/icons-vue'
+import {useSysStore} from '@/stores/sys'
+import {useUserStore} from '@/stores/user'
+
+const sysStore = useSysStore()
+const userStore = useUserStore()
+
+const isPracticeMode = computed(() => sysStore.practice !== false && sysStore.practice !== 'False')
+const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 const resources = [
   {
@@ -373,6 +401,88 @@ const openLink = (url) => {
 .primary-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(64, 158, 255, 0.23);
+}
+
+/* Exam Alert Card Styling */
+.exam-alert-card {
+  background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+  border: 2px solid #feb2b2;
+  border-radius: 24px;
+  padding: 32px;
+  margin: 0 auto 48px;
+  max-width: 700px;
+  box-shadow: 0 10px 25px rgba(245, 108, 108, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.exam-alert-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #f56c6c;
+}
+
+.exam-alert-content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  text-align: left;
+}
+
+.exam-alert-icon {
+  background: #fee2e2;
+  color: #f56c6c;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.exam-alert-text h3 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  color: #c53030;
+  font-weight: 700;
+}
+
+.exam-alert-text p {
+  margin: 0;
+  color: #742a2a;
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.exam-alert-action {
+  flex-shrink: 0;
+}
+
+.exam-btn-glow {
+  box-shadow: 0 0 15px rgba(245, 108, 108, 0.4);
+  animation: glow 2s infinite;
+}
+
+.pulse-icon {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 5px rgba(245, 108, 108, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(245, 108, 108, 0.6); }
+  100% { box-shadow: 0 0 5px rgba(245, 108, 108, 0.4); }
 }
 
 /* Stats Section */
@@ -654,6 +764,11 @@ const openLink = (url) => {
 
   .about-visual {
     margin-top: 40px;
+  }
+
+  .exam-alert-content {
+    flex-direction: column;
+    text-align: center;
   }
 }
 </style>

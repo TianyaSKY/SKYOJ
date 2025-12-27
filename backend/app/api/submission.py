@@ -7,7 +7,7 @@ from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db, User
 from app.services.judge_service import judge_submission
-from app.services.plagiarism_service import start_plagiarism_check_task
+from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
@@ -199,7 +199,7 @@ def check_single_submission_plagiarism(submission_id):
     submission = Submission.query.get_or_404(submission_id)
     
     app = current_app._get_current_object()
-    start_plagiarism_check_task(app, [submission.id])
+    plagiarism_service.start_check_task(app, [submission.id])
 
     return jsonify({
         "message": f"Plagiarism check started for submission #{submission_id}."

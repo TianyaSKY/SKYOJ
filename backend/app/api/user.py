@@ -1,10 +1,18 @@
+import os
+import uuid
 from app.models.submission import Submission
 from app.models.user import User, db
 from app.utils.auth_tools import token_required
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app, send_from_directory
+from werkzeug.utils import secure_filename
 
 user_bp = Blueprint('user', __name__)
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @user_bp.route('/all', methods=['GET'])
 @token_required
@@ -19,7 +27,8 @@ def get_all_users():
     return jsonify([{
         "id": u.id,
         "username": u.username,
-        "role": u.role
+        "role": u.role,
+        "avatar": u.avatar
     } for u in users]), 200
 
 
@@ -30,15 +39,57 @@ def get_user_profile(user_id):
     获取指定用户资料
     """
     user = User.query.get_or_404(user_id)
-    # 假设 User 模型中没有 created_at 和 avatar，这里先返回基础信息
-    # 如果后续模型更新了，可以再添加
     return jsonify({
         "id": user.id,
         "username": user.username,
         "role": user.role,
-        "created_at": None,  # 占位
-        "avatar": ""
+        "avatar": user.avatar
     }), 200
+
+
+@user_bp.route('/avatar', methods=['POST'])
+@token_required
+def upload_avatar():
+    """
+    上传头像
+    """
+    if 'avatar' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        # 使用 UUID 重命名文件以防止冲突
+        ext = filename.rsplit('.', 1)[1].lower()
+        new_filename = f"{uuid.uuid4().hex}.{ext}"
+        
+        # 统一保存到 backend/uploads/avatars
+        upload_folder = os.path.join(current_app.root_path, '..', 'uploads', 'avatars')
+        if not os.path.exists(upload_folder):
+            os.makedirs(upload_folder)
+            
+        file.save(os.path.join(upload_folder, new_filename))
+        
+        # 更新用户头像路径
+        user = request.current_user
+        user.avatar = f"/api/user/avatars/{new_filename}"
+        db.session.commit()
+        
+        return jsonify({"message": "Avatar uploaded successfully", "avatar": user.avatar}), 200
+    
+    return jsonify({"error": "Invalid file type"}), 400
+
+
+@user_bp.route('/avatars/<filename>')
+def get_avatar_file(filename):
+    """
+    获取头像文件
+    """
+    upload_folder = os.path.join(current_app.root_path, '..', 'uploads', 'avatars')
+    return send_from_directory(upload_folder, filename)
 
 
 @user_bp.route('/<int:user_id>/submissions', methods=['GET'])
