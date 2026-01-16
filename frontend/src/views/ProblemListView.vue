@@ -12,7 +12,7 @@
             :prefix-icon="Search"
             class="search-input"
             clearable
-            placeholder="搜索题目名称或 ID..."
+            placeholder="搜索题目名称或内容..."
             style="width: 350px"
         />
         <div class="filter-group">
@@ -111,6 +111,7 @@
         <el-pagination
             v-model:current-page="currentPage"
             v-model:page-size="pageSize"
+            :disabled="!!searchQuery"
             :page-sizes="[10, 20, 50]"
             :total="total"
             layout="total, sizes, prev, pager, next, jumper"
@@ -130,7 +131,7 @@ import {ElMessage} from 'element-plus'
 
 const loading = ref(false)
 const problems = ref([])
-const semanticSearchResults = ref([])
+const searchResults = ref([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -157,20 +158,26 @@ const getTypeTag = (type) => {
   return map[type.toLowerCase()] || 'info'
 }
 
-const performSemanticSearch = async () => {
+const handleSearch = async () => {
   if (!searchQuery.value) {
-    semanticSearchResults.value = []
+    searchResults.value = []
+    fetchProblems()
     return
   }
   loading.value = true
   try {
-    const data = await searchProblems({ query: searchQuery.value })
-    semanticSearchResults.value = data
-    // Reset pagination
+    const data = await searchProblems({
+      query: searchQuery.value,
+      mode: isSemanticSearch.value ? 'semantic' : 'normal',
+      top_k: 50
+    })
+    searchResults.value = data
+    // 更新总数，使分页组件显示正确的搜索结果数量
+    total.value = data.length
     currentPage.value = 1
   } catch (error) {
     console.error(error)
-    ElMessage.error('语义搜索失败')
+    ElMessage.error('搜索失败')
   } finally {
     loading.value = false
   }
@@ -178,16 +185,7 @@ const performSemanticSearch = async () => {
 
 // Filter problems based on search query and type
 const filteredProblems = computed(() => {
-  const useSemantic = isSemanticSearch.value && searchQuery.value
-  let result = useSemantic ? semanticSearchResults.value : problems.value
-
-  if (!useSemantic && searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(p =>
-        (p.title && p.title.toLowerCase().includes(query)) ||
-        (p.id && String(p.id).includes(query))
-    )
-  }
+  let result = searchQuery.value ? searchResults.value : problems.value
 
   if (typeFilter.value) {
     result = result.filter(p => p.type && p.type.toLowerCase() === typeFilter.value.toLowerCase())
@@ -198,23 +196,22 @@ const filteredProblems = computed(() => {
 
 let debounceTimer = null
 watch(searchQuery, (newVal) => {
-  if (isSemanticSearch.value) {
-    if (debounceTimer) clearTimeout(debounceTimer)
-    if (newVal) {
-      loading.value = true
-      debounceTimer = setTimeout(() => {
-        performSemanticSearch()
-      }, 500)
-    } else {
-      semanticSearchResults.value = []
-      loading.value = false
-    }
+  if (debounceTimer) clearTimeout(debounceTimer)
+  if (newVal) {
+    loading.value = true
+    debounceTimer = setTimeout(() => {
+      handleSearch()
+    }, 500)
+  } else {
+    searchResults.value = []
+    fetchProblems()
+    loading.value = false
   }
 })
 
-watch(isSemanticSearch, (val) => {
-  if (val && searchQuery.value) {
-    performSemanticSearch()
+watch(isSemanticSearch, () => {
+  if (searchQuery.value) {
+    handleSearch()
   }
 })
 
@@ -229,7 +226,6 @@ const fetchProblems = async () => {
       problems.value = res.problems
       total.value = res.total
     } else {
-      // Fallback for non-paginated response
       problems.value = res
       total.value = res.length
     }

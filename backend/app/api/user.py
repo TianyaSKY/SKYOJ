@@ -1,18 +1,22 @@
 import os
 import uuid
+
+from flask import Blueprint, jsonify, request, current_app, send_from_directory
+from werkzeug.utils import secure_filename
+
 from app.models.submission import Submission
 from app.models.user import User, db
 from app.utils.auth_tools import token_required
-from flask import Blueprint, jsonify, request, current_app, send_from_directory
-from werkzeug.utils import secure_filename
 
 user_bp = Blueprint('user', __name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+
 def allowed_file(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @user_bp.route('/all', methods=['GET'])
 @token_required
@@ -55,31 +59,31 @@ def upload_avatar():
     """
     if 'avatar' not in request.files:
         return jsonify({"error": "No file part"}), 400
-    
+
     file = request.files['avatar']
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
-    
+
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         # 使用 UUID 重命名文件以防止冲突
         ext = filename.rsplit('.', 1)[1].lower()
         new_filename = f"{uuid.uuid4().hex}.{ext}"
-        
+
         # 统一保存到 backend/uploads/avatars
         upload_folder = os.path.join(current_app.root_path, '..', 'uploads', 'avatars')
         if not os.path.exists(upload_folder):
             os.makedirs(upload_folder)
-            
+
         file.save(os.path.join(upload_folder, new_filename))
-        
+
         # 更新用户头像路径
         user = request.current_user
         user.avatar = f"/api/user/avatars/{new_filename}"
         db.session.commit()
-        
+
         return jsonify({"message": "Avatar uploaded successfully", "avatar": user.avatar}), 200
-    
+
     return jsonify({"error": "Invalid file type"}), 400
 
 

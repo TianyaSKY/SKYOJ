@@ -5,18 +5,13 @@
         <h1 class="page-title">教师工作台</h1>
         <p class="page-desc">欢迎回来，这里是您的教学管理中心。</p>
       </div>
-      <div class="header-right">
-        <el-button :icon="Plus" type="primary" @click="$router.push({ name: 'problem-admin' })">新增题目</el-button>
-        <el-button :icon="Timer" type="success" @click="$router.push({ name: 'exam-admin' })">创建考试</el-button>
-      </div>
     </div>
 
     <!-- Stats Overview -->
     <el-row :gutter="20" class="stats-row">
       <el-col v-for="(stat, index) in stats" :key="stat.label" :span="6">
         <div
-            :class="{ 'clickable-stat': index === 2 || index === 3 }"
-            class="stat-card"
+            class="stat-card clickable-stat"
             @click="handleStatClick(index)"
         >
           <div :style="{ color: stat.color, backgroundColor: stat.color + '15' }" class="stat-icon">
@@ -34,40 +29,8 @@
 
     <h3 class="section-title">核心管理</h3>
     <el-row :gutter="20" class="dashboard-cards">
-      <!-- 题目管理卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
-        <div class="nav-card" @click="$router.push({ name: 'problem-admin' })">
-          <div class="nav-icon" style="color: #409EFF; background-color: #ecf5ff">
-            <el-icon :size="32">
-              <List/>
-            </el-icon>
-          </div>
-          <h3>题目管理</h3>
-          <p>创建、编辑和删除题目，管理测试数据与 SPJ 脚本。</p>
-          <div class="nav-footer">
-            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
-          </div>
-        </div>
-      </el-col>
-
-      <!-- 考试管理卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
-        <div class="nav-card" @click="$router.push({ name: 'exam-admin' })">
-          <div class="nav-icon" style="color: #F56C6C; background-color: #fef0f0">
-            <el-icon :size="32">
-              <Timer/>
-            </el-icon>
-          </div>
-          <h3>考试管理</h3>
-          <p>组织在线考试、设置访问权限及监控实时进度。</p>
-          <div class="nav-footer">
-            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
-          </div>
-        </div>
-      </el-col>
-
       <!-- 查重管理卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
+      <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'plagiarism-admin' })">
           <div class="nav-icon" style="color: #E6A23C; background-color: #fdf6ec">
             <el-icon :size="32">
@@ -83,7 +46,7 @@
       </el-col>
 
       <!-- 系统设置卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
+      <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="openSysSettings">
           <div class="nav-icon" style="color: #909399; background-color: #f4f4f5">
             <el-icon :size="32">
@@ -99,7 +62,7 @@
       </el-col>
 
       <!-- 教师手册卡片 -->
-      <el-col :lg="6" :md="8" :sm="12" :xs="24" class="mb-4">
+      <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'doc-teacher-manual' })">
           <div class="nav-icon" style="color: #7232dd; background-color: #f2edfe">
             <el-icon :size="32">
@@ -230,7 +193,7 @@
 <script setup>
 import {onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
-import {ArrowRight, InfoFilled, List, Plus, Search, Setting, Timer, Monitor, Reading} from '@element-plus/icons-vue'
+import {ArrowRight, InfoFilled, Search, Setting, Reading} from '@element-plus/icons-vue'
 import {getSysInfo, getSysStatistics, rebuildIndex, updateSysInfo} from '@/api/sys'
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
@@ -288,10 +251,19 @@ const fetchUsers = async () => {
 }
 
 const handleStatClick = (index) => {
-  if (index === 2) {
-    router.push({ name: 'submission-admin' })
-  } else if (index === 3) {
-    userListVisible.value = true
+  switch (index) {
+    case 0:
+      router.push({ name: 'problem-admin' })
+      break
+    case 1:
+      router.push({ name: 'exam-admin' })
+      break
+    case 2:
+      router.push({ name: 'submission-admin' })
+      break
+    case 3:
+      userListVisible.value = true
+      break
   }
 }
 
@@ -390,11 +362,6 @@ onMounted(() => {
 .page-desc {
   color: #888;
   font-size: 1.1rem;
-}
-
-.header-right {
-  display: flex;
-  gap: 12px;
 }
 
 /* Stats Row */

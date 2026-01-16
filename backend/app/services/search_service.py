@@ -1,14 +1,16 @@
 import os
-import torch
 from pathlib import Path
+
+import torch
 from sentence_transformers import SentenceTransformer, util
+
 from app.models.problem import Problem
-from app.models.user import db
 
 # 模型路径
 current_file = Path(__file__).resolve()
 PROJECT_ROOT = current_file.parents[3]
 MODEL_PATH = os.path.join(PROJECT_ROOT, "skyoj_searching_model")
+
 
 class SearchService:
     def __init__(self):
@@ -75,5 +77,6 @@ class SearchService:
                 "score": float(score)
             })
         return results
+
 
 search_service = SearchService()

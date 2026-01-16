@@ -1,15 +1,18 @@
 import os
 import threading
 from pathlib import Path
+
 from sentence_transformers import SentenceTransformer, util
-from app.models.submission import Submission
+
 from app.models.plagiarism import PlagiarismLog
+from app.models.submission import Submission
 from app.models.user import db
 
 # 模型路径
 current_file = Path(__file__).resolve()
 PROJECT_ROOT = current_file.parents[3]
 MODEL_PATH = os.path.join(PROJECT_ROOT, "skyoj_plagiarism_model")
+
 
 class PlagiarismService:
     def __init__(self):
@@ -34,7 +37,8 @@ class PlagiarismService:
                 return
 
             # 过滤掉已经查重过的提交
-            checked_ids = [log.submission_id for log in PlagiarismLog.query.filter(PlagiarismLog.submission_id.in_(submission_ids)).all()]
+            checked_ids = [log.submission_id for log in
+                           PlagiarismLog.query.filter(PlagiarismLog.submission_id.in_(submission_ids)).all()]
             to_check_ids = [sid for sid in submission_ids if sid not in checked_ids]
 
             if not to_check_ids:
@@ -84,21 +88,22 @@ class PlagiarismService:
                             db.session.add(log)
                             continue
 
-                        current_embedding = model.encode(sub.code_content, normalize_embeddings=True, convert_to_tensor=True)
+                        current_embedding = model.encode(sub.code_content, normalize_embeddings=True,
+                                                         convert_to_tensor=True)
                         cosine_scores = util.cos_sim(current_embedding, ac_embeddings)[0]
-                        
+
                         max_score = 0.0
                         most_similar_sub_id = None
-                        
+
                         for i, score in enumerate(cosine_scores):
                             if ac_sub_ids[i] == sub.id:
                                 continue
-                            
+
                             score_val = float(score.item())
                             if score_val > max_score:
                                 max_score = score_val
                                 most_similar_sub_id = ac_sub_ids[i]
-                        
+
                         log = PlagiarismLog(
                             submission_id=sub.id,
                             target_submission_id=most_similar_sub_id,
@@ -113,7 +118,7 @@ class PlagiarismService:
                                     sub.output_log += alert_msg
                                 else:
                                     sub.output_log = alert_msg
-                    
+
                     db.session.commit()
                     print(f"Batch plagiarism check completed for Problem #{problem_id}")
 
@@ -125,5 +130,6 @@ class PlagiarismService:
         """启动异步查重任务"""
         thread = threading.Thread(target=self.run_batch_check, args=(app, submission_ids))
         thread.start()
+
 
 plagiarism_service = PlagiarismService()

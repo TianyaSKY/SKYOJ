@@ -1,11 +1,13 @@
 from flask import Blueprint, request, jsonify, current_app
+
 from app.models.plagiarism import PlagiarismLog
 from app.models.submission import Submission
 from app.models.user import db
-from app.utils.auth_tools import token_required
 from app.services.plagiarism_service import plagiarism_service
+from app.utils.auth_tools import token_required
 
 plagiarism_bp = Blueprint('plagiarism', __name__)
+
 
 @plagiarism_bp.route('/logs', methods=['GET'])
 @token_required
@@ -26,13 +28,13 @@ def get_plagiarism_logs():
 
     # 构建查询
     query = PlagiarismLog.query.join(Submission, PlagiarismLog.submission_id == Submission.id)
-    
+
     if problem_id:
         query = query.filter(Submission.problem_id == problem_id)
-    
+
     if exam_id:
         query = query.filter(Submission.exam_id == exam_id)
-    
+
     if min_score > 0:
         query = query.filter(PlagiarismLog.similarity_score >= min_score)
 
@@ -40,7 +42,7 @@ def get_plagiarism_logs():
     pagination = query.order_by(PlagiarismLog.similarity_score.desc()).paginate(
         page=page, per_page=page_size, error_out=False
     )
-    
+
     # 格式化结果
     logs_data = []
     for log in pagination.items:
@@ -55,7 +57,7 @@ def get_plagiarism_logs():
             "username": log.submission.user.username,
             "created_at": log.created_at.strftime('%Y-%m-%d %H:%M:%S')
         })
-    
+
     return jsonify({
         "total": pagination.total,
         "pages": pagination.pages,
@@ -64,6 +66,7 @@ def get_plagiarism_logs():
         "data": logs_data
     }), 200
 
+
 @plagiarism_bp.route('/logs/<int:submission_id>', methods=['GET'])
 @token_required
 def get_submission_plagiarism_log(submission_id):
@@ -71,7 +74,7 @@ def get_submission_plagiarism_log(submission_id):
     log = PlagiarismLog.query.filter_by(submission_id=submission_id).first()
     if not log:
         return jsonify({"error": "Plagiarism log not found"}), 404
-    
+
     # 权限检查：如果是学生，只能看自己的
     if request.current_user.role == 'student' and log.submission.user_id != request.current_user.id:
         return jsonify({"error": "Permission denied"}), 403
@@ -88,6 +91,7 @@ def get_submission_plagiarism_log(submission_id):
         "created_at": log.created_at.strftime('%Y-%m-%d %H:%M:%S')
     }), 200
 
+
 @plagiarism_bp.route('/check_batch', methods=['POST'])
 @token_required
 def trigger_batch_check():
@@ -97,14 +101,15 @@ def trigger_batch_check():
 
     data = request.get_json()
     submission_ids = data.get('submission_ids', [])
-    
+
     if not submission_ids:
         return jsonify({"error": "No submission_ids provided"}), 400
 
     app = current_app._get_current_object()
     plagiarism_service.start_check_task(app, submission_ids)
-    
+
     return jsonify({"message": "Batch plagiarism check started"}), 202
+
 
 @plagiarism_bp.route('/logs/<int:log_id>', methods=['DELETE'])
 @token_required
@@ -116,5 +121,5 @@ def delete_plagiarism_log(log_id):
     log = PlagiarismLog.query.get_or_404(log_id)
     db.session.delete(log)
     db.session.commit()
-    
+
     return jsonify({"message": "Log deleted"}), 200

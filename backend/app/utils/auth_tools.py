@@ -2,8 +2,9 @@ import datetime
 from functools import wraps
 
 import jwt
-from app.models.user import User
 from flask import current_app, request, jsonify
+
+from app.models.user import User
 
 
 def encode_auth_token(user_id, role, exam_id=-1):

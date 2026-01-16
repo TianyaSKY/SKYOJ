@@ -1,11 +1,12 @@
 import os
 import threading
 
+from flask import Blueprint, request, jsonify, send_from_directory, current_app
+from werkzeug.utils import secure_filename
+
 from app.models.dataset import Dataset
 from app.models.user import db
 from app.utils.auth_tools import token_required, decode_auth_token
-from flask import Blueprint, request, jsonify, send_from_directory, current_app
-from werkzeug.utils import secure_filename
 
 dataset_bp = Blueprint('dataset', __name__)
 
@@ -64,7 +65,8 @@ def upload_dataset():
     file.seek(0)  # 重置指针
 
     if size_bytes > MAX_DATASET_SIZE:
-        return jsonify({'error': f'File too large. Maximum size is {MAX_DATASET_SIZE // (1024 * 1024)}MB.You file size is {size_bytes // (1024 * 1024)}'}), 413
+        return jsonify({
+                           'error': f'File too large. Maximum size is {MAX_DATASET_SIZE // (1024 * 1024)}MB.You file size is {size_bytes // (1024 * 1024)}'}), 413
 
     name = request.form.get('name')
     description = request.form.get('description')

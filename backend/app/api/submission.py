@@ -2,6 +2,9 @@ import os
 from datetime import datetime
 from threading import Thread
 
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.utils import secure_filename
+
 from app.models.exam import Exam
 from app.models.problem import Problem
 from app.models.submission import Submission
@@ -9,8 +12,6 @@ from app.models.user import db, User
 from app.services.judge_service import judge_submission
 from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
-from flask import Blueprint, request, jsonify, current_app
-from werkzeug.utils import secure_filename
 
 submission_bp = Blueprint('submission', __name__)
 
@@ -117,7 +118,7 @@ def list_submissions():
     exam_id = request.args.get('exam_id', type=int)
     status = request.args.get('status')
     username = request.args.get('username')
-    
+
     query = Submission.query
 
     # 权限控制：学生只能看自己的提交，除非是特定题目的公共提交（如果系统有此设定）
@@ -126,16 +127,16 @@ def list_submissions():
         query = query.filter(Submission.user_id == request.current_user.id)
     elif user_id:
         query = query.filter(Submission.user_id == user_id)
-    
+
     if username:
         query = query.join(User).filter(User.username.like(f"%{username}%"))
 
     if problem_id:
         query = query.filter(Submission.problem_id == problem_id)
-    
+
     if exam_id:
         query = query.filter(Submission.exam_id == exam_id)
-    
+
     if status:
         query = query.filter(Submission.status == status)
 
@@ -143,7 +144,7 @@ def list_submissions():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     pagination = query.order_by(Submission.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    
+
     submissions = pagination.items
 
     return jsonify({
@@ -170,7 +171,7 @@ def get_submission(submission_id, *args, **kwargs):
     submission = Submission.query.get(submission_id)
     if not submission:
         return jsonify({"error": "Submission not found"}), 404
-    
+
     # 权限检查
     if request.current_user.role == 'student' and submission.user_id != request.current_user.id:
         return jsonify({"error": "Permission denied"}), 403
@@ -197,7 +198,7 @@ def check_single_submission_plagiarism(submission_id):
         return jsonify({"error": "Permission denied"}), 403
 
     submission = Submission.query.get_or_404(submission_id)
-    
+
     app = current_app._get_current_object()
     plagiarism_service.start_check_task(app, [submission.id])
 

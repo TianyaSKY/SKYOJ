@@ -1,16 +1,16 @@
+import csv
 import hashlib
 import io
-import csv
 from datetime import datetime
 
+from flask import Blueprint, request, jsonify, current_app, send_file
+from sqlalchemy import func
+
 from app.models.exam import Exam, ExamProblem
-from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db, User
 from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required, encode_auth_token
-from flask import Blueprint, request, jsonify, current_app, send_file
-from sqlalchemy import func
 
 exam_bp = Blueprint('exam', __name__)
 
@@ -59,7 +59,7 @@ def get_exams():
         exams = Exam.query.all()
     else:
         exams = Exam.query.filter_by(is_visible=True).all()
-    
+
     result = []
     for e in exams:
         d = e.to_dict()
@@ -68,7 +68,7 @@ def get_exams():
         # 获取提交次数
         d['submission_count'] = Submission.query.filter_by(exam_id=e.id).count()
         result.append(d)
-        
+
     return jsonify(result), 200
 
 
@@ -261,7 +261,7 @@ def get_exam_rank(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     exam_problems = ExamProblem.query.filter_by(exam_id=exam_id).all()
     problem_ids = [ep.problem_id for ep in exam_problems]
-    
+
     # 获取该考试的所有提交记录
     submissions = Submission.query.filter(
         Submission.exam_id == exam_id,
@@ -278,7 +278,7 @@ def get_exam_rank(exam_id):
                 "penalty": 0,
                 "problems": {pid: {"solved": False, "failed_attempts": 0, "time": 0} for pid in problem_ids}
             }
-        
+
         user_rank = rank_data[sub.user_id]
         prob_stats = user_rank["problems"].get(sub.problem_id)
         if not prob_stats or prob_stats["solved"]:
@@ -394,7 +394,7 @@ def check_exam_plagiarism(exam_id):
     ).subquery()
 
     submission_ids = [row.max_id for row in db.session.query(subquery.c.max_id).all()]
-    
+
     if not submission_ids:
         return jsonify({"message": "No submissions found for this exam"}), 200
 
@@ -418,7 +418,7 @@ def export_exam_scores(exam_id):
 
     exam = Exam.query.get_or_404(exam_id)
     exam_problems = ExamProblem.query.filter_by(exam_id=exam_id).order_by(ExamProblem.display_id).all()
-    
+
     # 获取所有在该考试中有提交记录的用户
     user_ids = db.session.query(Submission.user_id).filter(Submission.exam_id == exam_id).distinct().all()
     user_ids = [uid[0] for uid in user_ids]
@@ -426,7 +426,7 @@ def export_exam_scores(exam_id):
     # 准备 CSV 数据
     output = io.StringIO()
     writer = csv.writer(output)
-    
+
     # 表头
     header = ['User ID', 'Username']
     for ep in exam_problems:
@@ -439,24 +439,24 @@ def export_exam_scores(exam_id):
         user = User.query.get(uid)
         row = [user.id, user.username]
         total_score = 0
-        
+
         for ep in exam_problems:
             last_sub = Submission.query.filter_by(
                 exam_id=exam_id,
                 user_id=uid,
                 problem_id=ep.problem_id
             ).order_by(Submission.created_at.desc()).first()
-            
+
             score = last_sub.score if last_sub else 0
             row.append(score)
             total_score += score
-            
+
         row.append(total_score)
         writer.writerow(row)
 
     output.seek(0)
     filename = f"exam_{exam_id}_scores_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
-    
+
     return send_file(
         io.BytesIO(output.getvalue().encode('utf-8-sig')),
         mimetype='text/csv',

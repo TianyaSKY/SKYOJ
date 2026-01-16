@@ -1,9 +1,10 @@
+from flask import Blueprint, jsonify, request
+
 from app.models.sysdict import SysDict
 from app.services.judge_service import save_non_acm_script
 from app.services.llm import ask_llm
 from app.services.test_gen_service import run_test_generation
 from app.utils.auth_tools import token_required
-from flask import Blueprint, jsonify, request
 
 llm_bp = Blueprint('llm', __name__)
 

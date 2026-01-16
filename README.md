@@ -1,6 +1,12 @@
 
-# SKYOJ - 新一代 AI 驱动的在线评测系统
+<h2 align="center">SKYOJ - 新一代 AI 驱动的在线评测系统</h2>
 
+<p align="center">
+  <a href="README.md">中文</a> |
+  <a href="README_en.md">English</a>
+</p>
+
+![cover.png](images/cover.png)
 <div align="center">
   <img src="https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat-square&logo=vue.js" alt="Vue3">
   <img src="https://img.shields.io/badge/Flask-2.x-000000?style=flat-square&logo=flask" alt="Flask">
@@ -42,7 +48,8 @@
   - **资源配额**：基于 Linux Cgroups 严格限制 CPU、内存及 PID 数，防止 Fork 炸弹与资源耗尽攻击。
 
 ---
-
+![Timeline 1.gif](images/Timeline%201.gif)
+![Timeline 2.gif](images/Timeline%202.gif)
 ## 技术栈
 
 | 模块 | 技术选型 | 说明 |
@@ -82,7 +89,7 @@ SKYOJ/
 ### 第一步：获取代码
 
 ```bash
-git clone https://github.com/Dpleasure/SKYOJ.git
+git clone https://github.com/TianyaSKY/SKYOJ.git
 cd SKYOJ
 ```
 
@@ -119,15 +126,15 @@ docker-compose up -d --build
 
 ## 系统截图
 
-![img.png](imgs/img.png)
-![img_1.png](imgs/img_1.png)
-![img_2.png](imgs/img_2.png)
-![img_3.png](imgs/img_3.png)
-![img_4.png](imgs/img_4.png)
-![img_5.png](imgs/img_5.png)
-![img_6.png](imgs/img_6.png)
-![img_7.png](imgs/img_7.png)
-![img_8.png](imgs/img_8.png)
+![img.png](images/img.png)
+![img_1.png](images/img_1.png)
+![img_2.png](images/img_2.png)
+![img_3.png](images/img_3.png)
+![img_4.png](images/img_4.png)
+![img_5.png](images/img_5.png)
+![img_6.png](images/img_6.png)
+![img_7.png](images/img_7.png)
+![img_8.png](images/img_8.png)
 
 ---
 

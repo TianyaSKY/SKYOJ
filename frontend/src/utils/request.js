@@ -28,7 +28,6 @@ service.interceptors.response.use(
     },
     error => {
         if (error.response && error.response.status === 401) {
-          debugger
             ElMessageBox.confirm(
                 '登录状态已失效，您可以继续留在该页面，或者重新登录',
                 '系统提示',

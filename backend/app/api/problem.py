@@ -3,13 +3,14 @@ import os
 import shutil
 import zipfile
 
+from flask import Blueprint, request, jsonify, send_file, current_app
+from werkzeug.utils import secure_filename
+
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db
 from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
-from flask import Blueprint, request, jsonify, send_file, current_app
-from werkzeug.utils import secure_filename
 
 problem_bp = Blueprint('problem', __name__)
 UPLOAD_BASE_DIR = "uploads/problems"
@@ -232,7 +233,7 @@ def check_problem_plagiarism(problem_id):
 
     # 获取该题目的所有提交 ID
     submission_ids = [s.id for s in Submission.query.filter_by(problem_id=problem_id).all()]
-    
+
     if not submission_ids:
         return jsonify({"message": "No submissions found for this problem"}), 200
 

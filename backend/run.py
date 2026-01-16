@@ -1,6 +1,6 @@
 ﻿import os
-import time
 import threading
+import time
 
 from flask import Flask
 from sqlalchemy.exc import OperationalError
@@ -9,19 +9,18 @@ from app.api.auth import auth_bp
 from app.api.dataset import dataset_bp
 from app.api.exam import exam_bp
 from app.api.llm import llm_bp
+from app.api.plagiarism import plagiarism_bp
 from app.api.problem import problem_bp
+from app.api.search import search_bp
 from app.api.submission import submission_bp
 from app.api.sys_dict import sys_dict_bp
 from app.api.user import user_bp
-from app.api.search import search_bp
-from app.api.plagiarism import plagiarism_bp
 from app.models.sysdict import SysDict
 from app.models.user import db
-from app.utils.sys_dict import sys_dict_kv
-
+from app.services.plagiarism_service import plagiarism_service
 # 导入服务以进行初始化
 from app.services.search_service import search_service
-from app.services.plagiarism_service import plagiarism_service
+from app.utils.sys_dict import sys_dict_kv
 
 if os.path.exists('/.dockerenv'):
     db_host = 'mysql'
@@ -66,11 +65,11 @@ def init_services():
     try:
         # 加载查重模型
         plagiarism_service._ensure_model_loaded()
-        
+
         # 建立搜索索引
         with app.app_context():
             search_service.rebuild_index()
-            
+
         print("Services initialized successfully.")
     except Exception as e:
         print(f"Error initializing services: {e}")

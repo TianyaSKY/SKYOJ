@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 
+from flask import Blueprint, jsonify, request
+
 from app.models.exam import Exam
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.sysdict import SysDict
 from app.models.user import db, User
 from app.utils.auth_tools import token_required
-from flask import Blueprint, jsonify, request
 
 sys_dict_bp = Blueprint('sys_dict', __name__)
 

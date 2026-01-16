@@ -24,9 +24,8 @@
         <el-table-column label="类型" prop="type" width="100"/>
         <el-table-column label="语言" prop="language" width="150">
           <template #default="scope">
-            <el-tag v-for="lang in (scope.row.language ? scope.row.language.split(',') : ['All'])" :key="lang"
-                    size="small" style="margin-right: 4px">
-              {{ lang.trim() }}
+            <el-tag size="small">
+              {{ scope.row.language || 'python' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -69,9 +68,7 @@
           <el-col :span="6">
             <el-form-item label="允许语言" prop="language">
               <el-select
-                  v-model="languageArray"
-                  collapse-tags
-                  multiple
+                  v-model="form.language"
                   placeholder="请选择允许的语言"
                   style="width: 100%"
               >
@@ -97,7 +94,7 @@
           <div v-if="dialogVisible" class="editor-container mini-editor">
             <vue-monaco-editor
                 v-model:value="form.template_code"
-                :language="languageArray[0] || 'python'"
+                :language="form.language || 'python'"
                 :options="miniEditorOptions"
                 theme="vs-dark"
             />
@@ -298,7 +295,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {
   createProblem,
@@ -385,12 +382,6 @@ const form = ref({
   template_code: '',
 })
 
-const languageArray = ref(['python'])
-
-watch(languageArray, (newVal) => {
-  form.value.language = newVal.join(',')
-})
-
 const dialogTitle = computed(() => (isEdit.value ? '编辑题目' : '新增题目'))
 
 const fetchProblems = async () => {
@@ -414,7 +405,6 @@ const resetForm = () => {
     memory_limit: 128,
     template_code: '',
   }
-  languageArray.value = ['python']
   currentProblemId.value = null
 
   // Reset test case upload
@@ -472,7 +462,6 @@ const generateProblem = async () => {
         memory_limit: res.memory_limit || 128,
         template_code: res.template_code || '',
       }
-      languageArray.value = (res.language || 'python').split(',').map(s => s.trim())
       aiDialogVisible.value = false
       dialogVisible.value = true
       ElMessage.success('题目已生成，请预览并确认')
@@ -502,7 +491,6 @@ const handleEdit = async (row) => {
       template_code: detail.template_code || '',
       language: detail.language || 'python'
     }
-    languageArray.value = (detail.language || 'python').split(',').map(s => s.trim())
   } catch (error) {
     ElMessage.error('获取题目详情失败')
     dialogVisible.value = false
@@ -574,8 +562,8 @@ const handleGenerateScript = async () => {
     const modeConfigs = {
       acm: {
         role: '测试数据生成专家',
-        task: '编写一个 Python 脚本，用于生成随机的输入数据（.in）和对应的标准答案（.out）。',
-        rule: '脚本应循环生成指定数量的测试点文件。',
+        task: '编写一个 Python 脚本，用于生成随机的输入数据（.in）和对应的标准答案（.out）。并直接放置在原始文件夹下',
+        rule: `脚本应循环生成${testDataForm.value.count}组测试数据的测试点文件。`,
       },
       oop: {
         role: '自动化测试专家',
