@@ -1,4 +1,0 @@
-CREATE
-DATABASE IF NOT EXISTS oj_db;
-USE
-oj_db;

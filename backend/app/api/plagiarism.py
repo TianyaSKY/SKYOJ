@@ -3,8 +3,8 @@ from flask import Blueprint, request, jsonify, current_app
 from app.models.plagiarism import PlagiarismLog
 from app.models.submission import Submission
 from app.models.user import db
-from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
+from app.utils.feature_flags import ENABLE_PLAGIARISM
 
 plagiarism_bp = Blueprint('plagiarism', __name__)
 
@@ -98,6 +98,8 @@ def trigger_batch_check():
     """手动触发批量查重（仅限教师）"""
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
+    if not ENABLE_PLAGIARISM:
+        return jsonify({"error": "Plagiarism service is temporarily disabled"}), 503
 
     data = request.get_json()
     submission_ids = data.get('submission_ids', [])
@@ -106,6 +108,7 @@ def trigger_batch_check():
         return jsonify({"error": "No submission_ids provided"}), 400
 
     app = current_app._get_current_object()
+    from app.services.plagiarism_service import plagiarism_service
     plagiarism_service.start_check_task(app, submission_ids)
 
     return jsonify({"message": "Batch plagiarism check started"}), 202

@@ -3,8 +3,8 @@ from flask import Blueprint, request, jsonify
 from app.models.problem import Problem
 from app.models.search_history import SearchHistory
 from app.models.user import db
-from app.services.search_service import search_service
 from app.utils.auth_tools import token_required
+from app.utils.feature_flags import ENABLE_SEMANTIC_SEARCH
 
 search_bp = Blueprint('search', __name__)
 
@@ -48,7 +48,26 @@ def search_problems():
             "memory_limit": p.memory_limit
         } for p in problems]
     else:
+        if not ENABLE_SEMANTIC_SEARCH:
+            # 语义搜索关闭时，退化到普通搜索，保证接口可用
+            problems = Problem.query.filter(
+                (Problem.title.like(f'%{query}%')) |
+                (Problem.content.like(f'%{query}%'))
+            ).limit(top_k).all()
+
+            results = [{
+                "id": p.id,
+                "title": p.title,
+                "content": p.content,
+                "type": p.type,
+                "language": p.language,
+                "time_limit": p.time_limit,
+                "memory_limit": p.memory_limit
+            } for p in problems]
+            return jsonify(results)
+
         # Semantic search
+        from app.services.search_service import search_service
         results = search_service.search(query, top_k=top_k)
 
     return jsonify(results)
@@ -61,5 +80,9 @@ def rebuild_index():
     if request.current_user.role != 'teacher':
         return jsonify({'error': 'Permission denied'}), 403
 
+    if not ENABLE_SEMANTIC_SEARCH:
+        return jsonify({'error': 'Semantic search is temporarily disabled'}), 503
+
+    from app.services.search_service import search_service
     search_service.rebuild_index()
     return jsonify({'message': 'Index rebuilt successfully'})

@@ -9,8 +9,8 @@ from sqlalchemy import func
 from app.models.exam import Exam, ExamProblem
 from app.models.submission import Submission
 from app.models.user import db, User
-from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required, encode_auth_token
+from app.utils.feature_flags import ENABLE_PLAGIARISM
 
 exam_bp = Blueprint('exam', __name__)
 
@@ -382,6 +382,8 @@ def check_exam_plagiarism(exam_id):
     """
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
+    if not ENABLE_PLAGIARISM:
+        return jsonify({"error": "Plagiarism service is temporarily disabled"}), 503
 
     # 获取该考试中每个用户对每个题目的最后一次提交 ID
     subquery = db.session.query(
@@ -399,6 +401,7 @@ def check_exam_plagiarism(exam_id):
         return jsonify({"message": "No submissions found for this exam"}), 200
 
     app = current_app._get_current_object()
+    from app.services.plagiarism_service import plagiarism_service
     plagiarism_service.start_check_task(app, submission_ids)
 
     return jsonify({

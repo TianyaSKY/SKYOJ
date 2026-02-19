@@ -17,6 +17,7 @@
         />
         <div class="filter-group">
           <el-switch
+              v-if="ENABLE_SEMANTIC_SEARCH"
               v-model="isSemanticSearch"
               active-text="语义搜索"
               style="margin-right: 15px"
@@ -128,6 +129,7 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
 import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
+import {ENABLE_SEMANTIC_SEARCH} from '@/utils/featureFlags'
 
 const loading = ref(false)
 const problems = ref([])
@@ -168,7 +170,7 @@ const handleSearch = async () => {
   try {
     const data = await searchProblems({
       query: searchQuery.value,
-      mode: isSemanticSearch.value ? 'semantic' : 'normal',
+      mode: ENABLE_SEMANTIC_SEARCH && isSemanticSearch.value ? 'semantic' : 'normal',
       top_k: 50
     })
     searchResults.value = data
@@ -210,6 +212,7 @@ watch(searchQuery, (newVal) => {
 })
 
 watch(isSemanticSearch, () => {
+  if (!ENABLE_SEMANTIC_SEARCH) return
   if (searchQuery.value) {
     handleSearch()
   }

@@ -30,7 +30,7 @@
     <h3 class="section-title">核心管理</h3>
     <el-row :gutter="20" class="dashboard-cards">
       <!-- 查重管理卡片 -->
-      <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
+      <el-col v-if="ENABLE_PLAGIARISM" :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'plagiarism-admin' })">
           <div class="nav-icon" style="color: #E6A23C; background-color: #fdf6ec">
             <el-icon :size="32">
@@ -167,7 +167,7 @@
           <el-alert :closable="false" class="mb-4" show-icon
                     title="危险操作区，请谨慎操作。" type="warning"/>
           <div class="maintenance-actions">
-            <div class="action-item">
+            <div v-if="ENABLE_SEMANTIC_SEARCH" class="action-item">
               <div class="action-info">
                 <h4>重建搜索索引</h4>
                 <p>当语义搜索结果不准确或新增题目未被索引时使用。</p>
@@ -176,6 +176,7 @@
                 立即重建
               </el-button>
             </div>
+            <el-empty v-else description="语义搜索功能已临时关闭" />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -198,6 +199,7 @@ import {getSysInfo, getSysStatistics, rebuildIndex, updateSysInfo} from '@/api/s
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
 import {ElMessage, ElMessageBox} from 'element-plus'
+import {ENABLE_PLAGIARISM, ENABLE_SEMANTIC_SEARCH} from '@/utils/featureFlags'
 
 const router = useRouter()
 const sysStore = useSysStore()

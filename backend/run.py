@@ -17,9 +17,7 @@ from app.api.sys_dict import sys_dict_bp
 from app.api.user import user_bp
 from app.models.sysdict import SysDict
 from app.models.user import db
-from app.services.plagiarism_service import plagiarism_service
-# 导入服务以进行初始化
-from app.services.search_service import search_service
+from app.utils.feature_flags import ENABLE_PLAGIARISM, ENABLE_SEMANTIC_SEARCH
 from app.utils.sys_dict import sys_dict_kv
 
 if os.path.exists('/.dockerenv'):
@@ -61,14 +59,20 @@ def init_db():
 
 def init_services():
     """初始化搜索索引和查重模型"""
+    if not (ENABLE_PLAGIARISM or ENABLE_SEMANTIC_SEARCH):
+        print("Search and plagiarism services are disabled by feature flags. Skipping init.")
+        return
+
     print("Initializing services (Search Index & Plagiarism Model)...")
     try:
-        # 加载查重模型
-        plagiarism_service._ensure_model_loaded()
+        if ENABLE_PLAGIARISM:
+            from app.services.plagiarism_service import plagiarism_service
+            plagiarism_service._ensure_model_loaded()
 
-        # 建立搜索索引
-        with app.app_context():
-            search_service.rebuild_index()
+        if ENABLE_SEMANTIC_SEARCH:
+            from app.services.search_service import search_service
+            with app.app_context():
+                search_service.rebuild_index()
 
         print("Services initialized successfully.")
     except Exception as e:
@@ -79,7 +83,7 @@ def init_services():
 init_db()
 
 # 异步初始化服务，避免阻塞启动
-threading.Thread(target=init_services).start()
+threading.Thread(target=init_services, daemon=True).start()
 
 
 @app.route('/')

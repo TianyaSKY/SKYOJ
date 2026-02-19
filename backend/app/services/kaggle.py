@@ -60,6 +60,8 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
 
         try:
             final_score = float(lines[-1])
+            if final_score < 0 or final_score > 100:
+                return "Runtime Error", 0, f"Invalid score out of range [0, 100]: {final_score}"
             log_output = "\n".join(lines[:-1]) if len(lines) > 1 else "Score calculated."
             return "Accepted" if final_score == 100 else "Wrong Answer", final_score, log_output
         except ValueError:

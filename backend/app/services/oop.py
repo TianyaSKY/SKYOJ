@@ -1,7 +1,65 @@
 import os
+import re
 
 from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream
+
+
+FORBIDDEN_EXIT_PATTERNS = {
+    'python': [
+        (r"\bsys\s*\.\s*exit\s*\(", "sys.exit"),
+        (r"\bos\s*\.\s*_exit\s*\(", "os._exit"),
+    ],
+    'c': [
+        (r"\b(exit|_Exit|quick_exit|abort)\s*\(", "exit/_Exit/quick_exit/abort"),
+    ],
+    'cpp': [
+        (r"\b(exit|_Exit|quick_exit|abort)\s*\(", "exit/_Exit/quick_exit/abort"),
+    ],
+    'java': [
+        (r"\bSystem\s*\.\s*exit\s*\(", "System.exit"),
+        (r"\bRuntime\s*\.\s*getRuntime\s*\(\s*\)\s*\.\s*halt\s*\(", "Runtime.getRuntime().halt"),
+    ],
+}
+
+
+def _detect_forbidden_exit_apis(code, language):
+    patterns = FORBIDDEN_EXIT_PATTERNS.get(language.lower(), [])
+    hits = []
+    for pattern, label in patterns:
+        if re.search(pattern, code):
+            hits.append(label)
+    return sorted(set(hits))
+
+
+PYTHON_OOP_GUARD_RUNNER = """import runpy
+import sys
+import traceback
+
+
+def _system_exit_from_solution(tb):
+    while tb:
+        filename = tb.tb_frame.f_code.co_filename.replace("\\\\", "/")
+        if filename.endswith("/solution.py"):
+            return True
+        tb = tb.tb_next
+    return False
+
+
+try:
+    runpy.run_path("/app/main.py", run_name="__main__")
+except SystemExit as ex:
+    if _system_exit_from_solution(ex.__traceback__):
+        exit_code = ex.code if isinstance(ex.code, int) else 1
+        if exit_code == 0:
+            exit_code = 91
+        print(f"[SKYOJ] Forbidden SystemExit detected in solution.py: {ex.code}", file=sys.stderr)
+        sys.exit(exit_code)
+    raise
+except Exception:
+    traceback.print_exc()
+    sys.exit(1)
+"""
 
 
 def run_oop_judge(submission_id, user_code, problem_id, language='python'):
@@ -43,6 +101,14 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python'):
     lang_config = configs.get(language.lower())
     if not lang_config:
         return "System Error", 0, f"Unsupported language for OOP mode: {language}"
+
+    forbidden_hits = _detect_forbidden_exit_apis(user_code or "", language)
+    if forbidden_hits:
+        return "Runtime Error", 0, (
+            "Forbidden API usage detected: "
+            + ", ".join(forbidden_hits)
+            + ". Do not terminate the judge process directly."
+        )
 
     problem = Problem.query.get(problem_id)
     problem_dir = f"uploads/problems/{problem_id}"
@@ -86,7 +152,14 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python'):
         # 4. 运行
         # 使用 timeout 防止死循环
         time_limit = getattr(problem, 'time_limit', 5)
-        run_cmd = f"sh -c 'timeout {time_limit}s {lang_config['run']}'"
+        run_entry = lang_config['run']
+        if language.lower() == 'python':
+            guard_filename = "__skyoj_oop_guard_runner.py"
+            guard_tar = create_tar_stream(guard_filename, PYTHON_OOP_GUARD_RUNNER)
+            container.put_archive('/app', guard_tar)
+            run_entry = f"python3 {guard_filename}"
+
+        run_cmd = f"sh -c 'timeout {time_limit}s {run_entry}'"
         run_result = container.exec_run(run_cmd)
         output = run_result.output.decode('utf-8')
 
@@ -96,6 +169,8 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python'):
             try:
                 # 尝试解析最后一行作为分数
                 final_score = float(lines[-1].strip())
+                if final_score < 0 or final_score > 100:
+                    return "Runtime Error", 0, f"Invalid score out of range [0, 100]: {final_score}"
                 log_output = "\n".join(lines[:-1])
                 # 只有满分才显示 Accepted，否则显示 Wrong Answer (带部分分)
                 final_status = "Accepted" if final_score == 100 else "Wrong Answer"

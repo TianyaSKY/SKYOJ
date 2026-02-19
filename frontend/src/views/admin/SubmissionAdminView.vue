@@ -46,7 +46,12 @@
 
     <el-card shadow="never">
       <div class="table-actions mb-4">
-        <el-button type="success" :disabled="!selectedSubmissions.length" @click="handleBatchPlagiarism">
+        <el-button
+          v-if="ENABLE_PLAGIARISM"
+          type="success"
+          :disabled="!selectedSubmissions.length"
+          @click="handleBatchPlagiarism"
+        >
           对选中提交进行查重 ({{ selectedSubmissions.length }})
         </el-button>
       </div>
@@ -100,7 +105,7 @@
         <el-table-column label="操作" fixed="right" width="120" align="center">
           <template #default="scope">
             <el-button link type="primary" @click="viewDetail(scope.row.id)">详情</el-button>
-            <el-button link type="warning" @click="checkPlagiarism(scope.row.id)">查重</el-button>
+            <el-button v-if="ENABLE_PLAGIARISM" link type="warning" @click="checkPlagiarism(scope.row.id)">查重</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -127,6 +132,7 @@ import { getSubmissions } from '@/api/submission'
 import { checkPlagiarismBatch } from '@/api/plagiarism'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
+import { ENABLE_PLAGIARISM } from '@/utils/featureFlags'
 
 const router = useRouter()
 const loading = ref(false)

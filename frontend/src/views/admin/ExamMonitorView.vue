@@ -44,7 +44,12 @@
               <el-switch v-model="autoRefresh" @change="handleAutoRefreshChange" />
             </div>
             <el-button :icon="Refresh" :loading="loading" circle @click="fetchMonitorData"/>
-            <el-button type="warning" :loading="plagiarismLoading" @click="handleCheckExamPlagiarism">
+            <el-button
+              v-if="ENABLE_PLAGIARISM"
+              type="warning"
+              :loading="plagiarismLoading"
+              @click="handleCheckExamPlagiarism"
+            >
               全场查重
             </el-button>
           </div>
@@ -174,7 +179,14 @@
         <div class="detail-section">
           <div class="section-header">
             <h4>基本信息</h4>
-            <el-button :loading="singlePlagiarismLoading" size="small" type="warning" plain @click="handleCheckSinglePlagiarism">
+            <el-button
+              v-if="ENABLE_PLAGIARISM"
+              :loading="singlePlagiarismLoading"
+              size="small"
+              type="warning"
+              plain
+              @click="handleCheckSinglePlagiarism"
+            >
               单次查重
             </el-button>
           </div>
@@ -272,6 +284,7 @@ import {ElMessage, ElMessageBox} from 'element-plus'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/vs2015.css'
 import dayjs from 'dayjs'
+import {ENABLE_PLAGIARISM} from '@/utils/featureFlags'
 
 const route = useRoute()
 const examId = route.params.id

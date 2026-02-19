@@ -44,7 +44,7 @@
 
     <!-- Plagiarism Alert (Only for Teachers or if student has a log) -->
     <el-alert
-      v-if="plagiarismLog"
+      v-if="ENABLE_PLAGIARISM && plagiarismLog"
       :title="`检测到代码相似度过高 (${(plagiarismLog.similarity_score * 100).toFixed(2)}%)`"
       type="warning"
       show-icon
@@ -102,6 +102,7 @@ import {getPlagiarismDetail} from '@/api/plagiarism'
 import {useUserStore} from '@/stores/user'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import {ENABLE_PLAGIARISM} from '@/utils/featureFlags'
 import {
   CircleCheckFilled,
   CircleCloseFilled,
@@ -188,7 +189,11 @@ const fetchSubmission = async (silent = false) => {
     } else {
       stopPolling()
       // 判题结束后获取查重信息
-      fetchPlagiarismInfo()
+      if (ENABLE_PLAGIARISM) {
+        fetchPlagiarismInfo()
+      } else {
+        plagiarismLog.value = null
+      }
     }
   } catch (error) {
     ElMessage.error('Failed to load submission details')

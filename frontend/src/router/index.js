@@ -2,6 +2,7 @@ import {createRouter, createWebHistory} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import {useUserStore} from '@/stores/user'
 import {useSysStore} from '@/stores/sys'
+import {ENABLE_PLAGIARISM} from '@/utils/featureFlags'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -160,6 +161,11 @@ router.beforeEach(async (to, from, next) => {
     const user = userStore.user || JSON.parse(localStorage.getItem('user') || '{}')
     const isTeacher = user.role === 'teacher'
     const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
+
+    if (!ENABLE_PLAGIARISM && ['plagiarism-admin', 'code-compare'].includes(to.name)) {
+        next({name: isTeacher ? 'teacher-dashboard' : 'home'})
+        return
+    }
 
     // Exam Mode Logic
     if (!isPracticeMode) {

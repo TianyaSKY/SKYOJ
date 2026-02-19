@@ -10,8 +10,8 @@ from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db, User
 from app.services.judge_service import judge_submission
-from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
+from app.utils.feature_flags import ENABLE_PLAGIARISM
 
 submission_bp = Blueprint('submission', __name__)
 
@@ -196,10 +196,13 @@ def check_single_submission_plagiarism(submission_id):
     """
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
+    if not ENABLE_PLAGIARISM:
+        return jsonify({"error": "Plagiarism service is temporarily disabled"}), 503
 
     submission = Submission.query.get_or_404(submission_id)
 
     app = current_app._get_current_object()
+    from app.services.plagiarism_service import plagiarism_service
     plagiarism_service.start_check_task(app, [submission.id])
 
     return jsonify({

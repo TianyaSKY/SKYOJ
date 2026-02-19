@@ -9,8 +9,8 @@ from werkzeug.utils import secure_filename
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import db
-from app.services.plagiarism_service import plagiarism_service
 from app.utils.auth_tools import token_required
+from app.utils.feature_flags import ENABLE_PLAGIARISM
 
 problem_bp = Blueprint('problem', __name__)
 UPLOAD_BASE_DIR = "uploads/problems"
@@ -230,6 +230,8 @@ def check_problem_plagiarism(problem_id):
     """
     if request.current_user.role != 'teacher':
         return jsonify({"error": "Permission denied"}), 403
+    if not ENABLE_PLAGIARISM:
+        return jsonify({"error": "Plagiarism service is temporarily disabled"}), 503
 
     # 获取该题目的所有提交 ID
     submission_ids = [s.id for s in Submission.query.filter_by(problem_id=problem_id).all()]
@@ -238,6 +240,7 @@ def check_problem_plagiarism(problem_id):
         return jsonify({"message": "No submissions found for this problem"}), 200
 
     app = current_app._get_current_object()
+    from app.services.plagiarism_service import plagiarism_service
     plagiarism_service.start_check_task(app, submission_ids)
 
     return jsonify({
