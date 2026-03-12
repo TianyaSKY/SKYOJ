@@ -25,10 +25,14 @@ if os.path.exists('/.dockerenv'):
 else:
     db_host = '127.0.0.1'
 
+default_db_uri = f'mysql+pymysql://root:root@{db_host}:3306/oj_db'
+database_uri = os.getenv('DATABASE_URL', default_db_uri)
+secret_key = os.getenv('SECRET_KEY', 'TianyaSKY')
+
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://root:root@{db_host}:3306/oj_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'TianyaSKY'
+app.config['SECRET_KEY'] = secret_key
 
 db.init_app(app)
 

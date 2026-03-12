@@ -54,7 +54,7 @@
             </el-icon>
           </div>
           <h3>系统设置</h3>
-          <p>配置网站标题、公告、运行模式及 AI 智能体 API 密钥。</p>
+          <p>配置网站标题、公告、运行模式及 AI 智能体状态。</p>
           <div class="nav-footer">
             <span>打开设置 <el-icon><ArrowRight/></el-icon></span>
           </div>
@@ -142,25 +142,25 @@
         </el-tab-pane>
 
         <el-tab-pane label="AI 智能体 (LLM)">
-          <el-alert :closable="false" class="mb-4" show-icon
-                    title="配置后可启用 AI 辅助出题、AICase 自动生成测试数据等功能。" type="info"/>
-          <el-form :model="sysForm" class="mt-4" label-position="top">
-            <el-form-item label="API Endpoint">
-              <el-input v-model="sysForm.llm_api_url" placeholder="https://api.openai.com/v1"/>
-            </el-form-item>
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="模型名称">
-                  <el-input v-model="sysForm.llm_model_name" placeholder="gpt-4o"/>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="API Key">
-                  <el-input v-model="sysForm.llm_api_key" placeholder="sk-..." show-password type="password"/>
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-form>
+          <el-alert
+              :title="llmEnv.ready ? 'LLM 环境变量已配置，可正常使用 AI 功能。' : 'LLM 环境变量未完整配置，AI 功能不可用。'"
+              :type="llmEnv.ready ? 'success' : 'warning'"
+              :closable="false"
+              class="mb-4"
+              show-icon
+          />
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="配置来源">根目录 .env 环境变量</el-descriptions-item>
+            <el-descriptions-item label="API Endpoint">
+              {{ llmEnv.apiUrl || '未设置 (LLM_API_URL)' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="模型名称">
+              {{ llmEnv.modelName || '未设置 (LLM_MODEL_NAME)' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="API Key">
+              {{ llmEnv.ready ? '已设置 (已隐藏)' : '未设置 (LLM_API_KEY)' }}
+            </el-descriptions-item>
+          </el-descriptions>
         </el-tab-pane>
 
         <el-tab-pane label="高级维护">
@@ -210,10 +210,12 @@ const sysForm = ref({
   title: '',
   info: '',
   warning: false,
-  practice: true,
-  llm_api_url: '',
-  llm_model_name: '',
-  llm_api_key: ''
+  practice: true
+})
+const llmEnv = ref({
+  ready: false,
+  apiUrl: '',
+  modelName: ''
 })
 
 const userListVisible = ref(false)
@@ -287,10 +289,12 @@ const openSysSettings = async () => {
         title: res.title || 'SKYOJ',
         info: res.info || '',
         warning: res.warning === 'True' || res.warning === true,
-        practice: res.practice === 'True' || res.practice === true,
-        llm_api_url: res.llm_api_url || '',
-        llm_model_name: res.llm_model_name || '',
-        llm_api_key: res.llm_api_key || ''
+        practice: res.practice === 'True' || res.practice === true
+      }
+      llmEnv.value = {
+        ready: !!res.llm_env_ready,
+        apiUrl: res.llm_api_url || '',
+        modelName: res.llm_model_name || ''
       }
     }
   } catch (error) {

@@ -1,4 +1,4 @@
-
+﻿
 <h2 align="center">SKYOJ - Next-Generation AI-Powered Online Judge System</h2>
 
 <p align="center">
@@ -6,7 +6,7 @@
   <a href="README_en.md">English</a>
 </p>
 
-![cover.png](images/cover.png)
+![hero-banner.png](images/hero-banner.png)
 <div align="center">
   <img src="https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat-square&logo=vue.js" alt="Vue3">
   <img src="https://img.shields.io/badge/Flask-2.x-000000?style=flat-square&logo=flask" alt="Flask">
@@ -48,8 +48,8 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
   - **Resource Quotas**: Strictly limits CPU, memory, and PID counts based on Linux Cgroups to prevent Fork bombs and resource exhaustion attacks.
 
 ---
-![Timeline 1.gif](images/Timeline%201.gif)
-![Timeline 2.gif](images/Timeline%202.gif)
+![project-timeline-1.gif](images/project-timeline-1.gif)
+![project-timeline-2.gif](images/project-timeline-2.gif)
 ## Tech Stack
 
 | Module | Technology Selection | Description |
@@ -74,9 +74,15 @@ SKYOJ/
 │       ├── runners/        # Judging image (skyoj-runner) build files
 │       └── random_data/    # Data generation image (skyoj-generator) build files
 ├── frontend/               # Vue3 frontend source code
-├── docker/                 # Infrastructure configuration (MySQL, Nginx)
+├── docker/                 # Docker configuration directory
+│   ├── backend/            # Backend container Dockerfile
+│   ├── frontend/           # Frontend container Dockerfile
+│   ├── judge/              # Judge container Dockerfile
+│   ├── mysql/              # MySQL init script
+│   └── nginx/              # Nginx reverse proxy config
 ├── generate/               # Automated problem generation scripts
 ├── docker-compose.yml      # Container orchestration configuration
+├── .env.example            # Environment variable template
 └── README.md               # Project documentation
 ```
 
@@ -93,7 +99,19 @@ git clone https://github.com/TianyaSKY/SKYOJ.git
 cd SKYOJ
 ```
 
-### Step 2: Build Sandbox Images (Critical)
+### Step 2: Configure Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Please configure at least these LLM variables (for AI tutor and test-data generation):
+
+- `LLM_API_URL`
+- `LLM_MODEL_NAME`
+- `LLM_API_KEY`
+
+### Step 3: Build Sandbox Images (Critical)
 
 To ensure the security and independence of the evaluation environment, basic evaluation images must be built manually:
 
@@ -105,7 +123,7 @@ docker build -t skyoj-runner ./backend/sandbox/runners
 docker build -t skyoj-generator ./backend/sandbox/random_data
 ```
 
-### Step 3: Start Services
+### Step 4: Start Services
 
 Use Docker Compose to pull up the full-stack services:
 
@@ -114,7 +132,7 @@ Use Docker Compose to pull up the full-stack services:
 docker-compose up -d --build
 ```
 
-### Step 4: Access the System
+### Step 5: Access the System
 
 Wait about 30 seconds (database initialization) and then access:
 
@@ -126,15 +144,15 @@ Wait about 30 seconds (database initialization) and then access:
 
 ## System Screenshots
 
-![img.png](images/img.png)
-![img_1.png](images/img_1.png)
-![img_2.png](images/img_2.png)
-![img_3.png](images/img_3.png)
-![img_4.png](images/img_4.png)
-![img_5.png](images/img_5.png)
-![img_6.png](images/img_6.png)
-![img_7.png](images/img_7.png)
-![img_8.png](images/img_8.png)
+![problem-detail-editor.png](images/problem-detail-editor.png)
+![homepage-landing.png](images/homepage-landing.png)
+![public-datasets.png](images/public-datasets.png)
+![problem-list.png](images/problem-list.png)
+![plagiarism-log-list.png](images/plagiarism-log-list.png)
+![teacher-dashboard.png](images/teacher-dashboard.png)
+![plagiarism-code-compare.png](images/plagiarism-code-compare.png)
+![submission-result.png](images/submission-result.png)
+![admin-problem-management.png](images/admin-problem-management.png)
 
 ---
 
@@ -147,3 +165,4 @@ This project is a result of an undergraduate course project at the **School of I
 ## License
 
 This project is open-sourced under the [MIT License](https://opensource.org/licenses/MIT).
+

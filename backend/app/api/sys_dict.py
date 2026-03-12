@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import os
 
 from flask import Blueprint, jsonify, request
 
@@ -20,16 +21,17 @@ def get_sys_info():
     dicts = SysDict.query.all()
     # 将数据库中的键值对转换为字典格式返回
     config = {d.key: d.val for d in dicts}
+    # LLM 配置统一从环境变量读取，避免暴露数据库中的历史敏感值
+    config.pop("llm_api_key", None)
+    config.pop("llm_api_url", None)
+    config.pop("llm_model_name", None)
 
     # 确保前端需要的字段存在，如果不存在则返回默认值
     required_fields = {
         "title": "SKYOJ",
         "info": "",
         "warning": "false",
-        "practice": "true",
-        "llm_api_url": "",
-        "llm_model_name": "",
-        "llm_api_key": ""
+        "practice": "true"
     }
 
     for key, default in required_fields.items():
@@ -41,6 +43,13 @@ def get_sys_info():
         config["warning"] = config["warning"].lower() == "true"
     if "practice" in config:
         config["practice"] = config["practice"].lower() == "true"
+
+    llm_api_url = os.getenv("LLM_API_URL", "").strip()
+    llm_model_name = os.getenv("LLM_MODEL_NAME", "").strip()
+    llm_api_key = os.getenv("LLM_API_KEY", "").strip()
+    config["llm_api_url"] = llm_api_url
+    config["llm_model_name"] = llm_model_name
+    config["llm_env_ready"] = bool(llm_api_url and llm_model_name and llm_api_key)
 
     return jsonify(config), 200
 
@@ -58,8 +67,14 @@ def update_sys_info():
     if not data or not isinstance(data, dict):
         return jsonify({"error": "Invalid data format"}), 400
 
+    blocked_keys = {"llm_api_key", "llm_api_url", "llm_model_name"}
     updated_keys = []
+    skipped_keys = []
     for key, val in data.items():
+        if key in blocked_keys:
+            skipped_keys.append(key)
+            continue
+
         # 查找是否存在该键
         item = SysDict.query.filter_by(key=key).first()
         if item:
@@ -73,7 +88,8 @@ def update_sys_info():
     db.session.commit()
     return jsonify({
         "message": "System configuration updated successfully",
-        "updated_keys": updated_keys
+        "updated_keys": updated_keys,
+        "skipped_keys": skipped_keys
     }), 200
 
 

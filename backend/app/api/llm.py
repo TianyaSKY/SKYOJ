@@ -1,6 +1,7 @@
+import os
+
 from flask import Blueprint, jsonify, request
 
-from app.models.sysdict import SysDict
 from app.services.judge_service import save_non_acm_script
 from app.services.llm import ask_llm
 from app.services.test_gen_service import run_test_generation
@@ -13,7 +14,7 @@ llm_bp = Blueprint('llm', __name__)
 @token_required
 def call_llm():
     """
-    调用 LLM 接口，配置从数据库 SysDict 中获取
+    调用 LLM 接口，配置从环境变量中获取
     """
     data = request.get_json()
     system_setting = data.get('system_setting')
@@ -23,16 +24,14 @@ def call_llm():
     if not system_setting or not prompt:
         return jsonify({"error": "system_setting and prompt are required"}), 400
 
-    # 从数据库获取配置
-    configs = SysDict.query.filter(SysDict.key.in_(['llm_api_key', 'llm_api_url', 'llm_model_name'])).all()
-    config_dict = {c.key: c.val for c in configs}
-
-    api_key = config_dict.get('llm_api_key')
-    api_url = config_dict.get('llm_api_url')
-    model_name = config_dict.get('llm_model_name')
+    api_key = os.getenv('LLM_API_KEY', '').strip()
+    api_url = os.getenv('LLM_API_URL', '').strip()
+    model_name = os.getenv('LLM_MODEL_NAME', '').strip()
 
     if not all([api_key, api_url, model_name]):
-        return jsonify({"error": "LLM configuration (api_key, url, model_name) is missing in system settings"}), 500
+        return jsonify({
+            "error": "LLM environment variables are missing. Required: LLM_API_KEY, LLM_API_URL, LLM_MODEL_NAME"
+        }), 500
 
     # 调用服务
     result = ask_llm(

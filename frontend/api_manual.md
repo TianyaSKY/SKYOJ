@@ -83,7 +83,7 @@
 
 - **URL**: `/sys/info`
 - **Methods**: `GET`, `PUT` (Teacher only)
-- **常用 Key**: `tile`, `llm_api_key`, `llm_api_url`, `llm_model_name` 等。
+- **常用 Key**: `tile`, `title`, `practice`, `info`, `warning` 等。
 
 ---
 
@@ -102,7 +102,7 @@
     "output_format": { "explanation": "string" } 
   }
   ```
-- **Note**: 配置（API Key 等）由后端自动从 `SysDict` 中读取。
+- **Note**: 配置（API Key 等）由后端自动从环境变量读取（`.env` 中的 `LLM_API_URL`/`LLM_MODEL_NAME`/`LLM_API_KEY`）。
 
 ---
 

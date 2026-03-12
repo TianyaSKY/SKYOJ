@@ -1,4 +1,4 @@
-
+﻿
 <h2 align="center">SKYOJ - 新一代 AI 驱动的在线评测系统</h2>
 
 <p align="center">
@@ -6,7 +6,7 @@
   <a href="README_en.md">English</a>
 </p>
 
-![cover.png](images/cover.png)
+![hero-banner.png](images/hero-banner.png)
 <div align="center">
   <img src="https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat-square&logo=vue.js" alt="Vue3">
   <img src="https://img.shields.io/badge/Flask-2.x-000000?style=flat-square&logo=flask" alt="Flask">
@@ -48,8 +48,8 @@
   - **资源配额**：基于 Linux Cgroups 严格限制 CPU、内存及 PID 数，防止 Fork 炸弹与资源耗尽攻击。
 
 ---
-![Timeline 1.gif](images/Timeline%201.gif)
-![Timeline 2.gif](images/Timeline%202.gif)
+![project-timeline-1.gif](images/project-timeline-1.gif)
+![project-timeline-2.gif](images/project-timeline-2.gif)
 ## 技术栈
 
 | 模块 | 技术选型 | 说明 |
@@ -74,9 +74,15 @@ SKYOJ/
 │       ├── runners/        # 判题镜像 (skyoj-runner) 构建文件
 │       └── random_data/    # 数据生成镜像 (skyoj-generator) 构建文件
 ├── frontend/               # Vue3 前端源代码
-├── docker/                 # 基础设施配置 (MySQL, Nginx)
+├── docker/                 # Docker 配置目录
+│   ├── backend/            # 后端容器 Dockerfile
+│   ├── frontend/           # 前端容器 Dockerfile
+│   ├── judge/              # 判题容器 Dockerfile
+│   ├── mysql/              # MySQL 初始化脚本
+│   └── nginx/              # Nginx 反向代理配置
 ├── generate/               # 题目自动化生成脚本
 ├── docker-compose.yml      # 容器编排配置
+├── .env.example            # 环境变量模板
 └── README.md               # 项目说明文档
 ```
 
@@ -93,7 +99,19 @@ git clone https://github.com/TianyaSKY/SKYOJ.git
 cd SKYOJ
 ```
 
-### 第二步：构建沙箱镜像 (关键)
+### 第二步：配置环境变量
+
+```bash
+cp .env.example .env
+```
+
+请至少配置以下 LLM 变量（用于 AI 助教与测试数据生成）：
+
+- `LLM_API_URL`
+- `LLM_MODEL_NAME`
+- `LLM_API_KEY`
+
+### 第三步：构建沙箱镜像 (关键)
 
 为了保证评测环境的安全性与独立性，需手动构建基础评测镜像：
 
@@ -105,7 +123,7 @@ docker build -t skyoj-runner ./backend/sandbox/runners
 docker build -t skyoj-generator ./backend/sandbox/random_data
 ```
 
-### 第三步：启动服务
+### 第四步：启动服务
 
 使用 Docker Compose 拉起全栈服务：
 
@@ -114,7 +132,7 @@ docker build -t skyoj-generator ./backend/sandbox/random_data
 docker-compose up -d --build
 ```
 
-### 第四步：访问系统
+### 第五步：访问系统
 
 等待约 30 秒（数据库初始化）后访问：
 
@@ -126,15 +144,15 @@ docker-compose up -d --build
 
 ## 系统截图
 
-![img.png](images/img.png)
-![img_1.png](images/img_1.png)
-![img_2.png](images/img_2.png)
-![img_3.png](images/img_3.png)
-![img_4.png](images/img_4.png)
-![img_5.png](images/img_5.png)
-![img_6.png](images/img_6.png)
-![img_7.png](images/img_7.png)
-![img_8.png](images/img_8.png)
+![problem-detail-editor.png](images/problem-detail-editor.png)
+![homepage-landing.png](images/homepage-landing.png)
+![public-datasets.png](images/public-datasets.png)
+![problem-list.png](images/problem-list.png)
+![plagiarism-log-list.png](images/plagiarism-log-list.png)
+![teacher-dashboard.png](images/teacher-dashboard.png)
+![plagiarism-code-compare.png](images/plagiarism-code-compare.png)
+![submission-result.png](images/submission-result.png)
+![admin-problem-management.png](images/admin-problem-management.png)
 
 ---
 
@@ -147,3 +165,4 @@ docker-compose up -d --build
 ## 开源协议
 
 本项目采用 [MIT License](https://opensource.org/licenses/MIT) 开源。
+

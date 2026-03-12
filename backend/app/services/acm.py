@@ -1,8 +1,13 @@
+import io
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream
+
+DEFAULT_CASE_PARALLELISM = 2
+MAX_CASE_PARALLELISM = 8
 
 
 def natural_sort_key(s):
@@ -12,6 +17,100 @@ def natural_sort_key(s):
     """
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split('([0-9]+)', s)]
+
+
+def _resolve_case_parallelism(total_cases):
+    raw_value = os.getenv('ACM_CASE_PARALLELISM', str(DEFAULT_CASE_PARALLELISM))
+    try:
+        workers = int(raw_value)
+    except (TypeError, ValueError):
+        workers = DEFAULT_CASE_PARALLELISM
+
+    workers = max(1, min(workers, MAX_CASE_PARALLELISM))
+    cpu_count = os.cpu_count() or 1
+    workers = min(workers, cpu_count, total_cases)
+    return max(1, workers)
+
+
+def _prepare_workspace(lang_config, user_code, memory_limit):
+    """
+    在预热容器中准备好运行环境（源码 + 编译产物），并导出 /app 的 tar 快照。
+    """
+    container = None
+    try:
+        container = client.containers.run(
+            image=IMAGE_NAME,
+            command="sleep 600",
+            detach=True,
+            network_mode="none",
+            mem_limit=f"{memory_limit}m",
+            nano_cpus=1000000000,
+            remove=True,
+            pids_limit=50
+        )
+
+        container.put_archive('/app', create_tar_stream(lang_config['src'], user_code))
+
+        if lang_config['compile']:
+            exec_result = container.exec_run(lang_config['compile'])
+            if exec_result.exit_code != 0:
+                return None, 'compile', exec_result.output.decode('utf-8')
+
+        bits, _ = container.get_archive('/app')
+        workspace_tar = b''.join(bits)
+        return workspace_tar, None, None
+    except Exception as e:
+        return None, 'system', str(e)
+    finally:
+        if container:
+            try:
+                container.stop()
+            except:
+                pass
+
+
+def _judge_single_case(case_name, input_data, expected_output, run_entry, workspace_tar, memory_limit, time_limit_ms):
+    """
+    每个测试点使用独立容器执行，避免并行时相互污染。
+    """
+    container = None
+    try:
+        container = client.containers.run(
+            image=IMAGE_NAME,
+            command="sleep 600",
+            detach=True,
+            network_mode="none",
+            mem_limit=f"{memory_limit}m",
+            nano_cpus=1000000000,
+            remove=True,
+            pids_limit=50
+        )
+
+        container.put_archive('/', io.BytesIO(workspace_tar))
+        container.put_archive('/app', create_tar_stream('input.txt', input_data))
+
+        time_limit_s = max(1, int(time_limit_ms) // 1000)
+        run_cmd = f"sh -c 'timeout {time_limit_s}s {run_entry} < input.txt'"
+        result = container.exec_run(run_cmd)
+
+        if result.exit_code == 124:
+            return case_name, 'tle', None
+
+        actual_output = result.output.decode('utf-8').strip()
+
+        if result.exit_code != 0:
+            return case_name, 'runtime_error', actual_output
+        if actual_output == expected_output:
+            return case_name, 'passed', None
+        return case_name, 'wrong_answer', None
+    except Exception as e:
+        return case_name, 'runtime_error', str(e)
+    finally:
+        if container:
+            try:
+                container.stop()
+            except:
+                pass
 
 
 def run_acm_judge(submission_id, user_code, problem_id, language='python'):
@@ -27,105 +126,106 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
     if not lang_config:
         return "System Error", 0, f"Unsupported language: {language}"
 
-    # 1. 获取题目信息和测试点路径
     problem = Problem.query.get(problem_id)
-    # 假设路径为 /uploads/problems/1
-    test_case_dir = f"uploads/problems/{problem_id}"
+    if not problem:
+        return "System Error", 0, "Problem not found"
 
+    test_case_dir = f"uploads/problems/{problem_id}"
     if not os.path.exists(test_case_dir):
         return "Runtime Error", 0, "System Error: Test cases missing"
 
-    # 获取所有输入文件
     in_files = [f for f in os.listdir(test_case_dir) if f.endswith('.in')]
     total_cases = len(in_files)
     if total_cases == 0:
         return "Runtime Error", 0, "System Error: No .in files found"
 
-    # 使用自然排序，确保 1.in, 2.in, 10.in 的顺序正确
     in_files.sort(key=natural_sort_key)
 
-    passed_count = 0
-    logs = []
+    case_payloads = []
+    for in_file in in_files:
+        case_name = in_file.replace('.in', '')
+        out_file = os.path.join(test_case_dir, f"{case_name}.out")
+        if not os.path.exists(out_file):
+            return "System Error", 0, f"Missing output file for test case: {case_name}.out"
 
-    container = None
+        with open(os.path.join(test_case_dir, in_file), 'r') as f:
+            input_data = f.read()
+        with open(out_file, 'r') as f:
+            expected_output = f.read().strip()
+
+        case_payloads.append((case_name, input_data, expected_output))
+
     try:
-        # 启动容器 (挂起模式，等待指令)
-        container = client.containers.run(
-            image=IMAGE_NAME,
-            command="sleep 600",  # 保持容器运行
-            detach=True,
-            network_mode="none",
-            mem_limit=f"{problem.memory_limit}m",
-            # 确保使用本地构建的镜像
-            nano_cpus=1000000000,  # 限制为 1 CPU
-            remove=True,
-            pids_limit=50  # 防止创建过多进程
-        )
+        memory_limit = int(getattr(problem, 'memory_limit', 128) or 128)
+    except (TypeError, ValueError):
+        memory_limit = 128
+    memory_limit = max(16, memory_limit)
 
-        # 2. 上传用户代码
-        tar_stream = create_tar_stream(lang_config['src'], user_code)
-        container.put_archive('/app', tar_stream)
+    try:
+        time_limit_ms = int(getattr(problem, 'time_limit', 1000) or 1000)
+    except (TypeError, ValueError):
+        time_limit_ms = 1000
+    time_limit_ms = max(1, time_limit_ms)
 
-        # 3. 编译代码 (如果需要)
-        if lang_config['compile']:
-            exec_result = container.exec_run(lang_config['compile'])
-            if exec_result.exit_code != 0:
-                return "Compile Error", 0, exec_result.output.decode('utf-8')
+    workspace_tar, prep_error_type, prep_error_msg = _prepare_workspace(lang_config, user_code, memory_limit)
+    if prep_error_type == 'compile':
+        return "Compile Error", 0, prep_error_msg
+    if prep_error_type == 'system':
+        return "System Error", 0, prep_error_msg
+    if not workspace_tar:
+        return "System Error", 0, "Failed to prepare runtime workspace"
 
-        # 4. 循环测试每个点
-        for in_file in in_files:
-            case_name = in_file.replace('.in', '')
+    case_parallelism = _resolve_case_parallelism(total_cases)
+    ordered_results = [None] * total_cases
 
-            # 读取宿主机(Backend容器)中的测试用例
-            with open(os.path.join(test_case_dir, in_file), 'r') as f:
-                input_data = f.read()
-            with open(os.path.join(test_case_dir, f"{case_name}.out"), 'r') as f:
-                expected_output = f.read().strip()
+    try:
+        with ThreadPoolExecutor(max_workers=case_parallelism) as executor:
+            future_to_idx = {
+                executor.submit(
+                    _judge_single_case,
+                    case_name,
+                    input_data,
+                    expected_output,
+                    lang_config['run'],
+                    workspace_tar,
+                    memory_limit,
+                    time_limit_ms
+                ): idx
+                for idx, (case_name, input_data, expected_output) in enumerate(case_payloads)
+            }
 
-            # 将 input 写入容器的 input.txt
-            input_tar = create_tar_stream('input.txt', input_data)
-            container.put_archive('/app', input_tar)
-
-            # 运行命令: ./main < input.txt
-            # 增加超时保护
-            time_limit_ms = getattr(problem, 'time_limit', 1000)
-            time_limit_s = max(1, time_limit_ms // 1000)  # 转换为秒，至少1秒
-
-            # 使用 timeout 命令包装运行指令
-            run_cmd = f"sh -c 'timeout {time_limit_s}s {lang_config['run']} < input.txt'"
-
-            # 执行
-            result = container.exec_run(run_cmd)
-
-            # 检查是否超时 (timeout 命令在超时时通常返回 124)
-            if result.exit_code == 124:
-                logs.append(f"Test Case {case_name}: Time Limit Exceeded")
-                continue
-
-            actual_output = result.output.decode('utf-8').strip()
-
-            if result.exit_code != 0:
-                logs.append(f"Test Case {case_name}: Runtime Error\n{actual_output}")
-            elif actual_output == expected_output:
-                passed_count += 1
-                logs.append(f"Test Case {case_name}: Passed")
-            else:
-                logs.append(f"Test Case {case_name}: Wrong Answer")
-
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                case_name = case_payloads[idx][0]
+                try:
+                    ordered_results[idx] = future.result()
+                except Exception as e:
+                    ordered_results[idx] = (case_name, 'runtime_error', str(e))
     except Exception as e:
         return "Runtime Error", 0, str(e)
-    finally:
-        if container:
-            try:
-                container.stop()
-            except:
-                pass
 
-    # 3. 按比例计算分数
+    passed_count = 0
+    has_tle = False
+    logs = []
+
+    for case_name, result_type, detail in ordered_results:
+        if result_type == 'passed':
+            passed_count += 1
+            logs.append(f"Test Case {case_name}: Passed")
+        elif result_type == 'tle':
+            has_tle = True
+            logs.append(f"Test Case {case_name}: Time Limit Exceeded")
+        elif result_type == 'runtime_error':
+            if detail:
+                logs.append(f"Test Case {case_name}: Runtime Error\n{detail}")
+            else:
+                logs.append(f"Test Case {case_name}: Runtime Error")
+        else:
+            logs.append(f"Test Case {case_name}: Wrong Answer")
+
     final_score = (passed_count / total_cases) * 100
 
-    # 状态判定逻辑
-    if any("Time Limit Exceeded" in log for log in logs):
+    if has_tle:
         final_status = "Time Limit Exceeded"
     elif passed_count == total_cases:
         final_status = "Accepted"
