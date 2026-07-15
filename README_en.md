@@ -9,7 +9,7 @@
 ![hero-banner.png](images/hero-banner.png)
 <div align="center">
   <img src="https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat-square&logo=vue.js" alt="Vue3">
-  <img src="https://img.shields.io/badge/Flask-2.x-000000?style=flat-square&logo=flask" alt="Flask">
+  <img src="https://img.shields.io/badge/FastAPI-0.x-009688?style=flat-square&logo=fastapi" alt="FastAPI">
   <img src="https://img.shields.io/badge/Docker-Enabled-2496ED?style=flat-square&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/AI-Powered-purple?style=flat-square" alt="AI">
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License">
@@ -19,7 +19,7 @@
 
 **SKYOJ** is a modern Online Judge system designed for university computer science education and data science competitions.
 
-Unlike traditional OJs that only support ACM mode, SKYOJ adopts a **Vue3 + Flask + Docker** microservice architecture and innovatively introduces **OOP Unit Testing** and **Kaggle Data Science** evaluation modes. The system deeply integrates **LLM (Large Language Models)** and **Deep Learning Vector Models**, achieving a comprehensive intelligent assistant from "code plagiarism detection" to "smart tutoring."
+Unlike traditional OJs that only support ACM mode, SKYOJ adopts a **Vue3 + FastAPI + Docker** microservice architecture and innovatively introduces **OOP Unit Testing** and **Kaggle Data Science** evaluation modes. The system deeply integrates **LLM (Large Language Models)** and **Deep Learning Vector Models**, achieving a comprehensive intelligent assistant from "code plagiarism detection" to "smart tutoring."
 
 ---
 
@@ -55,7 +55,7 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 | Module | Technology Selection | Description |
 | :--- | :--- | :--- |
 | **Frontend** | Vue 3 + Vite | IDE-level coding experience with Monaco Editor |
-| **Backend** | Flask (Python) | Lightweight RESTful API, SQLAlchemy ORM |
+| **Backend** | FastAPI (Python) | High-performance ASGI RESTful API, SQLAlchemy ORM |
 | **Gateway** | Nginx | Reverse proxy, load balancing, static resource acceleration |
 | **Database** | MySQL 8.0 | Transaction support, storing user data and submission records |
 | **Containerization** | Docker & Compose | Full-stack containerized deployment, sandbox environment construction |
@@ -68,19 +68,16 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 
 ```text
 SKYOJ/
-├── backend/                # Flask backend business logic
-│   ├── app/                # API interfaces and model definitions
-│   └── sandbox/            # Evaluation sandbox configuration
-│       ├── runners/        # Judging image (skyoj-runner) build files
-│       └── random_data/    # Data generation image (skyoj-generator) build files
+├── backend/                # FastAPI backend business logic
+│   └── app/                # API interfaces and model definitions
 ├── frontend/               # Vue3 frontend source code
-├── docker/                 # Docker configuration directory
+├── docker/                 # All Docker configs (single directory)
 │   ├── backend/            # Backend container Dockerfile
 │   ├── frontend/           # Frontend container Dockerfile
-│   ├── judge/              # Judge container Dockerfile
+│   ├── runner/             # Judge sandbox image (skyoj-runner)
+│   ├── generator/          # Test-data generation image (skyoj-generator)
 │   ├── mysql/              # MySQL init script
 │   └── nginx/              # Nginx reverse proxy config
-├── generate/               # Automated problem generation scripts
 ├── docker-compose.yml      # Container orchestration configuration
 ├── .env.example            # Environment variable template
 └── README.md               # Project documentation
@@ -117,12 +114,11 @@ To ensure the security and independence of the evaluation environment, basic eva
 
 ```bash
 # 1. Build the judging runtime environment image (includes GCC, Python, Java)
-docker build -t skyoj-runner ./backend/sandbox/runners
+docker build -t skyoj-runner ./docker/runner
 
 # 2. Build the test data generation image
-docker build -t skyoj-generator ./backend/sandbox/random_data
+docker build -t skyoj-generator ./docker/generator
 ```
-
 ### Step 4: Start Services
 
 Use Docker Compose to pull up the full-stack services:

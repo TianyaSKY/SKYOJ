@@ -13,3 +13,12 @@ backend/uploads/submissions/*
 !backend/uploads/submissions/.gitkeep
 mysql_data/
 
+/.venv/
+
+# Local / tool temp artifacts
+mcps/
+.pytest_cache/
+backend/test_*.db
+backend/*.db
+*.db-journal
+

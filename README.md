@@ -9,7 +9,7 @@
 ![hero-banner.png](images/hero-banner.png)
 <div align="center">
   <img src="https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat-square&logo=vue.js" alt="Vue3">
-  <img src="https://img.shields.io/badge/Flask-2.x-000000?style=flat-square&logo=flask" alt="Flask">
+  <img src="https://img.shields.io/badge/FastAPI-0.x-009688?style=flat-square&logo=fastapi" alt="FastAPI">
   <img src="https://img.shields.io/badge/Docker-Enabled-2496ED?style=flat-square&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/AI-Powered-purple?style=flat-square" alt="AI">
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License">
@@ -19,7 +19,7 @@
 
 **SKYOJ** 是一个专为高校计算机教学与数据科学竞赛设计的现代化在线判题系统（Online Judge）。
 
-不同于传统仅支持 ACM 模式的 OJ，SKYOJ 采用 **Vue3 + Flask + Docker** 微服务架构，创新性地引入了 **OOP 单元测试**与 **Kaggle 数据科学**评测模式。系统深度集成了 **LLM（大语言模型）** 与 **深度学习向量模型**，实现了从“代码查重”到“智能助教”的全方位智能化辅助。
+不同于传统仅支持 ACM 模式的 OJ，SKYOJ 采用 **Vue3 + FastAPI + Docker** 微服务架构，创新性地引入了 **OOP 单元测试**与 **Kaggle 数据科学**评测模式。系统深度集成了 **LLM（大语言模型）** 与 **深度学习向量模型**，实现了从“代码查重”到“智能助教”的全方位智能化辅助。
 
 ---
 
@@ -55,7 +55,7 @@
 | 模块 | 技术选型 | 说明 |
 | :--- | :--- | :--- |
 | **前端** | Vue 3 + Vite | 配合 Monaco Editor 实现 IDE 级编码体验 |
-| **后端** | Flask (Python) | 轻量级 RESTful API，SQLAlchemy ORM |
+| **后端** | FastAPI (Python) | 高性能 ASGI RESTful API，SQLAlchemy ORM |
 | **网关** | Nginx | 反向代理、负载均衡、静态资源加速 |
 | **数据库** | MySQL 8.0 | 事务支持，存储用户数据与提交记录 |
 | **容器化** | Docker & Compose | 全栈容器化部署，沙箱环境构建 |
@@ -68,19 +68,16 @@
 
 ```text
 SKYOJ/
-├── backend/                # Flask 后端业务逻辑
-│   ├── app/                # API 接口与模型定义
-│   └── sandbox/            # 评测沙箱配置
-│       ├── runners/        # 判题镜像 (skyoj-runner) 构建文件
-│       └── random_data/    # 数据生成镜像 (skyoj-generator) 构建文件
+├── backend/                # FastAPI 后端业务逻辑
+│   └── app/                # API 接口与模型定义
 ├── frontend/               # Vue3 前端源代码
-├── docker/                 # Docker 配置目录
+├── docker/                 # 全部 Docker 配置（唯一目录）
 │   ├── backend/            # 后端容器 Dockerfile
 │   ├── frontend/           # 前端容器 Dockerfile
-│   ├── judge/              # 判题容器 Dockerfile
+│   ├── runner/             # 判题沙箱镜像 (skyoj-runner)
+│   ├── generator/          # 测试数据生成镜像 (skyoj-generator)
 │   ├── mysql/              # MySQL 初始化脚本
 │   └── nginx/              # Nginx 反向代理配置
-├── generate/               # 题目自动化生成脚本
 ├── docker-compose.yml      # 容器编排配置
 ├── .env.example            # 环境变量模板
 └── README.md               # 项目说明文档
@@ -117,10 +114,10 @@ cp .env.example .env
 
 ```bash
 # 1. 构建判题运行环境镜像 (包含 GCC, Python, Java 环境)
-docker build -t skyoj-runner ./backend/sandbox/runners
+docker build -t skyoj-runner ./docker/runner
 
 # 2. 构建测试数据生成镜像
-docker build -t skyoj-generator ./backend/sandbox/random_data
+docker build -t skyoj-generator ./docker/generator
 ```
 
 ### 第四步：启动服务
