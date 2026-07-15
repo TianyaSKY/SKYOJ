@@ -1,8 +1,9 @@
-fastapi
+﻿fastapi
 uvicorn[standard]
 SQLAlchemy
 PyMySQL
 python-multipart
+python-dotenv
 bcrypt
 docker
 cryptography
@@ -10,7 +11,5 @@ requests
 urllib3
 PyJWT
 openai
-torch
-sentence-transformers
 pytest
 httpx
