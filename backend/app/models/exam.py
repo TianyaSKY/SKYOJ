@@ -1,19 +1,29 @@
-from app.models.user import db
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
-class Exam(db.Model):
-    __tablename__ = 'exams'
+class Exam(Base):
+    __tablename__ = "exams"
 
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text)
-    start_time = db.Column(db.DateTime, nullable=False)
-    end_time = db.Column(db.DateTime, nullable=False)
-    password = db.Column(db.String(2000))  # 考试进入密码（可选）
-    is_visible = db.Column(db.Boolean, default=False)  # 考试是否对学生可见
+    id = Column(Integer, primary_key=True)
+    title = Column(String(100), nullable=False)
+    description = Column(Text)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    password = Column(String(2000))
+    is_visible = Column(Boolean, default=False)
 
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    creator = db.relationship('User', backref=db.backref('created_exams', lazy=True))
+    created_by = Column(Integer, ForeignKey("users.id"))
+    creator = relationship("User", back_populates="created_exams")
+    problems = relationship(
+        "ExamProblem",
+        back_populates="exam",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    submissions = relationship("Submission", back_populates="exam", lazy=True)
 
     def to_dict(self):
         return {
@@ -23,19 +33,20 @@ class Exam(db.Model):
             "start_time": self.start_time.isoformat(),
             "end_time": self.end_time.isoformat(),
             "is_visible": self.is_visible,
-            "created_by": self.created_by
+            "created_by": self.created_by,
         }
 
 
-class ExamProblem(db.Model):
-    __tablename__ = 'exam_problems'
+class ExamProblem(Base):
+    __tablename__ = "exam_problems"
 
-    id = db.Column(db.Integer, primary_key=True)
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=False)
-    problem_id = db.Column(db.Integer, db.ForeignKey('problems.id', ondelete='CASCADE'), nullable=False)
-    display_id = db.Column(db.String(10))  # 考试中的题号，如 A, B, C
-    score = db.Column(db.Integer, default=100)  # 该题在本次考试中的分数
+    id = Column(Integer, primary_key=True)
+    exam_id = Column(Integer, ForeignKey("exams.id"), nullable=False)
+    problem_id = Column(
+        Integer, ForeignKey("problems.id", ondelete="CASCADE"), nullable=False
+    )
+    display_id = Column(String(10))
+    score = Column(Integer, default=100)
 
-    exam = db.relationship('Exam', backref=db.backref('problems', lazy='dynamic', cascade="all, delete-orphan"))
-    # problem 关系已在 Problem 模型中通过 backref 定义，此处可省略或保持一致
-    # problem = db.relationship('Problem')
+    exam = relationship("Exam", back_populates="problems")
+    problem = relationship("Problem", back_populates="exam_problems")

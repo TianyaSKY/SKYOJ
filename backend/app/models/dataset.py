@@ -1,27 +1,31 @@
 from datetime import datetime
 
-from app.models.user import db
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
-class Dataset(db.Model):
-    __tablename__ = 'datasets'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(128), nullable=False)
-    description = db.Column(db.Text)
-    file_path = db.Column(db.String(256), nullable=False)
-    file_size = db.Column(db.String(64))
-    uploader_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+class Dataset(Base):
+    __tablename__ = "datasets"
 
-    uploader = db.relationship('User', backref=db.backref('datasets', lazy=True))
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), nullable=False)
+    description = Column(Text)
+    file_path = Column(String(256), nullable=False)
+    file_size = Column(String(64))
+    uploader_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    uploader = relationship("User", back_populates="datasets")
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'uploader': self.uploader.username if self.uploader else 'Unknown',
-            'file_size': self.file_size,
-            'created_at': self.created_at.isoformat(),
-            'download_url': f'/api/datasets/{self.id}/download'
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "uploader": self.uploader.username if self.uploader else "Unknown",
+            "file_size": self.file_size,
+            "created_at": self.created_at.isoformat(),
+            "download_url": f"/api/datasets/{self.id}/download",
         }

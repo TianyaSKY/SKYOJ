@@ -1,15 +1,18 @@
-from app.models.user import db
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
-class SearchHistory(db.Model):
-    __tablename__ = 'search_history'
+class SearchHistory(Base):
+    __tablename__ = "search_history"
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    query = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=db.func.now())
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    query = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=func.now())
 
-    user = db.relationship('User', backref=db.backref('search_history', lazy=True))
+    user = relationship("User", back_populates="search_history")
 
     def __repr__(self):
-        return f'<SearchHistory {self.query} by User {self.user_id}>'
+        return f"<SearchHistory {self.query} by User {self.user_id}>"

@@ -1,42 +1,53 @@
 from datetime import datetime
 
-from app.models.user import db
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
-class Submission(db.Model):
-    __tablename__ = 'submissions'
+class Submission(Base):
+    __tablename__ = "submissions"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
 
-    # 外键关联：关联到用户和题目
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    problem_id = db.Column(db.Integer, db.ForeignKey('problems.id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    problem_id = Column(
+        Integer, ForeignKey("problems.id", ondelete="CASCADE"), nullable=False
+    )
+    exam_id = Column(Integer, ForeignKey("exams.id"), nullable=True)
 
-    # 考试关联
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=True)
+    code_path = Column(String(500))
+    code_content = Column(Text)
+    language = Column(String(50))
 
-    # 提交的具体内容
-    code_path = db.Column(db.String(500))  # 存放代码文件或 CSV 文件的路径
-    code_content = db.Column(db.Text)  # 用户提交的代码文本
-    language = db.Column(db.String(50))  # 如: python, cpp, csv
+    status = Column(
+        Enum(
+            "Pending",
+            "Accepted",
+            "Wrong Answer",
+            "Time Limit Exceeded",
+            "Runtime Error",
+            "Compile Error",
+            "System Error",
+        ),
+        default="Pending",
+    )
 
-    # 判题结果
-    # 'Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error', 'System Error'
-    status = db.Column(
-        db.Enum('Pending', 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compile Error',
-                'System Error'),
-        default='Pending')
+    score = Column(Float, default=0.0)
+    output_log = Column(Text)
 
-    score = db.Column(db.Float, default=0.0)  # 针对 Kaggle 模式的分数
-    output_log = db.Column(db.Text)  # 存放判题过程中的错误日志或详细信息
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # 建立模型间的关系，方便查询
-    user = db.relationship('User', backref=db.backref('submissions', lazy=True))
-    # problem 关系已在 Problem 模型中通过 backref 定义，此处可省略或保持一致
-    # problem = db.relationship('Problem', backref=db.backref('submissions', lazy=True))
-    exam = db.relationship('Exam', backref=db.backref('submissions', lazy=True))
+    user = relationship("User", back_populates="submissions")
+    problem = relationship("Problem", back_populates="submissions")
+    exam = relationship("Exam", back_populates="submissions")
+    plagiarism_log = relationship(
+        "PlagiarismLog",
+        foreign_keys="PlagiarismLog.submission_id",
+        back_populates="submission",
+        uselist=False,
+    )
 
     def __repr__(self):
-        return f'<Submission {self.id} by User {self.user_id}>'
+        return f"<Submission {self.id} by User {self.user_id}>"

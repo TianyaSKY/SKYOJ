@@ -1,9 +1,13 @@
 import datetime
-from functools import wraps
+from dataclasses import dataclass
+from typing import Optional
 
 import jwt
-from flask import current_app, request, jsonify
+from fastapi import Depends, Header, HTTPException
+from sqlalchemy.orm import Session
 
+from app.config import SECRET_KEY
+from app.database import get_db
 from app.models.user import User
 
 
@@ -16,68 +20,76 @@ def encode_auth_token(user_id, role, exam_id=-1):
     """
     try:
         payload = {
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1),
-            'iat': datetime.datetime.utcnow(),
-            'sub': str(user_id),
-            'role': role,
-            'exam_id': exam_id
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1),
+            "iat": datetime.datetime.utcnow(),
+            "sub": str(user_id),
+            "role": role,
+            "exam_id": exam_id,
         }
-        return jwt.encode(
-            payload,
-            current_app.config.get('SECRET_KEY', 'skyoj_secret_key'),
-            algorithm='HS256'
-        )
+        return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
     except Exception as e:
         print(f"Error encoding token: {e}")
         return None
 
 
 def decode_auth_token(auth_token):
-    """
-    验证并解析 Token
-    """
+    """验证并解析 Token"""
     return jwt.decode(
         auth_token,
-        current_app.config.get('SECRET_KEY', 'skyoj_secret_key'),
-        algorithms=['HS256'],
-        # 保留这个以防止 "ImmatureSignatureError"
-        leeway=10
+        SECRET_KEY,
+        algorithms=["HS256"],
+        leeway=10,
     )
 
 
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
+@dataclass
+class AuthContext:
+    user: User
+    exam_id: int = -1
 
-        if token is None:
-            return jsonify({'message': 'Token 丢失'}), 401
 
-        if token.startswith('Bearer '):
-            token = token[7:].strip()
-        elif ' ' in token:
-            token = token.split()[-1]
+def _extract_bearer(authorization: Optional[str]) -> str:
+    if authorization is None:
+        raise HTTPException(status_code=401, detail={"message": "Token 丢失"})
 
-        try:
-            payload = decode_auth_token(token)
-            current_user = User.query.get(payload['sub'])
+    token = authorization
+    if token.startswith("Bearer "):
+        token = token[7:].strip()
+    elif " " in token:
+        token = token.split()[-1]
+    return token
 
-            if not current_user:
-                return jsonify({'message': 'User not found, token is invalid.'}), 401
 
-            # 将用户信息和考试状态存入 request 对象
-            request.current_user = current_user
-            request.exam_id = payload.get('exam_id', -1)
-
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired.'}), 401
-        except jwt.InvalidTokenError as e:
-            print(f"DEBUG: Invalid Token Error: {e}")
-            return jsonify({'message': f'Invalid token: {str(e)}'}), 401
-        except Exception as e:
-            print(f"DEBUG: Unknown Auth Error: {e}")
-            return jsonify({'message': 'Authentication failed'}), 401
-
-        return f(*args, **kwargs)
-
-    return decorated
+def get_current_auth(
+    authorization: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+) -> AuthContext:
+    token = _extract_bearer(authorization)
+    try:
+        payload = decode_auth_token(token)
+        current_user = db.get(User, int(payload["sub"]))
+        if not current_user:
+            raise HTTPException(
+                status_code=401,
+                detail={"message": "User not found, token is invalid."},
+            )
+        return AuthContext(
+            user=current_user,
+            exam_id=payload.get("exam_id", -1),
+        )
+    except HTTPException:
+        raise
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401, detail={"message": "Token has expired."}
+        )
+    except jwt.InvalidTokenError as e:
+        print(f"DEBUG: Invalid Token Error: {e}")
+        raise HTTPException(
+            status_code=401, detail={"message": f"Invalid token: {str(e)}"}
+        )
+    except Exception as e:
+        print(f"DEBUG: Unknown Auth Error: {e}")
+        raise HTTPException(
+            status_code=401, detail={"message": "Authentication failed"}
+        )

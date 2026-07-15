@@ -1,8 +1,11 @@
-from app.models.user import db
+from sqlalchemy import Column, Integer, String
+
+from app.database import Base
 
 
-class SysDict(db.Model):
-    __table__name = "sys_dict"
-    id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(100))
-    val = db.Column(db.String(100))
+class SysDict(Base):
+    __tablename__ = "sys_dict"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(100))
+    val = Column(String(100))
