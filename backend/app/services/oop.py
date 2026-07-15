@@ -62,7 +62,7 @@ except Exception:
 """
 
 
-def run_oop_judge(submission_id, user_code, problem_id, language='python'):
+def run_oop_judge(submission_id, user_code, problem_id, language='python', db=None):
     """
     OOP 模式判题逻辑，支持多种语言。
     约定:
@@ -110,7 +110,21 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python'):
             + ". Do not terminate the judge process directly."
         )
 
-    problem = Problem.query.get(problem_id)
+    if db is None:
+        from app.database import SessionLocal
+        _db = SessionLocal()
+        try:
+            problem = _db.get(Problem, problem_id)
+            if not problem:
+                return "System Error", 0, "Problem not found"
+            memory_limit = problem.memory_limit
+        finally:
+            _db.close()
+    else:
+        problem = db.get(Problem, problem_id)
+        if not problem:
+            return "System Error", 0, "Problem not found"
+        memory_limit = problem.memory_limit
     problem_dir = f"uploads/problems/{problem_id}"
 
     # 检查教师的测试文件是否存在
@@ -127,7 +141,7 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python'):
             command="sleep 600",
             detach=True,
             network_mode="none",
-            mem_limit=f"{problem.memory_limit}m",
+            mem_limit=f"{memory_limit}m",
             nano_cpus=1000000000,
             remove=True
         )

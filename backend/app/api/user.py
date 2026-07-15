@@ -1,150 +1,162 @@
 import os
 import uuid
 
-from flask import Blueprint, jsonify, request, current_app, send_from_directory
-from werkzeug.utils import secure_filename
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
 
+from app.config import BACKEND_ROOT
+from app.database import get_db
 from app.models.submission import Submission
-from app.models.user import User, db
-from app.utils.auth_tools import token_required
+from app.models.user import User
+from app.utils.auth_tools import AuthContext, get_current_auth
+from app.utils.files import secure_filename
 
-user_bp = Blueprint('user', __name__)
+router = APIRouter()
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-
-def allowed_file(filename):
-    return '.' in filename and \
-        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 
-@user_bp.route('/all', methods=['GET'])
-@token_required
-def get_all_users():
-    """
-    获取所有用户列表 (仅限教师/管理员)
-    """
-    if request.current_user.role != 'teacher':
-        return jsonify({"error": "Permission denied"}), 403
-
-    users = User.query.all()
-    return jsonify([{
-        "id": u.id,
-        "username": u.username,
-        "role": u.role,
-        "avatar": u.avatar
-    } for u in users]), 200
+def allowed_file(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@user_bp.route('/<int:user_id>/profile', methods=['GET'])
-@token_required
-def get_user_profile(user_id):
-    """
-    获取指定用户资料
-    """
-    user = User.query.get_or_404(user_id)
-    return jsonify({
+def _avatar_folder() -> str:
+    return os.path.join(BACKEND_ROOT, "uploads", "avatars")
+
+
+@router.get("/all")
+def get_all_users(
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    if auth.user.role != "teacher":
+        raise HTTPException(status_code=403, detail={"error": "Permission denied"})
+
+    users = db.query(User).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "role": u.role,
+            "avatar": u.avatar,
+        }
+        for u in users
+    ]
+
+
+@router.get("/{user_id}/profile")
+def get_user_profile(
+    user_id: int,
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail={"error": "Not found"})
+    return {
         "id": user.id,
         "username": user.username,
         "role": user.role,
-        "avatar": user.avatar
-    }), 200
+        "avatar": user.avatar,
+    }
 
 
-@user_bp.route('/avatar', methods=['POST'])
-@token_required
-def upload_avatar():
-    """
-    上传头像
-    """
-    if 'avatar' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+@router.post("/avatar")
+async def upload_avatar(
+    avatar: UploadFile = File(...),
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    if not avatar.filename:
+        raise HTTPException(status_code=400, detail={"error": "No selected file"})
 
-    file = request.files['avatar']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+    if not allowed_file(avatar.filename):
+        raise HTTPException(status_code=400, detail={"error": "Invalid file type"})
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        # 使用 UUID 重命名文件以防止冲突
-        ext = filename.rsplit('.', 1)[1].lower()
-        new_filename = f"{uuid.uuid4().hex}.{ext}"
+    filename = secure_filename(avatar.filename)
+    ext = filename.rsplit(".", 1)[1].lower()
+    new_filename = f"{uuid.uuid4().hex}.{ext}"
 
-        # 统一保存到 backend/uploads/avatars
-        upload_folder = os.path.join(current_app.root_path, '..', 'uploads', 'avatars')
-        if not os.path.exists(upload_folder):
-            os.makedirs(upload_folder)
+    upload_folder = _avatar_folder()
+    os.makedirs(upload_folder, exist_ok=True)
 
-        file.save(os.path.join(upload_folder, new_filename))
+    dest = os.path.join(upload_folder, new_filename)
+    content = await avatar.read()
+    with open(dest, "wb") as f:
+        f.write(content)
 
-        # 更新用户头像路径
-        user = request.current_user
-        user.avatar = f"/api/user/avatars/{new_filename}"
-        db.session.commit()
+    user = db.get(User, auth.user.id)
+    user.avatar = f"/api/user/avatars/{new_filename}"
+    db.commit()
 
-        return jsonify({"message": "Avatar uploaded successfully", "avatar": user.avatar}), 200
-
-    return jsonify({"error": "Invalid file type"}), 400
+    return {"message": "Avatar uploaded successfully", "avatar": user.avatar}
 
 
-@user_bp.route('/avatars/<filename>')
-def get_avatar_file(filename):
-    """
-    获取头像文件
-    """
-    upload_folder = os.path.join(current_app.root_path, '..', 'uploads', 'avatars')
-    return send_from_directory(upload_folder, filename)
+@router.get("/avatars/{filename}")
+def get_avatar_file(filename: str):
+    upload_folder = _avatar_folder()
+    path = os.path.join(upload_folder, filename)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail={"error": "File not found"})
+    return FileResponse(path)
 
 
-@user_bp.route('/<int:user_id>/submissions', methods=['GET'])
-@token_required
-def get_other_user_submissions(user_id):
-    """
-    获取指定用户的提交历史
-    """
-    # 如果是查看自己，或者当前用户是老师，则允许查看
-    if request.current_user.id != user_id and request.current_user.role != 'teacher':
-        # 这里可以根据隐私设置进一步过滤，目前简单处理
-        pass
-
-    submissions = Submission.query.filter_by(user_id=user_id).order_by(Submission.created_at.desc()).all()
+@router.get("/{user_id}/submissions")
+def get_other_user_submissions(
+    user_id: int,
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    submissions = (
+        db.query(Submission)
+        .filter_by(user_id=user_id)
+        .order_by(Submission.created_at.desc())
+        .all()
+    )
 
     result = []
     for s in submissions:
-        result.append({
-            "id": s.id,
-            "problem_id": s.problem_id,
-            "problem_title": s.problem.title if s.problem else "Unknown",
-            "status": s.status,
-            "score": s.score,
-            "language": s.language,
-            "created_at": s.created_at.isoformat(),
-            "exam_id": s.exam_id
-        })
+        result.append(
+            {
+                "id": s.id,
+                "problem_id": s.problem_id,
+                "problem_title": s.problem.title if s.problem else "Unknown",
+                "status": s.status,
+                "score": s.score,
+                "language": s.language,
+                "created_at": s.created_at.isoformat(),
+                "exam_id": s.exam_id,
+            }
+        )
+    return result
 
-    return jsonify(result), 200
 
-
-@user_bp.route('/submissions', methods=['GET'])
-@token_required
-def get_user_submissions():
-    # 从 token_required 装饰器设置的 request.current_user 中获取当前用户
-    user = request.current_user
-
-    # 查询该用户的所有提交记录，按时间倒序排列
-    submissions = Submission.query.filter_by(user_id=user.id).order_by(Submission.created_at.desc()).all()
+@router.get("/submissions")
+def get_user_submissions(
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    user = auth.user
+    submissions = (
+        db.query(Submission)
+        .filter_by(user_id=user.id)
+        .order_by(Submission.created_at.desc())
+        .all()
+    )
 
     result = []
     for s in submissions:
-        result.append({
-            "id": s.id,
-            "problem_id": s.problem_id,
-            "problem_title": s.problem.title if s.problem else "Unknown",
-            "status": s.status,
-            "score": s.score,
-            "language": s.language,
-            "created_at": s.created_at.isoformat(),
-            "exam_id": s.exam_id
-        })
-
-    return jsonify(result), 200
+        result.append(
+            {
+                "id": s.id,
+                "problem_id": s.problem_id,
+                "problem_title": s.problem.title if s.problem else "Unknown",
+                "status": s.status,
+                "score": s.score,
+                "language": s.language,
+                "created_at": s.created_at.isoformat(),
+                "exam_id": s.exam_id,
+            }
+        )
+    return result

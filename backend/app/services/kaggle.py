@@ -4,7 +4,7 @@ from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream, create_tar_from_path
 
 
-def run_kaggle_judge(submission_id, user_csv_content, problem_id):
+def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
     """
     Kaggle 模式判题逻辑
     约定:
@@ -12,7 +12,21 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
     - 学生提供: CSV 内容
     - 评分脚本需读取 truth.csv 和 submission.csv，并将最终分数打印到标准输出的最后一行
     """
-    problem = Problem.query.get(problem_id)
+    if db is None:
+        from app.database import SessionLocal
+        _db = SessionLocal()
+        try:
+            problem = _db.get(Problem, problem_id)
+            if not problem:
+                return "System Error", 0, "Problem not found"
+            memory_limit = problem.memory_limit
+        finally:
+            _db.close()
+    else:
+        problem = db.get(Problem, problem_id)
+        if not problem:
+            return "System Error", 0, "Problem not found"
+        memory_limit = problem.memory_limit
     problem_dir = f"uploads/problems/{problem_id}"
 
     teacher_files = ['main.py', 'truth.csv']
@@ -27,7 +41,7 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id):
             command="sleep 600",
             detach=True,
             network_mode="none",
-            mem_limit=f"{problem.memory_limit}m",
+            mem_limit=f"{memory_limit}m",
             nano_cpus=1000000000,
             remove=True
         )

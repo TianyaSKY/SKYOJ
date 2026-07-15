@@ -1,8 +1,6 @@
 import json
 from typing import Optional, Dict, Any
 
-from openai import OpenAI
-
 
 def ask_llm(
         api_key: str,
@@ -16,6 +14,7 @@ def ask_llm(
     基于 OpenAI SDK 向 LLM 发送请求并获取 JSON 返回信息。
     支持 DeepSeek 等模型的推理过程 (reasoning_content) 过滤，仅返回最终结果。
     """
+    from openai import OpenAI
 
     # 构造系统提示词，包含输出格式要求
     full_system_prompt = system_setting

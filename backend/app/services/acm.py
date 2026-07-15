@@ -113,7 +113,7 @@ def _judge_single_case(case_name, input_data, expected_output, run_entry, worksp
                 pass
 
 
-def run_acm_judge(submission_id, user_code, problem_id, language='python'):
+def run_acm_judge(submission_id, user_code, problem_id, language='python', db=None):
     # 多语言配置
     configs = {
         'c': {'src': 'main.c', 'compile': 'gcc main.c -o main', 'run': './main'},
@@ -126,9 +126,24 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
     if not lang_config:
         return "System Error", 0, f"Unsupported language: {language}"
 
-    problem = Problem.query.get(problem_id)
-    if not problem:
-        return "System Error", 0, "Problem not found"
+    if db is None:
+        from app.database import SessionLocal
+        _db = SessionLocal()
+        try:
+            problem = _db.get(Problem, problem_id)
+            if not problem:
+                return "System Error", 0, "Problem not found"
+            # Detach needed attributes before closing temporary session
+            memory_limit = problem.memory_limit
+            time_limit = problem.time_limit
+        finally:
+            _db.close()
+    else:
+        problem = db.get(Problem, problem_id)
+        if not problem:
+            return "System Error", 0, "Problem not found"
+        memory_limit = problem.memory_limit
+        time_limit = problem.time_limit
 
     test_case_dir = f"uploads/problems/{problem_id}"
     if not os.path.exists(test_case_dir):
@@ -156,13 +171,13 @@ def run_acm_judge(submission_id, user_code, problem_id, language='python'):
         case_payloads.append((case_name, input_data, expected_output))
 
     try:
-        memory_limit = int(getattr(problem, 'memory_limit', 128) or 128)
+        memory_limit = int(memory_limit or 128)
     except (TypeError, ValueError):
         memory_limit = 128
     memory_limit = max(16, memory_limit)
 
     try:
-        time_limit_ms = int(getattr(problem, 'time_limit', 1000) or 1000)
+        time_limit_ms = int(time_limit or 1000)
     except (TypeError, ValueError):
         time_limit_ms = 1000
     time_limit_ms = max(1, time_limit_ms)

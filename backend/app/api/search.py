@@ -1,88 +1,85 @@
-from flask import Blueprint, request, jsonify
+from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.models.problem import Problem
 from app.models.search_history import SearchHistory
-from app.models.user import db
-from app.utils.auth_tools import token_required
+from app.utils.auth_tools import AuthContext, get_current_auth
 from app.utils.feature_flags import ENABLE_SEMANTIC_SEARCH
 
-search_bp = Blueprint('search', __name__)
+router = APIRouter()
 
 
-@search_bp.route('', methods=['GET'])
-@token_required
-def search_problems():
-    query = request.args.get('query', '')
-    if not query:
-        return jsonify([])
-
-    mode = request.args.get('mode', 'semantic')
-    top_k = request.args.get('top_k', 5, type=int)
-
-    # Save search history
-    try:
-        search_history = SearchHistory(
-            user_id=request.current_user.id,
-            query=query
+def _normal_search(db: Session, query: str, top_k: int):
+    problems = (
+        db.query(Problem)
+        .filter(
+            or_(
+                Problem.title.like(f"%{query}%"),
+                Problem.content.like(f"%{query}%"),
+            )
         )
-        db.session.add(search_history)
-        db.session.commit()
-    except Exception as e:
-        print(f"Error saving search history: {e}")
-        db.session.rollback()
-
-    if mode == 'normal':
-        # Normal search using SQL LIKE
-        problems = Problem.query.filter(
-            (Problem.title.like(f'%{query}%')) |
-            (Problem.content.like(f'%{query}%'))
-        ).limit(top_k).all()
-
-        results = [{
+        .limit(top_k)
+        .all()
+    )
+    return [
+        {
             "id": p.id,
             "title": p.title,
             "content": p.content,
             "type": p.type,
             "language": p.language,
             "time_limit": p.time_limit,
-            "memory_limit": p.memory_limit
-        } for p in problems]
-    else:
-        if not ENABLE_SEMANTIC_SEARCH:
-            # 语义搜索关闭时，退化到普通搜索，保证接口可用
-            problems = Problem.query.filter(
-                (Problem.title.like(f'%{query}%')) |
-                (Problem.content.like(f'%{query}%'))
-            ).limit(top_k).all()
-
-            results = [{
-                "id": p.id,
-                "title": p.title,
-                "content": p.content,
-                "type": p.type,
-                "language": p.language,
-                "time_limit": p.time_limit,
-                "memory_limit": p.memory_limit
-            } for p in problems]
-            return jsonify(results)
-
-        # Semantic search
-        from app.services.search_service import search_service
-        results = search_service.search(query, top_k=top_k)
-
-    return jsonify(results)
+            "memory_limit": p.memory_limit,
+        }
+        for p in problems
+    ]
 
 
-@search_bp.route('/rebuild', methods=['POST'])
-@token_required
-def rebuild_index():
-    # Only teachers or admins should be able to rebuild the index
-    if request.current_user.role != 'teacher':
-        return jsonify({'error': 'Permission denied'}), 403
+@router.get("")
+def search_problems(
+    query: str = "",
+    mode: str = "semantic",
+    top_k: int = 5,
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    if not query:
+        return []
+
+    try:
+        search_history = SearchHistory(user_id=auth.user.id, query=query)
+        db.add(search_history)
+        db.commit()
+    except Exception as e:
+        print(f"Error saving search history: {e}")
+        db.rollback()
+
+    if mode == "normal":
+        return _normal_search(db, query, top_k)
 
     if not ENABLE_SEMANTIC_SEARCH:
-        return jsonify({'error': 'Semantic search is temporarily disabled'}), 503
+        return _normal_search(db, query, top_k)
 
     from app.services.search_service import search_service
+
+    return search_service.search(query, top_k=top_k)
+
+
+@router.post("/rebuild")
+def rebuild_index(auth: AuthContext = Depends(get_current_auth)):
+    if auth.user.role != "teacher":
+        raise HTTPException(status_code=403, detail={"error": "Permission denied"})
+    if not ENABLE_SEMANTIC_SEARCH:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Semantic search is temporarily disabled"},
+        )
+
+    from app.services.search_service import search_service
+
     search_service.rebuild_index()
-    return jsonify({'message': 'Index rebuilt successfully'})
+    return {"message": "Index rebuilt successfully"}

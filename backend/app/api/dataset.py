@@ -1,85 +1,93 @@
 import os
 import threading
+from typing import Optional
 
-from flask import Blueprint, request, jsonify, send_from_directory, current_app
-from werkzeug.utils import secure_filename
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    UploadFile,
+)
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
 
+from app.config import UPLOAD_FOLDER
+from app.database import get_db
 from app.models.dataset import Dataset
-from app.models.user import db
-from app.utils.auth_tools import token_required, decode_auth_token
+from app.utils.auth_tools import AuthContext, decode_auth_token, get_current_auth
+from app.utils.files import secure_filename
+from app.utils.pagination import paginate
 
-dataset_bp = Blueprint('dataset', __name__)
+router = APIRouter()
 
-# 限制最大上传大小为 500MB
 MAX_DATASET_SIZE = 500 * 1024 * 1024
 
 
-def async_save_file(app_context, file_data, file_path, dataset_id):
-    """异步保存文件并更新数据库状态（如果需要）"""
-    with app_context:
-        try:
-            with open(file_path, 'wb') as f:
-                f.write(file_data)
-            # 这里可以添加后续处理逻辑，如解压、校验等
-        except Exception as e:
-            print(f"Error in async_save_file: {e}")
+def async_save_file(file_data, file_path, dataset_id):
+    try:
+        with open(file_path, "wb") as f:
+            f.write(file_data)
+    except Exception as e:
+        print(f"Error in async_save_file: {e}")
 
 
-@dataset_bp.route('', methods=['GET'])
-def get_datasets():
-    page = request.args.get('page', type=int)
-    page_size = request.args.get('page_size', type=int)
-
+@router.get("")
+def get_datasets(
+    page: Optional[int] = None,
+    page_size: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Dataset).order_by(Dataset.id.desc())
     if page and page_size:
-        pagination = Dataset.query.order_by(Dataset.id.desc()).paginate(page=page, per_page=page_size, error_out=False)
-        datasets = pagination.items
-        return jsonify({
-            "total": pagination.total,
-            "page": pagination.page,
-            "page_size": pagination.per_page,
-            "datasets": [d.to_dict() for d in datasets]
-        }), 200
+        datasets, total, _pages = paginate(query, page=page, per_page=page_size)
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "datasets": [d.to_dict() for d in datasets],
+        }
 
-    datasets = Dataset.query.order_by(Dataset.id.desc()).all()
-    return jsonify([d.to_dict() for d in datasets]), 200
+    datasets = query.all()
+    return [d.to_dict() for d in datasets]
 
 
-@dataset_bp.route('', methods=['POST'])
-@token_required
-def upload_dataset():
-    # 权限校验：仅限教师上传
-    if request.current_user.role != 'teacher':
-        return jsonify({'error': 'Permission denied. Only teachers can upload datasets.'}), 403
+@router.post("", status_code=202)
+async def upload_dataset(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(default=None),
+    description: Optional[str] = Form(default=None),
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    if auth.user.role != "teacher":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Permission denied. Only teachers can upload datasets."
+            },
+        )
+    if not file.filename:
+        raise HTTPException(status_code=400, detail={"error": "No selected file"})
 
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-
-    # 检查文件大小 (从 Content-Length 获取，或者读取一部分检查)
-    # 注意：request.content_length 可能不可靠，取决于客户端
-    file.seek(0, os.SEEK_END)
-    size_bytes = file.tell()
-    file.seek(0)  # 重置指针
-
+    content = await file.read()
+    size_bytes = len(content)
     if size_bytes > MAX_DATASET_SIZE:
-        return jsonify({
-                           'error': f'File too large. Maximum size is {MAX_DATASET_SIZE // (1024 * 1024)}MB.You file size is {size_bytes // (1024 * 1024)}'}), 413
-
-    name = request.form.get('name')
-    description = request.form.get('description')
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": f"File too large. Maximum size is {MAX_DATASET_SIZE // (1024 * 1024)}MB.You file size is {size_bytes // (1024 * 1024)}"
+            },
+        )
 
     filename = secure_filename(file.filename)
-    upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
-    upload_dir = os.path.join(upload_folder, 'datasets')
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
-
+    upload_dir = os.path.join(UPLOAD_FOLDER, "datasets")
+    os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, filename)
 
-    # 格式化文件大小显示
     if size_bytes < 1024:
         file_size_str = f"{size_bytes} B"
     elif size_bytes < 1024 * 1024:
@@ -87,71 +95,88 @@ def upload_dataset():
     else:
         file_size_str = f"{size_bytes / (1024 * 1024):.2f} MB"
 
-    # 先创建数据库记录
     dataset = Dataset(
         name=name,
         description=description,
         file_path=file_path,
         file_size=file_size_str,
-        uploader_id=request.current_user.id
+        uploader_id=auth.user.id,
     )
-    db.session.add(dataset)
-    db.session.commit()
+    db.add(dataset)
+    db.commit()
+    db.refresh(dataset)
 
-    # 异步保存文件
-    file_data = file.read()
     thread = threading.Thread(
-        target=async_save_file,
-        args=(current_app.app_context(), file_data, file_path, dataset.id)
+        target=async_save_file, args=(content, file_path, dataset.id)
     )
     thread.start()
 
-    return jsonify({
-        "message": "Upload started",
-        "dataset": dataset.to_dict()
-    }), 202
+    return {"message": "Upload started", "dataset": dataset.to_dict()}
 
 
-@dataset_bp.route('/<int:id>', methods=['DELETE'])
-@token_required
-def delete_dataset(id):
-    # 权限校验：仅限教师删除
-    if request.current_user.role != 'teacher':
-        return jsonify({'error': 'Permission denied. Only teachers can delete datasets.'}), 403
+@router.delete("/{id}")
+def delete_dataset(
+    id: int,
+    auth: AuthContext = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    if auth.user.role != "teacher":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Permission denied. Only teachers can delete datasets."
+            },
+        )
 
-    dataset = Dataset.query.get_or_404(id)
+    dataset = db.get(Dataset, id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail={"error": "Not found"})
 
-    # 删除物理文件
     if os.path.exists(dataset.file_path):
         try:
             os.remove(dataset.file_path)
         except Exception as e:
-            current_app.logger.error(f"Error deleting file {dataset.file_path}: {e}")
+            print(f"Error deleting file {dataset.file_path}: {e}")
 
-    db.session.delete(dataset)
-    db.session.commit()
+    db.delete(dataset)
+    db.commit()
+    return {"message": "Dataset deleted successfully"}
 
-    return jsonify({'message': 'Dataset deleted successfully'}), 200
 
-
-@dataset_bp.route('/<int:id>/download', methods=['GET'])
-def download_dataset(id):
-    # 支持 Header Token 或 Query Token (方便直接粘贴链接下载)
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token[7:].strip()
+@router.get("/{id}/download")
+def download_dataset(
+    id: int,
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    auth_token = None
+    if authorization and authorization.startswith("Bearer "):
+        auth_token = authorization[7:].strip()
     else:
-        token = request.args.get('token')
+        auth_token = token
 
-    if not token:
-        return jsonify({'message': 'Authentication required'}), 401
+    if not auth_token:
+        raise HTTPException(
+            status_code=401, detail={"message": "Authentication required"}
+        )
 
     try:
-        decode_auth_token(token)
-    except:
-        return jsonify({'message': 'Invalid or expired token'}), 401
+        decode_auth_token(auth_token)
+    except Exception:
+        raise HTTPException(
+            status_code=401, detail={"message": "Invalid or expired token"}
+        )
 
-    dataset = Dataset.query.get_or_404(id)
-    directory = os.path.dirname(dataset.file_path)
-    filename = os.path.basename(dataset.file_path)
-    return send_from_directory(directory, filename, as_attachment=True)
+    dataset = db.get(Dataset, id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail={"error": "Not found"})
+
+    if not os.path.isfile(dataset.file_path):
+        raise HTTPException(status_code=404, detail={"error": "File not found"})
+
+    return FileResponse(
+        dataset.file_path,
+        filename=os.path.basename(dataset.file_path),
+        media_type="application/octet-stream",
+    )
