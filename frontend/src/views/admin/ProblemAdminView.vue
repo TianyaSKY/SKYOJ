@@ -48,13 +48,19 @@
     </el-card>
 
     <!-- Edit/Create Dialog -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="70%" @close="resetForm">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="82%" top="4vh" @close="resetForm">
       <el-form ref="formRef" v-loading="dialogLoading" :model="form" label-position="top">
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title"/>
         </el-form-item>
         <el-form-item label="内容 (Markdown)" prop="content">
-          <el-input v-model="form.content" :rows="10" type="textarea"/>
+          <MarkdownContentEditor
+              v-model="form.content"
+              default-mode="split"
+              min-height="360px"
+              :rows="16"
+              placeholder="题目描述支持 Markdown：标题、代码块、公式等"
+          />
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="6">
@@ -219,26 +225,11 @@
           <el-form-item label="生成方向/要求 (可选)">
             <el-input
                 v-model="testDataForm.direction"
-                :rows="3"
-                placeholder="例如：生成 10 组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
+                :rows="4"
+                placeholder="例如：生成若干组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
                 type="textarea"
             />
           </el-form-item>
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="测试点个数">
-                <el-input-number v-model="testDataForm.count" :max="50" :min="1"/>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="数据范围描述">
-                <el-input
-                    v-model="testDataForm.range_info"
-                    placeholder="例如：n <= 10^5, a[i] <= 10^9"
-                />
-              </el-form-item>
-            </el-col>
-          </el-row>
         </el-form>
       </div>
       <template #footer>
@@ -281,6 +272,7 @@ import {
 import {ElMessage} from 'element-plus'
 import {Cpu, Delete, Document, Download, Edit, MagicStick, Plus} from '@element-plus/icons-vue'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import MarkdownContentEditor from '@/components/MarkdownContentEditor.vue'
 
 const router = useRouter()
 const problems = ref([])
@@ -306,8 +298,6 @@ const fetchingDetail = ref(false)
 const scriptGenerating = ref(false)
 const testDataForm = ref({
   direction: '',
-  count: 10,
-  range_info: '',
 })
 
 const miniEditorOptions = {
@@ -465,8 +455,6 @@ const handleAiTestData = async (row) => {
   fetchingDetail.value = true
   testDataForm.value = {
     direction: '',
-    count: 10,
-    range_info: '',
   }
 
   try {
@@ -488,8 +476,6 @@ const handleGenerateScript = async () => {
   const parsed = generateTestScriptDraftSchema.safeParse({
     problem_id: currentProblem.value.id,
     direction: testDataForm.value.direction || '',
-    count: testDataForm.value.count || 10,
-    range_info: testDataForm.value.range_info || '',
   })
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '参数校验失败')

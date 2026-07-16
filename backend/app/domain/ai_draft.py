@@ -33,8 +33,6 @@ class SubmitTestScriptGenerationParams:
     user_id: int
     problem_id: int
     direction: str
-    count: int
-    range_info: str
 
 
 @dataclass(frozen=True)

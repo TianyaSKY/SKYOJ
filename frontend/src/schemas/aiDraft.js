@@ -21,13 +21,6 @@ export const generateTestScriptDraftSchema = z.object({
     .int('题目 ID 必须是整数')
     .min(1, '题目 ID 无效'),
   direction: z.string().max(5000, '生成方向过长').default(''),
-  count: z
-    .number({invalid_type_error: '测试点个数无效'})
-    .int('测试点个数必须是整数')
-    .min(1, '至少 1 组')
-    .max(50, '最多 50 组')
-    .default(10),
-  range_info: z.string().max(2000, '数据范围描述过长').default(''),
 })
 
 /** 测例执行表单 */

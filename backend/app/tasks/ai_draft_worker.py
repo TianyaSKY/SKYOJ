@@ -99,8 +99,6 @@ def _run_test_script_generation(
     """执行测例/评估脚本生成。"""
     problem_id = int(request["problem_id"])
     direction = str(request.get("direction") or "").strip()
-    count = int(request.get("count") or 10)
-    range_info = str(request.get("range_info") or "").strip()
 
     problem = problem_repo.get_by_id(problem_id)
     if problem is None:
@@ -127,7 +125,10 @@ def _run_test_script_generation(
                 "编写一个 Python 脚本，用于生成随机的输入数据（.in）和对应的标准答案（.out）。"
                 "并直接放置在原始文件夹下"
             ),
-            "rule": f"脚本应循环生成{count}组测试数据的测试点文件。",
+            "rule": (
+                "脚本应根据题目约束生成多组测试数据（含边界与典型情况），"
+                "数量与数据范围由题目描述自行合理推断。"
+            ),
         },
         "oop": {
             "role": "自动化测试专家",
@@ -170,8 +171,7 @@ def _run_test_script_generation(
     )
     prompt = (
         f"题目内容: {problem_snapshot}\n"
-        f"生成要求: {direction or '执行标准评估逻辑'}\n"
-        f"数据范围/参考: {range_info or '无'}"
+        f"生成要求: {direction or '执行标准评估逻辑'}"
     )
     output_format = {
         "code": "生成的完整代码字符串",
@@ -195,9 +195,7 @@ def _run_test_script_generation(
         "problem_id": problem_id,
         "problem_type": problem_type,
         "problem_title": problem.title,
-        "count": count,
         "direction": direction,
-        "range_info": range_info,
     }
     title = f"测例脚本 · {problem.title}"
     draft_repo.mark_success(draft_id, result_payload=payload, title=title)

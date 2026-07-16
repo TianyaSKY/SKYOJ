@@ -160,11 +160,12 @@
                 <el-input :model-value="detail.result_payload?.title" readonly/>
               </el-form-item>
               <el-form-item label="内容 (Markdown)">
-                <el-input
-                    :model-value="detail.result_payload?.content"
-                    :rows="12"
+                <MarkdownContentEditor
+                    :model-value="detail.result_payload?.content || ''"
+                    default-mode="preview"
+                    min-height="320px"
                     readonly
-                    type="textarea"
+                    :rows="12"
                 />
               </el-form-item>
               <el-row :gutter="12">
@@ -239,6 +240,7 @@ import {onMounted, onUnmounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import MarkdownContentEditor from '@/components/MarkdownContentEditor.vue'
 import {
   applyProblemDraft,
   deleteAiDraft,

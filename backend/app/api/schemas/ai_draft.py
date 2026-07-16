@@ -17,8 +17,6 @@ class GenerateTestScriptDraftBody(BaseModel):
 
     problem_id: int = Field(ge=1)
     direction: str = Field(default="", max_length=5000)
-    count: int = Field(default=10, ge=1, le=50)
-    range_info: str = Field(default="", max_length=2000)
 
 
 class ExecuteTestDataDraftBody(BaseModel):

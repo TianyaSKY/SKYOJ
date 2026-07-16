@@ -110,7 +110,28 @@ Please configure at least these LLM variables (for AI tutor and test-data genera
 
 ### Step 3: Build Sandbox Images (Critical)
 
-To ensure the security and independence of the evaluation environment, basic evaluation images must be built manually:
+To ensure the security and independence of the evaluation environment, build the judging and test-data generation sandbox images first.
+
+**Recommended: one-click scripts**
+
+```bash
+# Linux / macOS
+chmod +x scripts/build-sandbox.sh
+./scripts/build-sandbox.sh
+
+# Windows (cmd / PowerShell)
+scripts\build-sandbox.bat
+```
+
+Optional flags:
+
+```bash
+./scripts/build-sandbox.sh runner          # only skyoj-runner
+./scripts/build-sandbox.sh generator       # only skyoj-generator
+./scripts/build-sandbox.sh --no-cache      # force rebuild without cache
+```
+
+**Or build manually:**
 
 ```bash
 # 1. Build the judging runtime environment image (includes GCC, Python, Java)

@@ -180,8 +180,6 @@ def submit_test_script_generation(
                 user_id=auth.user.id,
                 problem_id=body.problem_id,
                 direction=body.direction,
-                count=body.count,
-                range_info=body.range_info,
             )
         )
     except BusinessError as exc:

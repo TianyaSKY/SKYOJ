@@ -99,16 +99,10 @@ class AiDraftService:
         if problem is None:
             raise ResourceNotFoundError(f"题目不存在: {params.problem_id}")
 
-        count = params.count if params.count and params.count > 0 else 10
-        if count > 50:
-            raise InvalidStateError("测试点个数不能超过 50")
-
         title = f"生成脚本中 · {problem.title}"
         request_payload = {
             "problem_id": params.problem_id,
             "direction": (params.direction or "").strip(),
-            "count": count,
-            "range_info": (params.range_info or "").strip(),
         }
         draft = self._drafts.create(
             user_id=params.user_id,

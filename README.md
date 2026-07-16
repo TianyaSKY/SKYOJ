@@ -110,7 +110,28 @@ cp .env.example .env
 
 ### 第三步：构建沙箱镜像 (关键)
 
-为了保证评测环境的安全性与独立性，需手动构建基础评测镜像：
+为了保证评测环境的安全性与独立性，需先构建判题 / 测例生成沙箱镜像。
+
+**推荐：使用一键脚本**
+
+```bash
+# Linux / macOS
+chmod +x scripts/build-sandbox.sh
+./scripts/build-sandbox.sh
+
+# Windows (cmd / PowerShell)
+scripts\build-sandbox.bat
+```
+
+可选参数：
+
+```bash
+./scripts/build-sandbox.sh runner          # 仅判题沙箱 skyoj-runner
+./scripts/build-sandbox.sh generator       # 仅测例沙箱 skyoj-generator
+./scripts/build-sandbox.sh --no-cache      # 强制无缓存重建
+```
+
+**或手动构建：**
 
 ```bash
 # 1. 构建判题运行环境镜像 (包含 GCC, Python, Java 环境)
