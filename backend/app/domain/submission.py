@@ -16,6 +16,7 @@ class SubmitParams:
     exam_id: Optional[int] = None
     is_file_upload: bool = False
     filename: Optional[str] = None
+    file_content: Optional[bytes] = None
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,21 @@ class PaginatedSubmissions:
     pages: int
     current_page: int
     submissions: list[SubmissionListItem]
+
+
+@dataclass(frozen=True)
+class SubmissionQuery:
+    """查询提交列表的业务参数。"""
+
+    requester_id: int
+    requester_role: str
+    problem_id: Optional[int] = None
+    user_id: Optional[int] = None
+    exam_id: Optional[int] = None
+    status: Optional[str] = None
+    username: Optional[str] = None
+    page: int = 1
+    page_size: int = 20
 
 
 @dataclass(frozen=True)

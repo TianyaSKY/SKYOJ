@@ -17,6 +17,8 @@ class PlagiarismLogItem:
     username: Optional[str]
     problem_id: Optional[int]
     problem_title: Optional[str]
+    exam_id: Optional[int]
+    user_id: Optional[int]
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,8 @@ class PlagiarismLogDetail:
     problem_title: Optional[str]
     code_content: Optional[str]
     target_code: Optional[str]
+    exam_id: Optional[int]
+    user_id: Optional[int]
 
 
 @dataclass(frozen=True)

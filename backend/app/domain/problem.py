@@ -32,6 +32,15 @@ class UpdateProblemParams:
 
 
 @dataclass(frozen=True)
+class UploadTestCasesParams:
+    """上传题目测试用例的业务参数。"""
+
+    problem_id: int
+    filename: str
+    content: bytes
+
+
+@dataclass(frozen=True)
 class ProblemListItem:
     """题目列表项。"""
 

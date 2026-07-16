@@ -13,6 +13,10 @@ class PermissionDeniedError(BusinessError):
     """当前用户无权执行该操作。"""
 
 
+class AuthenticationError(BusinessError):
+    """用户身份认证失败。"""
+
+
 class InvalidStateError(BusinessError):
     """业务对象状态不允许当前操作。"""
 

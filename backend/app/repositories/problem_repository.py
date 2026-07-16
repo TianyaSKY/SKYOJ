@@ -42,3 +42,26 @@ class ProblemRepository:
         self._db.commit()
         self._db.refresh(problem)
         return problem
+
+    def list(
+        self, page: int | None = None, page_size: int | None = None
+    ) -> tuple[list[Problem], int | None]:
+        """按创建顺序倒序查询题目，必要时在数据库侧分页。"""
+        query = self._db.query(Problem).order_by(Problem.id.desc())
+        if page is None or page_size is None:
+            return query.all(), None
+
+        total = query.count()
+        problems = query.offset((page - 1) * page_size).limit(page_size).all()
+        return problems, total
+
+    def update(self, problem: Problem) -> Problem:
+        """持久化题目更新。"""
+        self._db.commit()
+        self._db.refresh(problem)
+        return problem
+
+    def delete(self, problem: Problem) -> None:
+        """删除指定题目。"""
+        self._db.delete(problem)
+        self._db.commit()

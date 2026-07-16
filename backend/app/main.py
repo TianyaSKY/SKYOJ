@@ -3,6 +3,7 @@ import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from loguru import logger
 from sqlalchemy.exc import OperationalError
 
 from app.api import (
@@ -18,6 +19,13 @@ from app.api import (
     user,
 )
 from app.database import SessionLocal, create_tables
+from app.domain.errors import (
+    AuthenticationError,
+    BusinessError,
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
 from app.models.sysdict import SysDict
 from app.utils.feature_flags import ENABLE_PLAGIARISM, ENABLE_SEMANTIC_SEARCH
 from app.utils.sys_dict import sys_dict_kv
@@ -29,7 +37,7 @@ def init_db():
     while retries > 0:
         try:
             create_tables()
-            print("Successfully connected to MySQL and created tables!")
+            logger.success("数据库连接成功，数据表已创建")
 
             db = SessionLocal()
             try:
@@ -37,30 +45,38 @@ def init_db():
                     for key, val in sys_dict_kv.items():
                         db.add(SysDict(key=key, val=str(val)))
                     db.commit()
-                    print("Initialized SysDict from sys_dict_kv.")
+                    logger.success("系统字典已根据默认配置完成初始化")
             finally:
                 db.close()
             return
-        except OperationalError:
+        except OperationalError as exc:
             retries -= 1
-            print(f"Waiting for MySQL... ({5 - retries}/5)")
+            logger.warning(
+                "数据库暂不可用，准备重试，第 {} 次/共 5 次，原因：{}",
+                5 - retries,
+                exc,
+            )
             time.sleep(3)
-        except Exception as e:
+        except Exception as exc:
             retries -= 1
-            print(f"DB init error: {e} ({5 - retries}/5)")
+            logger.exception(
+                "数据库初始化失败，准备重试，第 {} 次/共 5 次，原因：{}",
+                5 - retries,
+                exc,
+            )
             time.sleep(3)
-    print("Could not connect to MySQL after several retries.")
+    logger.error("数据库多次连接失败，应用将以降级状态继续启动")
 
 
 def init_services():
     """初始化搜索索引和查重模型"""
     if not (ENABLE_PLAGIARISM or ENABLE_SEMANTIC_SEARCH):
-        print(
-            "Search and plagiarism services are disabled by feature flags. Skipping init."
+        logger.info(
+            "搜索和查重服务已由功能开关禁用，跳过初始化"
         )
         return
 
-    print("Initializing services (Search Index & Plagiarism Model)...")
+    logger.info("开始初始化搜索索引与查重模型")
     try:
         if ENABLE_PLAGIARISM:
             from app.services.plagiarism_service import plagiarism_service
@@ -72,9 +88,9 @@ def init_services():
 
             search_service.rebuild_index()
 
-        print("Services initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing services: {e}")
+        logger.success("搜索索引与查重模型初始化完成")
+    except Exception:
+        logger.exception("搜索索引或查重模型初始化失败")
 
 
 def create_app() -> FastAPI:
@@ -88,6 +104,36 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=exc.status_code, content={"detail": exc.detail}
         )
+
+    @application.exception_handler(ResourceNotFoundError)
+    async def resource_not_found_handler(
+        request: Request, exc: ResourceNotFoundError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+
+    @application.exception_handler(PermissionDeniedError)
+    async def permission_denied_handler(
+        request: Request, exc: PermissionDeniedError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=403, content={"error": str(exc)})
+
+    @application.exception_handler(AuthenticationError)
+    async def authentication_error_handler(
+        request: Request, exc: AuthenticationError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=401, content={"error": str(exc)})
+
+    @application.exception_handler(InvalidStateError)
+    async def invalid_state_handler(
+        request: Request, exc: InvalidStateError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+
+    @application.exception_handler(BusinessError)
+    async def business_error_handler(
+        request: Request, exc: BusinessError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
 
     @application.get("/")
     def hello():

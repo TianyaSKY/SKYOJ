@@ -1,14 +1,15 @@
-import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import get_ai_draft_service
+from app.api.deps import get_ai_draft_service, get_llm_facade_service
 from app.api.schemas.ai_draft import (
     ExecuteTestDataDraftBody,
+    ExecuteTestGenerationBody,
     GenerateProblemDraftBody,
     GenerateTestScriptDraftBody,
+    AskLlmBody,
 )
 from app.domain.ai_draft import (
     SubmitProblemGenerationParams,
@@ -23,10 +24,9 @@ from app.domain.errors import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.domain.llm import AskLlmParams, ExecuteTestGenerationParams
 from app.services.ai_draft_service import AiDraftService
-from app.services.judge_service import save_non_acm_script
-from app.services.llm import ask_llm
-from app.services.test_gen_service import run_test_generation
+from app.services.llm_facade_service import LlmFacadeService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
@@ -63,74 +63,31 @@ def _dt_iso(value: Optional[datetime]) -> Optional[str]:
 
 @router.post("/ask")
 def call_llm(
-    data: dict[str, Any],
+    body: AskLlmBody,
     auth: AuthContext = Depends(get_current_auth),
+    service: LlmFacadeService = Depends(get_llm_facade_service),
 ):
-    system_setting = data.get("system_setting")
-    prompt = data.get("prompt")
-    output_format = data.get("output_format")
-
-    if not system_setting or not prompt:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "system_setting and prompt are required"},
-        )
-
-    api_key = os.getenv("LLM_API_KEY", "").strip()
-    api_url = os.getenv("LLM_API_URL", "").strip()
-    model_name = os.getenv("LLM_MODEL_NAME", "").strip()
-
-    if not all([api_key, api_url, model_name]):
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "LLM environment variables are missing. Required: LLM_API_KEY, LLM_API_URL, LLM_MODEL_NAME"
-            },
-        )
-
-    result = ask_llm(
-        api_key=api_key,
-        api_url=api_url,
-        model_name=model_name,
-        system_setting=system_setting,
-        prompt=prompt,
-        output_format=output_format,
-    )
-    if result is None:
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "LLM request failed or output format mismatch"},
-        )
-    return result
+    try:
+        return service.ask(AskLlmParams(body.system_setting, body.prompt, body.output_format))
+    except BusinessError as exc:
+        raise _map_business_error(exc) from exc
 
 
 @router.post("/execute-test-generation")
 def execute_test_generation(
-    data: dict[str, Any],
+    body: ExecuteTestGenerationBody,
     auth: AuthContext = Depends(get_current_auth),
+    service: LlmFacadeService = Depends(get_llm_facade_service),
 ):
-    problem_id = data.get("problem_id")
-    code = data.get("code")
-    problem_type = data.get("type")
-    language = data.get("language", "python")
-
-    if not problem_id or not code:
-        raise HTTPException(
-            status_code=400, detail={"error": "problem_id and code are required"}
+    try:
+        message = service.execute_test_generation(
+            ExecuteTestGenerationParams(
+                body.problem_id, body.code, body.type, body.language
+            )
         )
-
-    if problem_type and problem_type != "acm":
-        success, message = save_non_acm_script(
-            problem_id, code, problem_type, language
-        )
-        if success:
-            return {"message": message}
-        raise HTTPException(status_code=500, detail={"error": message})
-
-    success, message = run_test_generation(problem_id, code)
-    if success:
-        return {"message": message}
-    raise HTTPException(status_code=500, detail={"error": message})
+    except BusinessError as exc:
+        raise _map_business_error(exc) from exc
+    return {"message": message}
 
 
 # ---------------------------------------------------------------------------

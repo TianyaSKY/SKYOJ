@@ -1,6 +1,8 @@
 import json
 from typing import Optional, Dict, Any
 
+from loguru import logger
+
 
 def ask_llm(
         api_key: str,
@@ -57,11 +59,11 @@ def ask_llm(
         if output_format:
             for key in output_format.keys():
                 if key not in parsed_content:
-                    print(f"LLM 返回格式不匹配: 缺失键 {key}")
+                    logger.error("LLM 返回格式不匹配，缺失字段：{}", key)
                     return None
 
         return parsed_content
 
-    except Exception as e:
-        print(f"LLM 请求失败: {str(e)}")
+    except Exception as exc:
+        logger.exception("LLM 请求失败，原因：{}", exc)
         return None

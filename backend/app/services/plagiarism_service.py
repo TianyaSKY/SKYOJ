@@ -3,6 +3,7 @@ import threading
 from pathlib import Path
 
 from sentence_transformers import SentenceTransformer, util
+from loguru import logger
 
 from app.database import SessionLocal
 from app.models.plagiarism import PlagiarismLog
@@ -21,10 +22,10 @@ class PlagiarismService:
     def _ensure_model_loaded(self):
         if self.model is None:
             if os.path.exists(MODEL_PATH):
-                print(f"Loading Plagiarism Detection Model: {MODEL_PATH}")
+                logger.info("加载剽窃检测模型，路径：{}", MODEL_PATH)
                 self.model = SentenceTransformer(MODEL_PATH)
             else:
-                print(f"Warning: Plagiarism model path {MODEL_PATH} not found.")
+                logger.warning("剽窃检测模型不存在，路径：{}", MODEL_PATH)
         return self.model
 
     def run_batch_check(self, submission_ids):
@@ -137,13 +138,11 @@ class PlagiarismService:
                                     sub.output_log = alert_msg
 
                     db.commit()
-                    print(f"Batch plagiarism check completed for Problem #{problem_id}")
+                    logger.success("题目剽窃检测完成，题目 ID：{}", problem_id)
 
-                except Exception as e:
+                except Exception:
                     db.rollback()
-                    print(
-                        f"Error in batch plagiarism check for Problem #{problem_id}: {e}"
-                    )
+                    logger.exception("题目剽窃检测失败，题目 ID：{}", problem_id)
         finally:
             db.close()
 

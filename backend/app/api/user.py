@@ -1,162 +1,70 @@
-import os
-import uuid
+"""用户 HTTP 接口。"""
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
 
-from app.config import BACKEND_ROOT
-from app.database import get_db
-from app.models.submission import Submission
-from app.models.user import User
+from app.api.deps import get_user_service
+from app.domain.user import UploadAvatarParams, UserProfile, UserSubmissionItem
+from app.services.user_service import UserService
 from app.utils.auth_tools import AuthContext, get_current_auth
-from app.utils.files import secure_filename
 
 router = APIRouter()
 
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
+
+def _profile_response(profile: UserProfile) -> dict:
+    return {"id": profile.id, "username": profile.username, "role": profile.role, "avatar": profile.avatar}
 
 
-def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def _avatar_folder() -> str:
-    return os.path.join(BACKEND_ROOT, "uploads", "avatars")
+def _submission_response(item: UserSubmissionItem) -> dict:
+    return {
+        "id": item.id, "problem_id": item.problem_id, "problem_title": item.problem_title,
+        "status": item.status, "score": item.score, "language": item.language,
+        "created_at": item.created_at.isoformat(), "exam_id": item.exam_id,
+    }
 
 
 @router.get("/all")
 def get_all_users(
     auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
+    service: UserService = Depends(get_user_service),
 ):
-    if auth.user.role != "teacher":
-        raise HTTPException(status_code=403, detail={"error": "Permission denied"})
-
-    users = db.query(User).all()
-    return [
-        {
-            "id": u.id,
-            "username": u.username,
-            "role": u.role,
-            "avatar": u.avatar,
-        }
-        for u in users
-    ]
+    return [_profile_response(user) for user in service.list_users(auth.user.role)]
 
 
 @router.get("/{user_id}/profile")
-def get_user_profile(
-    user_id: int,
-    auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
-):
-    user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail={"error": "Not found"})
-    return {
-        "id": user.id,
-        "username": user.username,
-        "role": user.role,
-        "avatar": user.avatar,
-    }
+def get_user_profile(user_id: int, service: UserService = Depends(get_user_service)):
+    return _profile_response(service.get_profile(user_id))
 
 
 @router.post("/avatar")
 async def upload_avatar(
     avatar: UploadFile = File(...),
     auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
+    service: UserService = Depends(get_user_service),
 ):
-    if not avatar.filename:
-        raise HTTPException(status_code=400, detail={"error": "No selected file"})
-
-    if not allowed_file(avatar.filename):
-        raise HTTPException(status_code=400, detail={"error": "Invalid file type"})
-
-    filename = secure_filename(avatar.filename)
-    ext = filename.rsplit(".", 1)[1].lower()
-    new_filename = f"{uuid.uuid4().hex}.{ext}"
-
-    upload_folder = _avatar_folder()
-    os.makedirs(upload_folder, exist_ok=True)
-
-    dest = os.path.join(upload_folder, new_filename)
-    content = await avatar.read()
-    with open(dest, "wb") as f:
-        f.write(content)
-
-    user = db.get(User, auth.user.id)
-    user.avatar = f"/api/user/avatars/{new_filename}"
-    db.commit()
-
-    return {"message": "Avatar uploaded successfully", "avatar": user.avatar}
+    profile = service.upload_avatar(
+        UploadAvatarParams(user_id=auth.user.id, filename=avatar.filename or "", content=await avatar.read())
+    )
+    return {"message": "Avatar uploaded successfully", "avatar": profile.avatar}
 
 
 @router.get("/avatars/{filename}")
-def get_avatar_file(filename: str):
-    upload_folder = _avatar_folder()
-    path = os.path.join(upload_folder, filename)
-    if not os.path.isfile(path):
-        raise HTTPException(status_code=404, detail={"error": "File not found"})
-    return FileResponse(path)
+def get_avatar_file(filename: str, service: UserService = Depends(get_user_service)):
+    return FileResponse(service.get_avatar_path(filename))
 
 
 @router.get("/{user_id}/submissions")
 def get_other_user_submissions(
     user_id: int,
     auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
+    service: UserService = Depends(get_user_service),
 ):
-    submissions = (
-        db.query(Submission)
-        .filter_by(user_id=user_id)
-        .order_by(Submission.created_at.desc())
-        .all()
-    )
-
-    result = []
-    for s in submissions:
-        result.append(
-            {
-                "id": s.id,
-                "problem_id": s.problem_id,
-                "problem_title": s.problem.title if s.problem else "Unknown",
-                "status": s.status,
-                "score": s.score,
-                "language": s.language,
-                "created_at": s.created_at.isoformat(),
-                "exam_id": s.exam_id,
-            }
-        )
-    return result
+    return [_submission_response(item) for item in service.list_submissions(user_id)]
 
 
 @router.get("/submissions")
 def get_user_submissions(
     auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
+    service: UserService = Depends(get_user_service),
 ):
-    user = auth.user
-    submissions = (
-        db.query(Submission)
-        .filter_by(user_id=user.id)
-        .order_by(Submission.created_at.desc())
-        .all()
-    )
-
-    result = []
-    for s in submissions:
-        result.append(
-            {
-                "id": s.id,
-                "problem_id": s.problem_id,
-                "problem_title": s.problem.title if s.problem else "Unknown",
-                "status": s.status,
-                "score": s.score,
-                "language": s.language,
-                "created_at": s.created_at.isoformat(),
-                "exam_id": s.exam_id,
-            }
-        )
-    return result
+    return [_submission_response(item) for item in service.list_submissions(auth.user.id)]

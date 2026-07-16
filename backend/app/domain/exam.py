@@ -39,6 +39,15 @@ class EnterExamParams:
 
 
 @dataclass(frozen=True)
+class AddExamProblemParams:
+    """向考试添加题目的业务参数。"""
+
+    problem_id: int
+    display_id: Optional[str] = None
+    score: int = 100
+
+
+@dataclass(frozen=True)
 class ExamProblemItem:
     """考试题目信息。"""
 
@@ -165,3 +174,13 @@ class RankResult:
     exam_title: str
     problems: list[RankProblemInfo]
     rank: list[RankEntry]
+
+
+@dataclass(frozen=True)
+class ExamScoreRow:
+    """导出成绩时单个学生的一行数据。"""
+
+    user_id: int
+    username: str
+    scores: list[float]
+    total_score: float

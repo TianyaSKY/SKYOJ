@@ -4,6 +4,7 @@ from typing import Optional
 
 import jwt
 from fastapi import Depends, Header, HTTPException
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.config import SECRET_KEY
@@ -27,8 +28,8 @@ def encode_auth_token(user_id, role, exam_id=-1):
             "exam_id": exam_id,
         }
         return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-    except Exception as e:
-        print(f"Error encoding token: {e}")
+    except Exception:
+        logger.exception("生成认证令牌失败，用户 ID：{}", user_id)
         return None
 
 
@@ -83,13 +84,13 @@ def get_current_auth(
         raise HTTPException(
             status_code=401, detail={"message": "Token has expired."}
         )
-    except jwt.InvalidTokenError as e:
-        print(f"DEBUG: Invalid Token Error: {e}")
+    except jwt.InvalidTokenError as exc:
+        logger.warning("认证令牌无效，原因：{}", exc)
         raise HTTPException(
             status_code=401, detail={"message": f"Invalid token: {str(e)}"}
         )
-    except Exception as e:
-        print(f"DEBUG: Unknown Auth Error: {e}")
+    except Exception:
+        logger.exception("认证过程发生未处理异常")
         raise HTTPException(
             status_code=401, detail={"message": "Authentication failed"}
         )

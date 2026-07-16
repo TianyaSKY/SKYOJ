@@ -1,5 +1,3 @@
-import os
-import threading
 from typing import Optional
 
 from fastapi import (
@@ -13,46 +11,30 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
 
-from app.config import UPLOAD_FOLDER
-from app.database import get_db
-from app.models.dataset import Dataset
+from app.api.deps import get_dataset_service
+from app.domain.dataset import PaginatedDatasets, UploadDatasetParams
+from app.services.dataset_service import DatasetService
 from app.utils.auth_tools import AuthContext, decode_auth_token, get_current_auth
-from app.utils.files import secure_filename
-from app.utils.pagination import paginate
 
 router = APIRouter()
-
-MAX_DATASET_SIZE = 500 * 1024 * 1024
-
-
-def async_save_file(file_data, file_path, dataset_id):
-    try:
-        with open(file_path, "wb") as f:
-            f.write(file_data)
-    except Exception as e:
-        print(f"Error in async_save_file: {e}")
 
 
 @router.get("")
 def get_datasets(
-    page: Optional[int] = None,
-    page_size: Optional[int] = None,
-    db: Session = Depends(get_db),
+    page: Optional[int] = Query(default=None, ge=1),
+    page_size: Optional[int] = Query(default=None, ge=1, le=100),
+    service: DatasetService = Depends(get_dataset_service),
 ):
-    query = db.query(Dataset).order_by(Dataset.id.desc())
-    if page and page_size:
-        datasets, total, _pages = paginate(query, page=page, per_page=page_size)
+    result = service.list_datasets(page=page, page_size=page_size)
+    if isinstance(result, PaginatedDatasets):
         return {
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "datasets": [d.to_dict() for d in datasets],
+            "total": result.total,
+            "page": result.page,
+            "page_size": result.page_size,
+            "datasets": [_dataset_to_response(dataset) for dataset in result.datasets],
         }
-
-    datasets = query.all()
-    return [d.to_dict() for d in datasets]
+    return [_dataset_to_response(dataset) for dataset in result]
 
 
 @router.post("", status_code=202)
@@ -61,85 +43,30 @@ async def upload_dataset(
     name: Optional[str] = Form(default=None),
     description: Optional[str] = Form(default=None),
     auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
+    service: DatasetService = Depends(get_dataset_service),
 ):
-    if auth.user.role != "teacher":
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "Permission denied. Only teachers can upload datasets."
-            },
-        )
-    if not file.filename:
-        raise HTTPException(status_code=400, detail={"error": "No selected file"})
-
     content = await file.read()
-    size_bytes = len(content)
-    if size_bytes > MAX_DATASET_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail={
-                "error": f"File too large. Maximum size is {MAX_DATASET_SIZE // (1024 * 1024)}MB.You file size is {size_bytes // (1024 * 1024)}"
-            },
+    dataset = service.upload_dataset(
+        UploadDatasetParams(
+            requester_role=auth.user.role,
+            uploader_id=auth.user.id,
+            filename=file.filename or "",
+            content=content,
+            name=name,
+            description=description,
         )
-
-    filename = secure_filename(file.filename)
-    upload_dir = os.path.join(UPLOAD_FOLDER, "datasets")
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, filename)
-
-    if size_bytes < 1024:
-        file_size_str = f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        file_size_str = f"{size_bytes / 1024:.2f} KB"
-    else:
-        file_size_str = f"{size_bytes / (1024 * 1024):.2f} MB"
-
-    dataset = Dataset(
-        name=name,
-        description=description,
-        file_path=file_path,
-        file_size=file_size_str,
-        uploader_id=auth.user.id,
     )
-    db.add(dataset)
-    db.commit()
-    db.refresh(dataset)
 
-    thread = threading.Thread(
-        target=async_save_file, args=(content, file_path, dataset.id)
-    )
-    thread.start()
-
-    return {"message": "Upload started", "dataset": dataset.to_dict()}
+    return {"message": "Upload started", "dataset": _dataset_to_response(dataset)}
 
 
 @router.delete("/{id}")
 def delete_dataset(
     id: int,
     auth: AuthContext = Depends(get_current_auth),
-    db: Session = Depends(get_db),
+    service: DatasetService = Depends(get_dataset_service),
 ):
-    if auth.user.role != "teacher":
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "Permission denied. Only teachers can delete datasets."
-            },
-        )
-
-    dataset = db.get(Dataset, id)
-    if not dataset:
-        raise HTTPException(status_code=404, detail={"error": "Not found"})
-
-    if os.path.exists(dataset.file_path):
-        try:
-            os.remove(dataset.file_path)
-        except Exception as e:
-            print(f"Error deleting file {dataset.file_path}: {e}")
-
-    db.delete(dataset)
-    db.commit()
+    service.delete_dataset(auth.user.role, id)
     return {"message": "Dataset deleted successfully"}
 
 
@@ -148,7 +75,7 @@ def download_dataset(
     id: int,
     authorization: Optional[str] = Header(default=None),
     token: Optional[str] = Query(default=None),
-    db: Session = Depends(get_db),
+    service: DatasetService = Depends(get_dataset_service),
 ):
     auth_token = None
     if authorization and authorization.startswith("Bearer "):
@@ -168,15 +95,23 @@ def download_dataset(
             status_code=401, detail={"message": "Invalid or expired token"}
         )
 
-    dataset = db.get(Dataset, id)
-    if not dataset:
-        raise HTTPException(status_code=404, detail={"error": "Not found"})
-
-    if not os.path.isfile(dataset.file_path):
-        raise HTTPException(status_code=404, detail={"error": "File not found"})
+    dataset = service.download_dataset(id)
 
     return FileResponse(
         dataset.file_path,
-        filename=os.path.basename(dataset.file_path),
+        filename=dataset.filename,
         media_type="application/octet-stream",
     )
+
+
+def _dataset_to_response(dataset) -> dict:
+    """在 HTTP 边界组装数据集响应。"""
+    return {
+        "id": dataset.id,
+        "name": dataset.name,
+        "description": dataset.description,
+        "uploader": dataset.uploader,
+        "file_size": dataset.file_size,
+        "created_at": dataset.created_at.isoformat() if dataset.created_at else None,
+        "download_url": f"/api/datasets/{dataset.id}/download",
+    }
