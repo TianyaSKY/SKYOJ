@@ -1,3 +1,4 @@
+from app.models.ai_draft import AiDraft
 from app.models.dataset import Dataset
 from app.models.exam import Exam, ExamProblem
 from app.models.plagiarism import PlagiarismLog
@@ -8,6 +9,7 @@ from app.models.sysdict import SysDict
 from app.models.user import User
 
 __all__ = [
+    "AiDraft",
     "Dataset",
     "Exam",
     "ExamProblem",

@@ -5,6 +5,7 @@
         <div class="card-header">
           <h2>题目管理</h2>
           <div class="header-actions">
+            <el-button :icon="Document" @click="goToDraftBox">AI 草稿箱</el-button>
             <el-button :icon="MagicStick" type="success" @click="handleAiCreate"
             >AI 生成题目
             </el-button
@@ -169,8 +170,15 @@
       </template>
     </el-dialog>
 
-    <!-- AI Generation Dialog -->
-    <el-dialog v-model="aiDialogVisible" title="AI 生成题目" width="500px">
+    <!-- AI Generation Dialog（异步提交到草稿箱） -->
+    <el-dialog v-model="aiDialogVisible" title="AI 生成题目" width="520px">
+      <el-alert
+          :closable="false"
+          class="mb-12"
+          show-icon
+          title="提交后将在后台生成，可关闭本窗口，到「AI 草稿箱」查看结果并创建正式题目。"
+          type="info"
+      />
       <el-form :model="aiForm" label-position="top">
         <el-form-item label="题目背景/大致方向" required>
           <el-input
@@ -182,30 +190,31 @@
         </el-form-item>
         <el-form-item label="题目难度">
           <el-radio-group v-model="aiForm.difficulty">
-            <el-radio label="简单">简单</el-radio>
-            <el-radio label="中等">中等</el-radio>
-            <el-radio label="困难">困难</el-radio>
+            <el-radio value="简单">简单</el-radio>
+            <el-radio value="中等">中等</el-radio>
+            <el-radio value="困难">困难</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="aiDialogVisible = false">取消</el-button>
-        <el-button :loading="aiGenerating" type="primary" @click="generateProblem"
-        >生成预览
-        </el-button
-        >
+        <el-button @click="goToDraftBox">打开草稿箱</el-button>
+        <el-button :loading="aiGenerating" type="primary" @click="generateProblem">
+          提交后台生成
+        </el-button>
       </template>
     </el-dialog>
 
-    <!-- AI Test Data Generation Dialog -->
-    <el-dialog v-model="aiTestDataVisible" title="AI 生成测试数据" width="900px">
-      <el-steps :active="aiStep" finish-status="success" simple style="margin-bottom: 20px">
-        <el-step title="配置方向"/>
-        <el-step title="生成脚本"/>
-        <el-step title="执行生成"/>
-      </el-steps>
-
-      <div v-if="aiStep === 0" v-loading="fetchingDetail">
+    <!-- AI Test Data Generation Dialog（异步提交到草稿箱） -->
+    <el-dialog v-model="aiTestDataVisible" title="AI 生成测试数据" width="560px">
+      <el-alert
+          :closable="false"
+          class="mb-12"
+          show-icon
+          title="脚本在后台生成。完成后请到「AI 草稿箱」预览脚本并提交执行，无需在本页等待。"
+          type="info"
+      />
+      <div v-loading="fetchingDetail">
         <el-form :model="testDataForm" label-position="top">
           <el-form-item label="生成方向/要求 (可选)">
             <el-input
@@ -232,63 +241,17 @@
           </el-row>
         </el-form>
       </div>
-
-      <div v-if="aiStep === 1">
-        <div class="script-header">
-          <span>生成的 {{ generatedLanguage === 'java' ? 'Java 测试类' : '测试脚本' }}</span>
-          <el-tag size="small" type="info">语言: {{ generatedLanguage }}</el-tag>
-        </div>
-        <div v-if="aiTestDataVisible" class="editor-container script-editor">
-          <vue-monaco-editor
-              v-model:value="generatedScript"
-              :language="generatedLanguage"
-              :options="editorOptions"
-              theme="vs-dark"
-          />
-        </div>
-      </div>
-
-      <div v-if="aiStep === 2" class="execution-status">
-        <div v-if="executing" class="loading-box">
-          <el-icon class="is-loading">
-            <Loading/>
-          </el-icon>
-          <p>正在生成测试数据并提交到服务器...</p>
-        </div>
-        <div v-else-if="executionResult" class="result-box">
-          <el-result
-              :sub-title="`已成功生成并上传 ${testDataForm.count} 组测试数据。`"
-              icon="success"
-              title="生成成功"
-          >
-            <template #extra>
-              <el-button type="primary" @click="aiTestDataVisible = false">完成</el-button>
-            </template>
-          </el-result>
-        </div>
-      </div>
-
       <template #footer>
-        <div class="dialog-footer">
-          <el-button v-if="aiStep > 0 && aiStep < 2" @click="aiStep--">上一步</el-button>
-          <el-button
-              v-if="aiStep === 0"
-              :disabled="fetchingDetail"
-              :loading="scriptGenerating"
-              type="primary"
-              @click="handleGenerateScript"
-          >
-            下一步：生成脚本
-          </el-button>
-          <el-button
-              v-if="aiStep === 1"
-              :loading="executing"
-              type="success"
-              @click="handleExecuteScript"
-          >
-            执行并提交
-          </el-button>
-        </div>
+        <el-button @click="aiTestDataVisible = false">取消</el-button>
+        <el-button @click="goToDraftBox">打开草稿箱</el-button>
+        <el-button
+            :disabled="fetchingDetail || !currentProblem"
+            :loading="scriptGenerating"
+            type="primary"
+            @click="handleGenerateScript"
+        >
+          提交后台生成脚本
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -307,9 +270,16 @@ import {
   updateProblem,
   uploadTestCases,
 } from '@/api/problem'
-import {askLLM, executeAndSubmitTestData} from '@/api/llm'
+import {
+  submitProblemGenerationDraft,
+  submitTestScriptGenerationDraft,
+} from '@/api/llm'
+import {
+  generateProblemDraftSchema,
+  generateTestScriptDraftSchema,
+} from '@/schemas/aiDraft'
 import {ElMessage} from 'element-plus'
-import {Cpu, Delete, Download, Edit, Loading, MagicStick, Plus} from '@element-plus/icons-vue'
+import {Cpu, Delete, Document, Download, Edit, MagicStick, Plus} from '@element-plus/icons-vue'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 
 const router = useRouter()
@@ -333,28 +303,12 @@ const aiForm = ref({
 // AI Test Data State
 const aiTestDataVisible = ref(false)
 const fetchingDetail = ref(false)
-const aiStep = ref(0)
 const scriptGenerating = ref(false)
-const executing = ref(false)
-const generatedScript = ref('')
-const generatedLanguage = ref('python')
-const executionResult = ref(null)
 const testDataForm = ref({
   direction: '',
   count: 10,
   range_info: '',
 })
-
-// Editor Options
-const editorOptions = {
-  automaticLayout: true,
-  minimap: {enabled: true},
-  fontSize: 14,
-  scrollBeyondLastLine: false,
-  roundedSelection: false,
-  readOnly: false,
-  cursorStyle: 'line',
-}
 
 const miniEditorOptions = {
   automaticLayout: true,
@@ -423,51 +377,28 @@ const handleAiCreate = () => {
   aiDialogVisible.value = true
 }
 
+const goToDraftBox = () => {
+  router.push({name: 'ai-draft-box'})
+}
+
 const generateProblem = async () => {
-  if (!aiForm.value.background) {
-    ElMessage.warning('请输入题目背景')
+  const parsed = generateProblemDraftSchema.safeParse({
+    background: aiForm.value.background,
+    difficulty: aiForm.value.difficulty,
+  })
+  if (!parsed.success) {
+    ElMessage.warning(parsed.error.issues[0]?.message || '参数校验失败')
     return
   }
 
   aiGenerating.value = true
   try {
-    const res = await askLLM({
-      system_setting: `你是一个专业的算法竞赛出题人。请根据用户提供的背景 and 难度，设计一道高质量的编程题目。
-      平台支持三种模式：
-      1. ACM 模式：标准 I/O，严格文本比对。
-      2. OOP 模式：实现特定接口/类，运行单元测试。
-      3. Kaggle 模式：提交预测结果 CSV 文件，基于 Metric 评分。
-      请根据题目性质选择最合适的模式。题目内容必须使用 Markdown 格式，包含：题目描述、输入格式、输出格式、样例输入、样例输出、提示/说明。`,
-      prompt: `题目背景: ${aiForm.value.background}\n难度: ${aiForm.value.difficulty}`,
-      output_format: {
-        title: '题目名称',
-        content: 'Markdown 格式的题目内容',
-        template_code: '该题目的初始代码模板（可选）',
-        type: 'acm/oop/kaggle',
-        language: '建议的编程语言 (python/cpp/java/c)',
-        time_limit: 1000,
-        memory_limit: 128,
-      },
-    })
-
-    if (res) {
-      isEdit.value = false
-      resetForm()
-      form.value = {
-        title: res.title,
-        content: res.content,
-        language: res.language || 'python',
-        type: res.type || 'acm',
-        time_limit: res.time_limit || 1000,
-        memory_limit: res.memory_limit || 128,
-        template_code: res.template_code || '',
-      }
-      aiDialogVisible.value = false
-      dialogVisible.value = true
-      ElMessage.success('题目已生成，请预览并确认')
-    }
+    const res = await submitProblemGenerationDraft(parsed.data)
+    aiDialogVisible.value = false
+    ElMessage.success(res.message || '已提交后台生成，请到草稿箱查看')
   } catch (error) {
-    ElMessage.error('AI 生成失败')
+    const msg = error?.response?.data?.error || '提交 AI 出题任务失败'
+    ElMessage.error(msg)
   } finally {
     aiGenerating.value = false
   }
@@ -528,14 +459,10 @@ const handleSubmit = async () => {
   }
 }
 
-// AI Test Data Handlers
+// AI Test Data Handlers（异步：只提交生成脚本任务）
 const handleAiTestData = async (row) => {
   aiTestDataVisible.value = true
   fetchingDetail.value = true
-  aiStep.value = 0
-  generatedScript.value = ''
-  generatedLanguage.value = 'python'
-  executionResult.value = null
   testDataForm.value = {
     direction: '',
     count: 10,
@@ -543,7 +470,6 @@ const handleAiTestData = async (row) => {
   }
 
   try {
-    // Fetch full problem details from /api/problems/id
     currentProblem.value = await getProblemDetail(row.id)
   } catch (error) {
     ElMessage.error('获取题目详情失败')
@@ -554,83 +480,32 @@ const handleAiTestData = async (row) => {
 }
 
 const handleGenerateScript = async () => {
+  if (!currentProblem.value?.id) {
+    ElMessage.warning('题目信息未加载完成')
+    return
+  }
+
+  const parsed = generateTestScriptDraftSchema.safeParse({
+    problem_id: currentProblem.value.id,
+    direction: testDataForm.value.direction || '',
+    count: testDataForm.value.count || 10,
+    range_info: testDataForm.value.range_info || '',
+  })
+  if (!parsed.success) {
+    ElMessage.warning(parsed.error.issues[0]?.message || '参数校验失败')
+    return
+  }
+
   scriptGenerating.value = true
   try {
-    const type = currentProblem.value.type
-    const language = currentProblem.value.language || 'All'
-
-    const modeConfigs = {
-      acm: {
-        role: '测试数据生成专家',
-        task: '编写一个 Python 脚本，用于生成随机的输入数据（.in）和对应的标准答案（.out）。并直接放置在原始文件夹下',
-        rule: `脚本应循环生成${testDataForm.value.count}组测试数据的测试点文件。`,
-      },
-      oop: {
-        role: '自动化测试专家',
-        task: '编写一个单元测试脚本，用于验证学生提交的代码实现。',
-        rule: `【重要】脚本必须包含/导入学生的代码。
-        - 对于 C++: 使用 #include \"solution.cpp\"
-        - 对于 Java: 假设学生类在同包下直接调用，或使用 import Solution;
-        - 对于 Python: 使用 from solution import *
-        严禁在脚本中自行实现题目要求的类，必须测试外部导入的实现。最后一行必须只打印一个 0-100 的整数分数。`,
-      },
-      kaggle: {
-        role: '数据科学竞赛裁判',
-        task: '编写一个评估脚本，用于对比学生的预测结果 and 已有的标准答案。',
-        rule: '【重要】严禁在脚本中生成随机数据 or 创建 truth.csv。脚本应假设当前目录下已存在 truth.csv（老师上传）和 submission.csv（学生上传）。脚本只需读取这两个文件，计算指标（如 Accuracy/MSE），最后一行只打印一个 0-100 的整数分数。',
-      },
-    }
-
-    const config = modeConfigs[type] || modeConfigs.acm
-
-    const systemSetting = `你是一个专业的${config.role}。
-    当前题目类型：${type.toUpperCase()}
-    题目目标语言：${language}
-
-    任务目标：${config.task}
-
-    具体要求：
-    1. 语言：${type === 'oop' ? '使用 ' + language : '使用 Python'}。
-    2. 逻辑：${config.rule}
-    3. 输出控制：你可以打印调试日志，但脚本执行的最后一行输出必须且只能是一个整数（0-100），代表得分。
-    4. 依赖：尽量使用基础库（如 csv, math, json），如果使用 pandas 或 sklearn，请确保逻辑简洁。`
-
-    const res = await askLLM({
-      system_setting: systemSetting,
-      prompt: `题目内容: ${JSON.stringify(currentProblem.value)}\n生成要求: ${testDataForm.value.direction || '执行标准评估逻辑'}\n数据范围/参考: ${testDataForm.value.range_info || '无'}`,
-      output_format: {
-        code: '生成的完整代码字符串',
-        language: '脚本使用的编程语言 (python/java/cpp/c)',
-      },
-    })
-
-    generatedScript.value = res.code || ''
-    generatedLanguage.value = res.language || (currentProblem.value.type === 'oop' ? (currentProblem.value.language || 'java') : 'python')
-    aiStep.value = 1
+    const res = await submitTestScriptGenerationDraft(parsed.data)
+    aiTestDataVisible.value = false
+    ElMessage.success(res.message || '已提交后台生成，请到草稿箱查看')
   } catch (error) {
-    ElMessage.error('生成脚本失败')
+    const msg = error?.response?.data?.error || '提交测例脚本任务失败'
+    ElMessage.error(msg)
   } finally {
     scriptGenerating.value = false
-  }
-}
-
-const handleExecuteScript = async () => {
-  executing.value = true
-  aiStep.value = 2
-  try {
-    const res = await executeAndSubmitTestData({
-      problem_id: currentProblem.value.id,
-      code: generatedScript.value,
-      type: currentProblem.value.type,
-      language: currentProblem.value.language,
-    })
-    executionResult.value = res
-    ElMessage.success('测试数据生成并提交成功')
-  } catch (error) {
-    ElMessage.error('执行失败')
-    aiStep.value = 1 // Go back to script step if failed
-  } finally {
-    executing.value = false
   }
 }
 
@@ -731,17 +606,14 @@ onMounted(() => {
   gap: 10px;
 }
 
+.mb-12 {
+  margin-bottom: 12px;
+}
+
 .test-cases-section {
   margin-top: 20px;
   padding-top: 10px;
   border-top: 1px dashed var(--el-border-color);
-}
-
-.script-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
 }
 
 .editor-container {
@@ -753,26 +625,5 @@ onMounted(() => {
 
 .mini-editor {
   height: 200px;
-}
-
-.script-editor {
-  height: 450px;
-}
-
-.execution-status {
-  padding: 40px 0;
-  text-align: center;
-}
-
-.loading-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-  color: var(--el-text-color-secondary);
-}
-
-.loading-box .el-icon {
-  font-size: 40px;
 }
 </style>

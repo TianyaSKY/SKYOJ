@@ -11,5 +11,6 @@ requests
 urllib3
 PyJWT
 openai
+loguru
 pytest
 httpx

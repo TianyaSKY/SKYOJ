@@ -67,6 +67,12 @@ const router = createRouter({
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
+            path: '/admin/drafts',
+            name: 'ai-draft-box',
+            component: () => import('../views/admin/DraftBoxView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
             path: '/admin/exams',
             name: 'exam-admin',
             component: () => import('../views/admin/ExamAdminView.vue'),

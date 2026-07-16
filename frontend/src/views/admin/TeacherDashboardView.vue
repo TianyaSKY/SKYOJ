@@ -45,6 +45,22 @@
         </div>
       </el-col>
 
+      <!-- AI 草稿箱卡片 -->
+      <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
+        <div class="nav-card" @click="$router.push({ name: 'ai-draft-box' })">
+          <div class="nav-icon" style="color: #409EFF; background-color: #ecf5ff">
+            <el-icon :size="32">
+              <Document/>
+            </el-icon>
+          </div>
+          <h3>AI 草稿箱</h3>
+          <p>查看异步出题与测例生成任务进度，完成后可预览并应用结果。</p>
+          <div class="nav-footer">
+            <span>进入草稿箱 <el-icon><ArrowRight/></el-icon></span>
+          </div>
+        </div>
+      </el-col>
+
       <!-- 系统设置卡片 -->
       <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="openSysSettings">
@@ -134,8 +150,8 @@
             </el-form-item>
             <el-form-item label="公告样式">
               <el-radio-group v-model="sysForm.warning">
-                <el-radio :label="false">普通 (蓝色)</el-radio>
-                <el-radio :label="true">警告 (红色)</el-radio>
+                <el-radio :value="false">普通 (蓝色)</el-radio>
+                <el-radio :value="true">警告 (红色)</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-form>
@@ -194,7 +210,7 @@
 <script setup>
 import {onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
-import {ArrowRight, InfoFilled, Search, Setting, Reading} from '@element-plus/icons-vue'
+import {ArrowRight, Document, InfoFilled, Search, Setting, Reading} from '@element-plus/icons-vue'
 import {getSysInfo, getSysStatistics, rebuildIndex, updateSysInfo} from '@/api/sys'
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
