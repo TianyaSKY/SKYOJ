@@ -9,6 +9,7 @@ from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageC
 from app.clients.submission_storage_client import SubmissionStorageClient
 from app.clients.dataset_storage_client import DatasetStorageClient
 from app.database import get_db
+from app.services.async_job_service import AsyncJobService
 from app.repositories.ai_draft_repository import AiDraftRepository
 from app.repositories.problem_repository import ProblemRepository
 from app.repositories.user_repository import UserRepository
@@ -27,8 +28,6 @@ from app.services.search_facade_service import SearchFacadeService
 from app.services.user_service import UserService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService
-from app.tasks.dataset_file_task import DatasetFileTask
-from app.tasks.queue import get_task_queue
 
 
 def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
@@ -36,7 +35,7 @@ def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
     return AiDraftService(
         draft_repository=AiDraftRepository(db),
         problem_repository=ProblemRepository(db),
-        task_queue=get_task_queue(),
+        job_service=AsyncJobService.from_session(db),
         llm_client=LlmClient(),
     )
 
@@ -75,14 +74,14 @@ def get_dataset_service(db: Session = Depends(get_db)) -> DatasetService:
     return DatasetService(
         dataset_repository=DatasetRepository(db),
         storage_client=storage_client,
-        file_task=DatasetFileTask(storage_client),
+        job_service=AsyncJobService.from_session(db),
     )
 
 
 def get_submission_service(db: Session = Depends(get_db)) -> SubmissionService:
     """构造提交领域服务。"""
     return SubmissionService(
-        SubmissionRepository(db), get_task_queue(), SubmissionStorageClient()
+        SubmissionRepository(db), AsyncJobService.from_session(db), SubmissionStorageClient()
     )
 
 

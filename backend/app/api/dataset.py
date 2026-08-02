@@ -45,13 +45,13 @@ async def upload_dataset(
     auth: AuthContext = Depends(get_current_auth),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    content = await file.read()
+    await file.seek(0)
     dataset = service.upload_dataset(
         UploadDatasetParams(
             requester_role=auth.user.role,
             uploader_id=auth.user.id,
             filename=file.filename or "",
-            content=content,
+            content=file.file,
             name=name,
             description=description,
         )
@@ -114,4 +114,5 @@ def _dataset_to_response(dataset) -> dict:
         "file_size": dataset.file_size,
         "created_at": dataset.created_at.isoformat() if dataset.created_at else None,
         "download_url": f"/api/datasets/{dataset.id}/download",
+        "status": dataset.status,
     }

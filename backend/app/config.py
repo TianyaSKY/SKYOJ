@@ -53,3 +53,16 @@ if not IN_DOCKER:
     DATABASE_URL = DATABASE_URL.replace("@mysql:", "@127.0.0.1:")
 
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
+
+# RabbitMQ/Celery 只传递任务 ID，业务状态和任务参数保存在 MySQL。
+_DEFAULT_CELERY_BROKER_URL = (
+    "amqp://guest:guest@rabbitmq:5672//"
+    if IN_DOCKER
+    else "amqp://guest:guest@127.0.0.1:5672//"
+)
+CELERY_BROKER_URL = (
+    os.getenv("CELERY_BROKER_URL") or _DEFAULT_CELERY_BROKER_URL
+).strip()
+
+# 恢复进程使用普通阻塞循环，不使用 Celery Beat 或后台线程。
+JOB_RECOVERY_INTERVAL_SECONDS = int(os.getenv("JOB_RECOVERY_INTERVAL_SECONDS", "30"))

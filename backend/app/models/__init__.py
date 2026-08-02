@@ -1,4 +1,5 @@
 from app.models.ai_draft import AiDraft
+from app.models.async_job import AsyncJob, AsyncJobOutbox
 from app.models.dataset import Dataset
 from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
@@ -9,6 +10,8 @@ from app.models.user import User
 
 __all__ = [
     "AiDraft",
+    "AsyncJob",
+    "AsyncJobOutbox",
     "Dataset",
     "Exam",
     "ExamProblem",

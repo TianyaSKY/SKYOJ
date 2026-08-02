@@ -1,5 +1,7 @@
 """数据集领域的业务服务。"""
 
+from typing import BinaryIO
+
 from app.clients.dataset_storage_client import DatasetStorageClient
 from app.domain.dataset import (
     CreateDatasetParams,
@@ -11,7 +13,7 @@ from app.domain.dataset import (
 )
 from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
 from app.repositories.dataset_repository import DatasetRepository
-from app.tasks.dataset_file_task import DatasetFileTask
+from app.services.async_job_service import AsyncJobService
 
 
 class DatasetService:
@@ -21,11 +23,11 @@ class DatasetService:
         self,
         dataset_repository: DatasetRepository,
         storage_client: DatasetStorageClient,
-        file_task: DatasetFileTask,
+        job_service: AsyncJobService,
     ) -> None:
         self._dataset_repository = dataset_repository
         self._storage_client = storage_client
-        self._file_task = file_task
+        self._job_service = job_service
 
     def list_datasets(
         self, page: int | None = None, page_size: int | None = None
@@ -39,31 +41,49 @@ class DatasetService:
             total=total or 0, page=page, page_size=page_size, datasets=items
         )
 
-    def create_dataset(self, params: CreateDatasetParams, content: bytes) -> DatasetDetail:
+    def create_dataset(
+        self,
+        params: CreateDatasetParams,
+        content: bytes | BinaryIO,
+    ) -> DatasetDetail:
         """创建数据集记录并提交文件写入任务。"""
-        dataset = self._dataset_repository.create(
-            name=params.name,
-            description=params.description,
-            file_path=params.file_path,
-            file_size=params.file_size,
-            uploader_id=params.uploader_id,
-        )
-        self._file_task.submit_save(content, dataset.file_path, dataset.id)
+        temporary_path = ""
+        try:
+            temporary_path, byte_size = self._storage_client.stage_upload(
+                content,
+                params.file_path,
+            )
+            dataset = self._dataset_repository.create(
+                name=params.name,
+                description=params.description,
+                file_path=params.file_path,
+                file_size=self._format_file_size(byte_size),
+                uploader_id=params.uploader_id,
+                temp_path=temporary_path,
+                status="pending",
+            )
+            self._job_service.enqueue_finalize_dataset(dataset.id)
+        except Exception:
+            if temporary_path:
+                self._storage_client.remove_staged(temporary_path)
+            raise
         return self._to_detail(dataset)
 
     def upload_dataset(self, params: UploadDatasetParams) -> DatasetDetail:
         """校验上传权限、大小和文件路径后创建数据集。"""
         self._require_teacher(params.requester_role)
-        if len(params.content) > 500 * 1024 * 1024:
+        if (
+            isinstance(params.content, bytes)
+            and len(params.content) > DatasetStorageClient.MAX_FILE_SIZE
+        ):
             raise InvalidStateError("数据集文件超过 500MB 限制")
         filename, file_path = self._storage_client.prepare_path(params.filename)
-        file_size = self._format_file_size(len(params.content))
         return self.create_dataset(
             CreateDatasetParams(
                 name=params.name or filename,
                 description=params.description or "",
                 file_path=file_path,
-                file_size=file_size,
+                file_size="",
                 uploader_id=params.uploader_id,
             ),
             params.content,
@@ -78,11 +98,17 @@ class DatasetService:
         self._require_teacher(requester_role)
         dataset = self._require_dataset(dataset_id)
         self._storage_client.delete(dataset.file_path, dataset.id)
+        if getattr(dataset, "temp_path", None):
+            remove_staged = getattr(self._storage_client, "remove_staged", None)
+            if callable(remove_staged):
+                remove_staged(dataset.temp_path)
         self._dataset_repository.delete(dataset)
 
     def dataset_file_exists(self, dataset_id: int) -> DatasetDetail:
         """确认数据集及其文件均存在。"""
         detail = self.get_dataset(dataset_id)
+        if detail.status not in {"ready", ""}:
+            raise InvalidStateError("数据集文件仍在处理中")
         if not self._storage_client.exists(detail.file_path):
             raise ResourceNotFoundError("数据集文件不存在")
         return detail
@@ -123,6 +149,7 @@ class DatasetService:
             uploader=dataset.uploader.username if dataset.uploader else "Unknown",
             file_size=dataset.file_size or "",
             created_at=dataset.created_at,
+            status=getattr(dataset, "status", "ready") or "ready",
             download_url=f"/api/datasets/{dataset.id}/download",
         )
 
@@ -137,4 +164,5 @@ class DatasetService:
             uploader_id=dataset.uploader_id,
             uploader=dataset.uploader.username if dataset.uploader else "Unknown",
             created_at=dataset.created_at,
+            status=getattr(dataset, "status", "ready") or "ready",
         )

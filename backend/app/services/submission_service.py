@@ -13,8 +13,7 @@ from app.domain.submission import (
 )
 from app.repositories.submission_repository import SubmissionRepository
 from app.clients.submission_storage_client import SubmissionStorageClient
-from app.services.judge_service import judge_submission
-from app.tasks.queue import ThreadTaskQueue
+from app.services.async_job_service import AsyncJobService
 
 
 class SubmissionService:
@@ -23,11 +22,11 @@ class SubmissionService:
     def __init__(
         self,
         submission_repository: SubmissionRepository,
-        task_queue: ThreadTaskQueue,
+        job_service: AsyncJobService,
         storage_client: SubmissionStorageClient | None = None,
     ) -> None:
         self._submission_repository = submission_repository
-        self._task_queue = task_queue
+        self._job_service = job_service
         self._storage_client = storage_client or SubmissionStorageClient()
 
     def submit(self, params: SubmitParams) -> SubmitResult:
@@ -47,10 +46,7 @@ class SubmissionService:
         submission = self._submission_repository.create(
             params.user_id, params.problem_id, exam_id, params.language, code
         )
-        self._task_queue.enqueue(
-            judge_submission, submission.id, str(problem.type), code,
-            params.problem_id, params.language,
-        )
+        self._job_service.enqueue_judge_submission(submission.id)
         return SubmitResult(submission_id=submission.id, status="Pending", exam_id=exam_id)
 
     def _resolve_exam_id(self, exam_id: int | None) -> int | None:

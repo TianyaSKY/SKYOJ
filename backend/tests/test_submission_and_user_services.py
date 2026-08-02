@@ -44,14 +44,14 @@ class FakeSubmissionRepository:
         return next((item for item in self.created if item.id == submission_id), None)
 
 
-class FakeQueue:
-    """记录判题任务。"""
+class FakeJobService:
+    """记录数据库异步任务。"""
 
     def __init__(self) -> None:
-        self.calls = []
+        self.submission_ids = []
 
-    def enqueue(self, *args) -> None:
-        self.calls.append(args)
+    def enqueue_judge_submission(self, submission_id: int) -> None:
+        self.submission_ids.append(submission_id)
 
 
 class FakeSubmissionStorage:
@@ -63,8 +63,8 @@ class FakeSubmissionStorage:
 
 def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
     repository = FakeSubmissionRepository()
-    queue = FakeQueue()
-    service = SubmissionService(repository, queue, FakeSubmissionStorage())
+    job_service = FakeJobService()
+    service = SubmissionService(repository, job_service, FakeSubmissionStorage())
 
     result = service.submit(
         SubmitParams(
@@ -82,11 +82,11 @@ def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
     assert result.submission_id == 1
     assert result.exam_id == 5
     assert repository.created[0].code_content.endswith("3_7_answer.csv")
-    assert queue.calls and queue.calls[0][3].endswith("3_7_answer.csv")
+    assert job_service.submission_ids == [result.submission_id]
 
 
 def test_submission_service_rejects_unknown_problem() -> None:
-    service = SubmissionService(FakeSubmissionRepository(), FakeQueue())
+    service = SubmissionService(FakeSubmissionRepository(), FakeJobService())
 
     with pytest.raises(ResourceNotFoundError):
         service.submit(SubmitParams(1, 99, "code", "python"))

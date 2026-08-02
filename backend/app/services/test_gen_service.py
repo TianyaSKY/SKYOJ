@@ -3,6 +3,8 @@ import os
 import shutil
 import tarfile
 
+from loguru import logger
+
 from app.services.judge_service import client, create_tar_stream
 
 # 使用专门的生成沙箱镜像
@@ -72,5 +74,5 @@ def run_test_generation(problem_id, code):
         if container:
             try:
                 container.stop()
-            except:
-                pass
+            except Exception as exc:
+                logger.warning("停止测试数据生成沙箱失败: {}", exc)

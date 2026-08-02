@@ -24,7 +24,7 @@ from app.domain.errors import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
-from app.domain.llm import AskLlmParams, ExecuteTestGenerationParams
+from app.domain.llm import AskLlmParams
 from app.services.ai_draft_service import AiDraftService
 from app.services.llm_facade_service import LlmFacadeService
 from app.utils.auth_tools import AuthContext, get_current_auth
@@ -57,7 +57,7 @@ def _dt_iso(value: Optional[datetime]) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# 兼容：同步接口（历史行为保留，后续可再分层改造）
+# 兼容：同步问答接口与异步测试数据接口
 # ---------------------------------------------------------------------------
 
 
@@ -73,21 +73,31 @@ def call_llm(
         raise _map_business_error(exc) from exc
 
 
-@router.post("/execute-test-generation")
+@router.post("/execute-test-generation", status_code=202)
 def execute_test_generation(
     body: ExecuteTestGenerationBody,
     auth: AuthContext = Depends(get_current_auth),
-    service: LlmFacadeService = Depends(get_llm_facade_service),
+    service: AiDraftService = Depends(get_ai_draft_service),
 ):
+    """兼容旧接口，但将执行请求投递到 Judge Worker。"""
+    _require_teacher(auth)
     try:
-        message = service.execute_test_generation(
-            ExecuteTestGenerationParams(
-                body.problem_id, body.code, body.type, body.language
+        result = service.submit_test_data_execution(
+            SubmitTestDataExecutionParams(
+                user_id=auth.user.id,
+                problem_id=body.problem_id,
+                code=body.code,
+                problem_type=body.type or "acm",
+                language=body.language,
             )
         )
     except BusinessError as exc:
         raise _map_business_error(exc) from exc
-    return {"message": message}
+    return {
+        "message": "测试数据执行任务已提交，请到草稿箱查看进度",
+        "draft_id": result.draft_id,
+        "status": result.status,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 import os
 import re
 
+from loguru import logger
+
 from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream
 
@@ -206,5 +208,5 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python', db=No
         if container:
             try:
                 container.stop()
-            except:
-                pass
+            except Exception as exc:
+                logger.warning("停止 OOP 沙箱失败: {}", exc)

@@ -14,7 +14,7 @@ export function askLLM(data) {
 }
 
 /**
- * 执行生成的脚本/类以生成并提交测试数据（同步，保留兼容）
+ * 执行生成的脚本/类以生成并提交测试数据（兼容接口，后台异步执行）
  * @param {Object} data { problem_id, code, type, language }
  */
 export function executeAndSubmitTestData(data) {

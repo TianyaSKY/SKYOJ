@@ -38,7 +38,7 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 
 ### 3. Enterprise-Grade Architecture
 - **Cloud-Native Architecture**: Orchestrated based on Docker Compose, achieving complete decoupling of Web services, databases, and evaluation sandboxes.
-- **Asynchronous Evaluation Scheduling**: Uses a non-blocking task distribution mechanism. The Web main thread only handles requests, while background daemon thread pools handle time-consuming judging, ensuring system stability under high concurrency.
+- **Asynchronous Evaluation Scheduling**: Uses RabbitMQ and Celery `solo` workers. The API persists jobs and Outbox records, while dedicated single-process workers serially handle judging, AI, and file tasks; scale out by adding worker containers.
 - **Security Sandbox Isolation**:
   - **Network Circuit Breaking**: Containers are configured with `network_mode="none"` to block malicious networking.
   - **Resource Quotas**: Strictly limits CPU, memory, and PID counts based on Linux Cgroups to prevent Fork bombs and resource exhaustion attacks.
@@ -54,6 +54,7 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 | **Backend** | FastAPI (Python) | High-performance ASGI RESTful API, SQLAlchemy ORM |
 | **Gateway** | Nginx | Reverse proxy, load balancing, static resource acceleration |
 | **Database** | MySQL 8.0 | Transaction support, storing user data and submission records |
+| **Messaging** | RabbitMQ + Celery | Reliable task delivery and serial workers |
 | **Containerization** | Docker & Compose | Full-stack containerized deployment, sandbox environment construction |
 | **LLM SDK** | OpenAI / DeepSeek | Smart tutor inference service |
 
@@ -77,6 +78,10 @@ SKYOJ/
 ├── .env.example            # Environment variable template
 └── README.md               # Project documentation
 ```
+
+### Asynchronous task processes
+
+The system keeps only the `judge`, `ai`, and `file` queues. The API stores task parameters in MySQL, and an Outbox Dispatcher publishes task IDs to RabbitMQ. Workers run with `--pool=solo --concurrency=1`; no in-process thread pool is used. The Judge Worker is the only service that mounts the Docker Socket.
 
 ---
 

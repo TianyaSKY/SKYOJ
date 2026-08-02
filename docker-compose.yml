@@ -25,6 +25,24 @@ services:
     networks:
       - skyoj-net
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: skyoj-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    expose:
+      - "5672"
+      - "15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - skyoj-net
+
   backend:
     build:
       context: ./backend
@@ -35,18 +53,159 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_MODEL_NAME: ${LLM_MODEL_NAME:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./backend:/app
-      # 临时保留：当前判题服务直接通过 Docker SDK 创建沙箱容器。
-      # 里程碑 2 将判题迁移至独立 Judge Worker，届时必须从 API 服务移除。
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/uploads:/app/uploads
     depends_on:
       mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - skyoj-net
+
+  outbox-dispatcher:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: skyoj-outbox-dispatcher
+    command:
+      - python
+      - -m
+      - app.workers.outbox_dispatcher
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - skyoj-net
+
+  job-recovery:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: skyoj-job-recovery
+    command:
+      - python
+      - -m
+      - app.workers.job_recovery
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      JOB_RECOVERY_INTERVAL_SECONDS: ${JOB_RECOVERY_INTERVAL_SECONDS:-30}
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - skyoj-net
+
+  judge-worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: skyoj-judge-worker
+    command:
+      - celery
+      - -A
+      - app.messaging.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --queues=judge
+      - --pool=solo
+      - --concurrency=1
+      - --hostname=judge@%h
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - skyoj-net
+
+  ai-worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: skyoj-ai-worker
+    command:
+      - celery
+      - -A
+      - app.messaging.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --queues=ai
+      - --pool=solo
+      - --concurrency=1
+      - --hostname=ai@%h
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - skyoj-net
+
+  file-worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: skyoj-file-worker
+    command:
+      - celery
+      - -A
+      - app.messaging.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --queues=file
+      - --pool=solo
+      - --concurrency=1
+      - --hostname=file@%h
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - skyoj-net

@@ -35,6 +35,8 @@ class DatasetRepository:
         file_path: str,
         file_size: str,
         uploader_id: int,
+        temp_path: Optional[str] = None,
+        status: str = "pending",
     ) -> Dataset:
         """创建并持久化数据集记录。"""
         dataset = Dataset(
@@ -42,6 +44,8 @@ class DatasetRepository:
             description=description,
             file_path=file_path,
             file_size=file_size,
+            temp_path=temp_path,
+            status=status,
             uploader_id=uploader_id,
         )
         self._db.add(dataset)
@@ -53,3 +57,28 @@ class DatasetRepository:
         """删除数据集记录。"""
         self._db.delete(dataset)
         self._db.commit()
+
+    def mark_ready(self, dataset_id: int, *, file_size: str, file_hash: str) -> Optional[Dataset]:
+        """文件落盘后将数据集标记为可用。"""
+        dataset = self.get_by_id(dataset_id)
+        if dataset is None:
+            return None
+        dataset.status = "ready"
+        dataset.file_size = file_size
+        dataset.file_hash = file_hash
+        dataset.temp_path = None
+        dataset.error_message = None
+        self._db.commit()
+        self._db.refresh(dataset)
+        return dataset
+
+    def mark_failed(self, dataset_id: int, error_message: str) -> Optional[Dataset]:
+        """文件处理失败后记录错误。"""
+        dataset = self.get_by_id(dataset_id)
+        if dataset is None:
+            return None
+        dataset.status = "failed"
+        dataset.error_message = error_message[:2000]
+        self._db.commit()
+        self._db.refresh(dataset)
+        return dataset

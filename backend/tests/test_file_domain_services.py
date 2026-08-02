@@ -44,6 +44,12 @@ class FakeDatasetStorage:
     def prepare_path(self, filename: str):
         return filename, f"uploads/datasets/{filename}"
 
+    def stage_upload(self, content, file_path: str):
+        return f"{file_path}.pending", len(content)
+
+    def remove_staged(self, path: str) -> None:
+        pass
+
     def delete(self, path: str, dataset_id: int) -> None:
         self.deleted.append((path, dataset_id))
 
@@ -51,20 +57,20 @@ class FakeDatasetStorage:
         return True
 
 
-class FakeFileTask:
-    """记录异步文件任务参数。"""
+class FakeFileJobService:
+    """记录 File Worker 任务。"""
 
     def __init__(self) -> None:
         self.calls = []
 
-    def submit_save(self, content: bytes, path: str, dataset_id: int) -> None:
-        self.calls.append((content, path, dataset_id))
+    def enqueue_finalize_dataset(self, dataset_id: int) -> None:
+        self.calls.append(dataset_id)
 
 
-def test_dataset_service_checks_role_and_submits_file_task() -> None:
+def test_dataset_service_checks_role_and_submits_file_job() -> None:
     repository = FakeDatasetRepository()
     storage = FakeDatasetStorage()
-    task = FakeFileTask()
+    task = FakeFileJobService()
     service = DatasetService(repository, storage, task)
 
     with pytest.raises(PermissionDeniedError):
@@ -78,7 +84,7 @@ def test_dataset_service_checks_role_and_submits_file_task() -> None:
 
     assert result.name == "sample.csv"
     assert result.file_path == "uploads/datasets/sample.csv"
-    assert task.calls == [(b"a,b\n1,2", result.file_path, result.id)]
+    assert task.calls == [result.id]
 
 
 class FakeProblemRepository:

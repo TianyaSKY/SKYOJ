@@ -12,5 +12,6 @@ urllib3
 PyJWT
 openai
 loguru
+celery
 pytest
 httpx

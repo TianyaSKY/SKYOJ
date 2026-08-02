@@ -5,6 +5,10 @@ from typing import Optional
 from loguru import logger
 
 from app.clients.llm_client import LlmClient
+from app.messaging.task_names import (
+    GENERATE_PROBLEM_TASK,
+    GENERATE_TEST_SCRIPT_TASK,
+)
 from app.domain.ai_draft import (
     STATUS_PENDING,
     STATUS_SUCCESS,
@@ -28,8 +32,7 @@ from app.domain.errors import (
 )
 from app.repositories.ai_draft_repository import AiDraftRepository
 from app.repositories.problem_repository import ProblemRepository
-from app.tasks.ai_draft_worker import process_ai_draft
-from app.tasks.queue import ThreadTaskQueue
+from app.services.async_job_service import AsyncJobService
 
 
 class AiDraftService:
@@ -39,12 +42,12 @@ class AiDraftService:
         self,
         draft_repository: AiDraftRepository,
         problem_repository: ProblemRepository,
-        task_queue: ThreadTaskQueue,
+        job_service: AsyncJobService,
         llm_client: Optional[LlmClient] = None,
     ) -> None:
         self._drafts = draft_repository
         self._problems = problem_repository
-        self._task_queue = task_queue
+        self._job_service = job_service
         self._llm_client = llm_client or LlmClient()
 
     def _ensure_llm_ready(self) -> None:
@@ -76,7 +79,7 @@ class AiDraftService:
             request_payload=request_payload,
             status=STATUS_PENDING,
         )
-        self._task_queue.enqueue(process_ai_draft, draft.id)
+        self._enqueue_draft_job(draft.id, GENERATE_PROBLEM_TASK)
         logger.info(
             "已提交 AI 出题任务 draft_id={} user_id={}",
             draft.id,
@@ -112,7 +115,7 @@ class AiDraftService:
             problem_id=params.problem_id,
             status=STATUS_PENDING,
         )
-        self._task_queue.enqueue(process_ai_draft, draft.id)
+        self._enqueue_draft_job(draft.id, GENERATE_TEST_SCRIPT_TASK)
         logger.info(
             "已提交测例脚本任务 draft_id={} problem_id={}",
             draft.id,
@@ -157,7 +160,7 @@ class AiDraftService:
             problem_id=params.problem_id,
             status=STATUS_PENDING,
         )
-        self._task_queue.enqueue(process_ai_draft, draft.id)
+        self._job_service.enqueue_test_data_execution(draft.id)
         logger.info(
             "已提交测例执行任务 draft_id={} problem_id={}",
             draft.id,
@@ -169,6 +172,10 @@ class AiDraftService:
             task_type=draft.task_type,
             title=draft.title,
         )
+
+    def _enqueue_draft_job(self, draft_id: int, task_name: str) -> None:
+        """创建 AI 任务；生产实现只写入 AsyncJob/Outbox。"""
+        self._job_service.enqueue_ai_draft(draft_id, task_name)
 
     def list_drafts(
         self,

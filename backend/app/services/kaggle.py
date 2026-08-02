@@ -1,5 +1,7 @@
 import os
 
+from loguru import logger
+
 from app.models.problem import Problem
 from app.services.judge_service import client, IMAGE_NAME, create_tar_stream, create_tar_from_path
 
@@ -87,5 +89,5 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
         if container:
             try:
                 container.stop()
-            except:
-                pass
+            except Exception as exc:
+                logger.warning("停止 Kaggle 沙箱失败: {}", exc)

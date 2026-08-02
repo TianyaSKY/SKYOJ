@@ -2,8 +2,8 @@ import io
 import os
 import tarfile
 
-from app.database import SessionLocal
 from app.models.submission import Submission
+from loguru import logger
 
 IMAGE_NAME = "skyoj-runner"
 _client = None
@@ -58,11 +58,13 @@ def create_tar_from_path(local_path, remote_filename):
     return tar_stream
 
 
-def judge_submission(submission_id, problem_type, user_code, problem_id, language):
-    """
-    执行判题逻辑 (后台线程调用，使用独立 DB session)
-    """
-    db = SessionLocal()
+def judge_submission(submission_id: int, db=None) -> None:
+    """读取提交并执行判题；该函数只在 Judge Worker 中调用。"""
+    owns_session = db is None
+    if owns_session:
+        from app.database import SessionLocal
+
+        db = SessionLocal()
     try:
         from app.services.acm import run_acm_judge
         from app.services.oop import run_oop_judge
@@ -70,9 +72,14 @@ def judge_submission(submission_id, problem_type, user_code, problem_id, languag
 
         submission = db.get(Submission, submission_id)
         if not submission:
+            logger.warning("提交记录不存在，跳过判题 submission_id={}", submission_id)
             return
 
         try:
+            problem_type = str(submission.problem.type or "acm").lower()
+            user_code = submission.code_content or ""
+            problem_id = submission.problem_id
+            language = submission.language or "python"
             if problem_type == "acm":
                 status, score, log = run_acm_judge(
                     submission_id, user_code, problem_id, language, db=db
@@ -91,13 +98,15 @@ def judge_submission(submission_id, problem_type, user_code, problem_id, languag
             submission.status = status
             submission.score = score
             submission.output_log = log
-        except Exception as e:
+        except Exception as exc:
             submission.status = "System Error"
-            submission.output_log = f"Judge Error: {str(e)}"
+            submission.output_log = f"Judge Error: {str(exc)}"
+            logger.exception("判题业务执行异常 submission_id={}", submission_id)
 
         db.commit()
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 def save_non_acm_script(problem_id, code, problem_type, language):
@@ -118,5 +127,10 @@ def save_non_acm_script(problem_id, code, problem_type, language):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(code)
         return True, f"Script saved as {filename} for {problem_type} problem."
-    except Exception as e:
-        return False, str(e)
+    except Exception as exc:
+        logger.exception(
+            "保存非 ACM 测试脚本失败 problem_id={} problem_type={}",
+            problem_id,
+            problem_type,
+        )
+        return False, str(exc)

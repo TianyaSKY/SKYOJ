@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import BinaryIO, Optional
 
 
 @dataclass(frozen=True)
@@ -14,6 +14,8 @@ class CreateDatasetParams:
     file_path: str
     file_size: str
     uploader_id: int
+    temp_path: Optional[str] = None
+    status: str = "pending"
 
 
 @dataclass(frozen=True)
@@ -23,7 +25,7 @@ class UploadDatasetParams:
     requester_role: str
     uploader_id: int
     filename: str
-    content: bytes
+    content: bytes | BinaryIO
     name: Optional[str] = None
     description: Optional[str] = None
 
@@ -39,6 +41,7 @@ class DatasetListItem:
     file_size: str
     created_at: Optional[datetime]
     download_url: str
+    status: str = "ready"
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,7 @@ class DatasetDetail:
     uploader_id: int
     uploader: str
     created_at: Optional[datetime]
+    status: str = "ready"
 
 
 @dataclass(frozen=True)

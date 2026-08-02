@@ -38,7 +38,7 @@
 
 ### 3. 企业级系统架构
 - **云原生架构**：基于 Docker Compose 编排，实现 Web 服务、数据库、评测沙箱的完全解耦。
-- **异步评测调度**：采用非阻塞式任务分发机制，Web 主线程仅负责接收请求，由后台守护线程池处理耗时判题，确保高并发下的系统稳定性。
+- **异步评测调度**：采用 RabbitMQ + Celery `solo` Worker，Web API 只保存任务和 Outbox 记录；判题、AI 和文件处理分别由单进程串行 Worker 执行，需要扩容时增加 Worker 容器数量。
 - **安全沙箱隔离**：
   - **网络熔断**：容器配置 `network_mode="none"`，阻断恶意联网。
   - **资源配额**：基于 Linux Cgroups 严格限制 CPU、内存及 PID 数，防止 Fork 炸弹与资源耗尽攻击。
@@ -54,6 +54,7 @@
 | **后端** | FastAPI (Python) | 高性能 ASGI RESTful API，SQLAlchemy ORM |
 | **网关** | Nginx | 反向代理、负载均衡、静态资源加速 |
 | **数据库** | MySQL 8.0 | 事务支持，存储用户数据与提交记录 |
+| **消息队列** | RabbitMQ + Celery | 任务通知、可靠投递与串行 Worker |
 | **容器化** | Docker & Compose | 全栈容器化部署，沙箱环境构建 |
 | **LLM SDK** | OpenAI / DeepSeek | 智能助教推理服务 |
 
@@ -77,6 +78,10 @@ SKYOJ/
 ├── .env.example            # 环境变量模板
 └── README.md               # 项目说明文档
 ```
+
+### 异步任务进程
+
+系统只保留 `judge`、`ai`、`file` 三个队列。API 将任务参数写入 MySQL，Outbox Dispatcher 再向 RabbitMQ 发布任务 ID；Worker 使用 `--pool=solo --concurrency=1`，不在进程内创建线程池。判题 Worker 是唯一挂载 Docker Socket 的服务。
 
 ---
 
