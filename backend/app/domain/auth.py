@@ -1,7 +1,6 @@
 """认证相关业务参数与结果。"""
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -10,7 +9,6 @@ class RegisterParams:
 
     username: str
     password: str
-    role: str = "student"
 
 
 @dataclass(frozen=True)

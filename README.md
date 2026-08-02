@@ -108,6 +108,14 @@ cp .env.example .env
 - `LLM_MODEL_NAME`
 - `LLM_API_KEY`
 
+同时必须把 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 和 `SECRET_KEY` 替换为本地生成的强随机值；`DATABASE_URL` 使用非 root 的 `MYSQL_USER` 账号。仓库不会为这些变量提供可用默认值。
+
+公开注册只创建学生账号。需要教师账号时，在后端容器中执行：
+
+```bash
+docker compose exec backend python scripts/create_teacher.py
+```
+
 ### 第三步：构建沙箱镜像 (关键)
 
 为了保证评测环境的安全性与独立性，需先构建判题 / 测例生成沙箱镜像。
@@ -155,7 +163,7 @@ docker-compose up -d --build
 等待约 30 秒（数据库初始化）后访问：
 
 * **前端页面**：http://localhost
-* **后端 API**：http://localhost:5000/api
+* **后端 API**：http://localhost/api
 * **数据库管理**：(如配置了 phpMyAdmin) http://localhost:8080
 
 ---
@@ -183,4 +191,3 @@ docker-compose up -d --build
 ## 开源协议
 
 本项目采用 [MIT License](https://opensource.org/licenses/MIT) 开源。
-

@@ -114,7 +114,7 @@ const handleRegister = async () => {
         await register({
           username: registerForm.username,
           password: registerForm.password,
-          // Role defaults to 'student' on the backend according to api_manual.md
+          // 公开注册由后端固定创建学生账号。
         })
         ElMessage.success('Registration successful! Please log in.')
         router.push('/login')

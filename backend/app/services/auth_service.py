@@ -38,7 +38,7 @@ class AuthService:
         user = self._user_repository.create(
             username=params.username,
             password_hash=self._password_hasher(params.password),
-            role=params.role,
+            role="student",
         )
         return RegisterResult(user_id=user.id, username=user.username)
 

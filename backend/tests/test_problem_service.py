@@ -89,7 +89,7 @@ def test_problem_service_raises_for_unknown_problem() -> None:
         service.get_problem(999)
 
 
-def test_auth_service_registers_and_logs_in() -> None:
+def test_auth_service_registers_public_student_and_logs_in() -> None:
     repository = FakeUserRepository()
     service = AuthService(
         user_repository=repository,
@@ -98,12 +98,12 @@ def test_auth_service_registers_and_logs_in() -> None:
         token_encoder=lambda user_id, role: f"token:{user_id}:{role}",
     )
 
-    registered = service.register(RegisterParams("teacher", "secret", "teacher"))
-    logged_in = service.login(LoginParams("teacher", "secret"))
+    registered = service.register(RegisterParams("student", "secret"))
+    logged_in = service.login(LoginParams("student", "secret"))
 
-    assert registered.username == "teacher"
-    assert logged_in.token == "token:1:teacher"
-    assert logged_in.user.role == "teacher"
+    assert registered.username == "student"
+    assert logged_in.token == "token:1:student"
+    assert logged_in.user.role == "student"
 
 
 def test_auth_service_rejects_duplicate_and_invalid_credentials() -> None:

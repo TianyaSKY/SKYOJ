@@ -20,9 +20,10 @@ def encode_auth_token(user_id, role, exam_id=-1):
     :param exam_id: 正在进行的考试ID，-1表示不在考试中
     """
     try:
+        now = datetime.datetime.now(datetime.UTC)
         payload = {
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1),
-            "iat": datetime.datetime.utcnow(),
+            "exp": now + datetime.timedelta(days=1),
+            "iat": now,
             "sub": str(user_id),
             "role": role,
             "exam_id": exam_id,
@@ -87,8 +88,8 @@ def get_current_auth(
     except jwt.InvalidTokenError as exc:
         logger.warning("认证令牌无效，原因：{}", exc)
         raise HTTPException(
-            status_code=401, detail={"message": f"Invalid token: {str(e)}"}
-        )
+            status_code=401, detail={"message": "Invalid token"}
+        ) from exc
     except Exception:
         logger.exception("认证过程发生未处理异常")
         raise HTTPException(

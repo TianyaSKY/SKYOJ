@@ -4,7 +4,7 @@
 
 ## 1. 基础信息
 
-- **Base URL**: `http://<host>:<port>/api` (开发环境下通常为 `http://localhost:5000/api`)
+- **Base URL**: `http://<host>/api` (通过 Docker Compose 默认从 Nginx 的 80 端口访问)
 - **Content-Type**: `application/json` (文件上传接口除外)
 - **认证方式**: 使用 JWT (JSON Web Token)。除登录/注册外，大部分接口需要在 Header 中携带：
   `Authorization: Bearer <your_token>`
@@ -18,7 +18,8 @@
 - **URL**: `/auth/register`
 - **Method**: `POST`
 - **Auth Required**: No
-- **Request Body**: `{"username": "test", "password": "...", "role": "student"}`
+- **Request Body**: `{"username": "test", "password": "..."}`
+- **说明**：公开注册始终创建学生账号；请求中携带 `role` 等额外字段会被拒绝。教师账号只能通过后端命令行脚本创建。
 
 ### 2.2 用户登录
 

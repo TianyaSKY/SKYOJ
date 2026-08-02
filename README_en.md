@@ -108,6 +108,14 @@ Please configure at least these LLM variables (for AI tutor and test-data genera
 - `LLM_MODEL_NAME`
 - `LLM_API_KEY`
 
+You must also replace `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, and `SECRET_KEY` with strong locally generated values, and keep `DATABASE_URL` pointed at the non-root `MYSQL_USER` account. The repository does not provide usable defaults for these values.
+
+Public registration creates student accounts only. Create a teacher account interactively inside the backend container:
+
+```bash
+docker compose exec backend python scripts/create_teacher.py
+```
+
 ### Step 3: Build Sandbox Images (Critical)
 
 To ensure the security and independence of the evaluation environment, build the judging and test-data generation sandbox images first.
@@ -154,7 +162,7 @@ docker-compose up -d --build
 Wait about 30 seconds (database initialization) and then access:
 
 * **Frontend Page**: http://localhost
-* **Backend API**: http://localhost:5000/api
+* **Backend API**: http://localhost/api
 * **Database Management**: (if phpMyAdmin is configured) http://localhost:8080
 
 ---
@@ -182,4 +190,3 @@ This project is a result of an undergraduate course project at the **School of I
 ## License
 
 This project is open-sourced under the [MIT License](https://opensource.org/licenses/MIT).
-

@@ -7,6 +7,10 @@ env/
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+*.sql
+backups/
 backend/uploads/problems/*
 !backend/uploads/problems/.gitkeep
 backend/uploads/submissions/*
@@ -21,4 +25,3 @@ mcps/
 backend/test_*.db
 backend/*.db
 *.db-journal
-

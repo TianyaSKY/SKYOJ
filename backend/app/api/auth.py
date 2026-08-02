@@ -17,7 +17,6 @@ def register(
         RegisterParams(
             username=body.username,
             password=body.password,
-            role=body.role,
         )
     )
     return {"message": "User registered successfully"}
