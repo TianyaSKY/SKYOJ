@@ -1,7 +1,6 @@
 from app.models.ai_draft import AiDraft
 from app.models.dataset import Dataset
 from app.models.exam import Exam, ExamProblem
-from app.models.plagiarism import PlagiarismLog
 from app.models.problem import Problem
 from app.models.search_history import SearchHistory
 from app.models.submission import Submission
@@ -13,7 +12,6 @@ __all__ = [
     "Dataset",
     "Exam",
     "ExamProblem",
-    "PlagiarismLog",
     "Problem",
     "SearchHistory",
     "Submission",

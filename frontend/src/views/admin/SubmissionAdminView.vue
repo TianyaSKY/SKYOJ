@@ -45,25 +45,12 @@
     </el-card>
 
     <el-card shadow="never">
-      <div class="table-actions mb-4">
-        <el-button
-          v-if="ENABLE_PLAGIARISM"
-          type="success"
-          :disabled="!selectedSubmissions.length"
-          @click="handleBatchPlagiarism"
-        >
-          对选中提交进行查重 ({{ selectedSubmissions.length }})
-        </el-button>
-      </div>
-
       <el-table
         v-loading="loading"
         :data="submissions"
         stripe
         style="width: 100%"
-        @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
         <el-table-column prop="id" label="ID" width="80" align="center"/>
         <el-table-column label="用户" min-width="150">
           <template #default="scope">
@@ -105,7 +92,6 @@
         <el-table-column label="操作" fixed="right" width="120" align="center">
           <template #default="scope">
             <el-button link type="primary" @click="viewDetail(scope.row.id)">详情</el-button>
-            <el-button v-if="ENABLE_PLAGIARISM" link type="warning" @click="checkPlagiarism(scope.row.id)">查重</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -129,15 +115,12 @@
 import { onMounted, ref, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSubmissions } from '@/api/submission'
-import { checkPlagiarismBatch } from '@/api/plagiarism'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
-import { ENABLE_PLAGIARISM } from '@/utils/featureFlags'
 
 const router = useRouter()
 const loading = ref(false)
 const submissions = ref([])
-const selectedSubmissions = ref([])
 
 const STORAGE_KEY = 'skyoj_submission_filter'
 
@@ -218,55 +201,8 @@ const handleCurrentChange = (val) => {
   fetchSubmissions()
 }
 
-const handleSelectionChange = (val) => {
-  selectedSubmissions.value = val
-}
-
 const viewDetail = (id) => {
   router.push({ name: 'submission-detail', params: { id } })
-}
-
-const checkPlagiarism = async (id) => {
-  try {
-    await ElMessageBox.confirm('确定要对该提交进行查重吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
-
-    await checkPlagiarismBatch({ submission_ids: [id] })
-    ElMessage.success('查重任务已提交')
-    router.push({ name: 'plagiarism-admin' })
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('提交查重任务失败')
-    }
-  }
-}
-
-const handleBatchPlagiarism = async () => {
-  if (!selectedSubmissions.value.length) return
-
-  try {
-    await ElMessageBox.confirm(
-      `确定要对选中的 ${selectedSubmissions.value.length} 条提交进行查重吗？`,
-      '批量查重',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    const ids = selectedSubmissions.value.map(s => s.id)
-    await checkPlagiarismBatch({ submission_ids: ids })
-    ElMessage.success('批量查重任务已提交')
-    router.push({ name: 'plagiarism-admin' })
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('提交查重任务失败')
-    }
-  }
 }
 
 const getStatusType = (status) => {

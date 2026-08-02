@@ -19,7 +19,7 @@
 
 **SKYOJ** is a modern Online Judge system designed for university computer science education and data science competitions.
 
-Unlike traditional OJs that only support ACM mode, SKYOJ adopts a **Vue3 + FastAPI + Docker** microservice architecture and innovatively introduces **OOP Unit Testing** and **Kaggle Data Science** evaluation modes. The system deeply integrates **LLM (Large Language Models)** and **Deep Learning Vector Models**, achieving a comprehensive intelligent assistant from "code plagiarism detection" to "smart tutoring."
+Unlike traditional OJs that only support ACM mode, SKYOJ adopts a **Vue3 + FastAPI + Docker** microservice architecture and innovatively introduces **OOP Unit Testing** and **Kaggle Data Science** evaluation modes. The system deeply integrates **LLM (Large Language Models)** to provide smart tutoring capabilities.
 
 ---
 
@@ -35,10 +35,6 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 - **Smart Tutor**:
   - Integrated **DeepSeek/OpenAI** interfaces.
   - Employs **CoT (Chain of Thought)** and **Role-Playing** prompt engineering to guide students in analyzing logical flaws rather than providing direct answers.
-- **Semantic Plagiarism Detection**:
-  - Abandons traditional text edit distance algorithms.
-  - Built-in fine-tuned **Sentence-Transformers (UnixCoder)** model.
-  - Converts code into high-dimensional semantic vectors to effectively identify "variable renaming," "statement reordering," and other obfuscation techniques, with a similarity recognition accuracy > 0.85.
 
 ### 3. Enterprise-Grade Architecture
 - **Cloud-Native Architecture**: Orchestrated based on Docker Compose, achieving complete decoupling of Web services, databases, and evaluation sandboxes.
@@ -59,7 +55,6 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 | **Gateway** | Nginx | Reverse proxy, load balancing, static resource acceleration |
 | **Database** | MySQL 8.0 | Transaction support, storing user data and submission records |
 | **Containerization** | Docker & Compose | Full-stack containerized deployment, sandbox environment construction |
-| **AI Model** | Sentence-Transformers | Semantic vector calculation for plagiarism detection |
 | **LLM SDK** | OpenAI / DeepSeek | Smart tutor inference service |
 
 ---
@@ -173,9 +168,7 @@ Wait about 30 seconds (database initialization) and then access:
 ![homepage-landing.png](images/homepage-landing.png)
 ![public-datasets.png](images/public-datasets.png)
 ![problem-list.png](images/problem-list.png)
-![plagiarism-log-list.png](images/plagiarism-log-list.png)
 ![teacher-dashboard.png](images/teacher-dashboard.png)
-![plagiarism-code-compare.png](images/plagiarism-code-compare.png)
 ![submission-result.png](images/submission-result.png)
 ![admin-problem-management.png](images/admin-problem-management.png)
 

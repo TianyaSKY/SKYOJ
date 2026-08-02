@@ -29,22 +29,6 @@
 
     <h3 class="section-title">核心管理</h3>
     <el-row :gutter="20" class="dashboard-cards">
-      <!-- 查重管理卡片 -->
-      <el-col v-if="ENABLE_PLAGIARISM" :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
-        <div class="nav-card" @click="$router.push({ name: 'plagiarism-admin' })">
-          <div class="nav-icon" style="color: #E6A23C; background-color: #fdf6ec">
-            <el-icon :size="32">
-              <Search/>
-            </el-icon>
-          </div>
-          <h3>查重管理</h3>
-          <p>查看代码查重日志，管理相似度报告及批量查重任务。</p>
-          <div class="nav-footer">
-            <span>进入管理 <el-icon><ArrowRight/></el-icon></span>
-          </div>
-        </div>
-      </el-col>
-
       <!-- AI 草稿箱卡片 -->
       <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'ai-draft-box' })">
@@ -86,7 +70,7 @@
             </el-icon>
           </div>
           <h3>教师手册</h3>
-          <p>查看平台使用指南，了解如何高效管理题目、考试与查重。</p>
+          <p>查看平台使用指南，了解如何高效管理题目、考试与提交记录。</p>
           <div class="nav-footer">
             <span>立即查看 <el-icon><ArrowRight/></el-icon></span>
           </div>
@@ -179,22 +163,6 @@
           </el-descriptions>
         </el-tab-pane>
 
-        <el-tab-pane label="高级维护">
-          <el-alert :closable="false" class="mb-4" show-icon
-                    title="危险操作区，请谨慎操作。" type="warning"/>
-          <div class="maintenance-actions">
-            <div v-if="ENABLE_SEMANTIC_SEARCH" class="action-item">
-              <div class="action-info">
-                <h4>重建搜索索引</h4>
-                <p>当语义搜索结果不准确或新增题目未被索引时使用。</p>
-              </div>
-              <el-button :loading="rebuildLoading" type="warning" @click="handleRebuildIndex">
-                立即重建
-              </el-button>
-            </div>
-            <el-empty v-else description="语义搜索功能已临时关闭" />
-          </div>
-        </el-tab-pane>
       </el-tabs>
 
       <template #footer>
@@ -210,18 +178,16 @@
 <script setup>
 import {onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
-import {ArrowRight, Document, InfoFilled, Search, Setting, Reading} from '@element-plus/icons-vue'
-import {getSysInfo, getSysStatistics, rebuildIndex, updateSysInfo} from '@/api/sys'
+import {ArrowRight, Document, InfoFilled, Setting, Reading} from '@element-plus/icons-vue'
+import {getSysInfo, getSysStatistics, updateSysInfo} from '@/api/sys'
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
-import {ElMessage, ElMessageBox} from 'element-plus'
-import {ENABLE_PLAGIARISM, ENABLE_SEMANTIC_SEARCH} from '@/utils/featureFlags'
+import {ElMessage} from 'element-plus'
 
 const router = useRouter()
 const sysStore = useSysStore()
 const sysDialogVisible = ref(false)
 const sysSubmitting = ref(false)
-const rebuildLoading = ref(false)
 const sysForm = ref({
   title: '',
   info: '',
@@ -329,29 +295,6 @@ const handleSaveSysSettings = async () => {
     ElMessage.error('更新失败')
   } finally {
     sysSubmitting.value = false
-  }
-}
-
-const handleRebuildIndex = async () => {
-  try {
-    await ElMessageBox.confirm(
-        '重建索引可能需要一些时间，期间搜索功能可能受影响。是否继续？',
-        '确认重建索引',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning',
-        }
-    )
-    rebuildLoading.value = true
-    await rebuildIndex()
-    ElMessage.success('索引重建任务已提交')
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('重建索引失败')
-    }
-  } finally {
-    rebuildLoading.value = false
   }
 }
 
@@ -545,31 +488,4 @@ onMounted(() => {
   padding-top: 10px;
 }
 
-.maintenance-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.action-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #ebeef5;
-}
-
-.action-info h4 {
-  margin: 0 0 4px;
-  font-size: 1rem;
-  color: #303133;
-}
-
-.action-info p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #909399;
-}
 </style>

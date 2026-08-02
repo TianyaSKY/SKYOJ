@@ -132,11 +132,6 @@ class ExamService:
             rows.append(ExamScoreRow(user.id, user.username, scores, sum(scores)))
         return detail, rows
 
-    def final_submission_ids(self, requester_role: str, exam_id: int) -> list[int]:
-        self._require_teacher(requester_role)
-        self._require_exam(exam_id)
-        return self._repository.list_final_submission_ids(exam_id)
-
     def _to_list_item(self, exam) -> ExamListItem:
         return ExamListItem(exam.id, exam.title, exam.description or "", exam.start_time, exam.end_time, exam.is_visible, exam.created_by, self._repository.count_problems(exam.id), self._repository.count_submissions(exam.id), bool(exam.password))
 

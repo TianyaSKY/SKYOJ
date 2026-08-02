@@ -45,8 +45,6 @@ services:
       # 里程碑 2 将判题迁移至独立 Judge Worker，届时必须从 API 服务移除。
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/uploads:/app/uploads
-      - ./skyoj_plagiarism_model:/skyoj_plagiarism_model
-      - ./skyoj_searching_model:/skyoj_searching_model
     depends_on:
       mysql:
         condition: service_healthy

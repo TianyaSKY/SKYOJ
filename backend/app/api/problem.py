@@ -3,13 +3,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_plagiarism_service, get_problem_service, get_submission_service
+from app.api.deps import get_problem_service
 from app.api.schemas.problem import CreateProblemBody, UpdateProblemBody
 from app.domain.problem import CreateProblemParams, PaginatedProblems, UpdateProblemParams, UploadTestCasesParams
 from app.services.problem_service import ProblemService
-from app.services.plagiarism_facade_service import PlagiarismFacadeService
-from app.services.submission_service import SubmissionService
-from app.domain.plagiarism import BatchCheckParams
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
@@ -167,25 +164,3 @@ def download_test_cases(
             "Content-Disposition": f'attachment; filename="problem_{problem_id}_test_cases.zip"'
         },
     )
-
-
-@router.post("/{problem_id}/check_plagiarism", status_code=202)
-def check_problem_plagiarism(
-    problem_id: int,
-    auth: AuthContext = Depends(get_current_auth),
-    submission_service: SubmissionService = Depends(get_submission_service),
-    plagiarism_service: PlagiarismFacadeService = Depends(get_plagiarism_service),
-):
-    submission_ids = submission_service.submission_ids_for_problem(
-        problem_id, auth.user.role
-    )
-    if not submission_ids:
-        return {"message": "No submissions found for this problem"}
-    plagiarism_service.start_batch_check(
-        auth.user.role, BatchCheckParams(submission_ids)
-    )
-
-    return {
-        "message": f"Plagiarism check started for {len(submission_ids)} submissions.",
-        "count": len(submission_ids),
-    }

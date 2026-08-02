@@ -44,14 +44,6 @@
               <el-switch v-model="autoRefresh" @change="handleAutoRefreshChange" />
             </div>
             <el-button :icon="Refresh" :loading="loading" circle @click="fetchMonitorData"/>
-            <el-button
-              v-if="ENABLE_PLAGIARISM"
-              type="warning"
-              :loading="plagiarismLoading"
-              @click="handleCheckExamPlagiarism"
-            >
-              全场查重
-            </el-button>
           </div>
         </template>
       </el-page-header>
@@ -179,16 +171,6 @@
         <div class="detail-section">
           <div class="section-header">
             <h4>基本信息</h4>
-            <el-button
-              v-if="ENABLE_PLAGIARISM"
-              :loading="singlePlagiarismLoading"
-              size="small"
-              type="warning"
-              plain
-              @click="handleCheckSinglePlagiarism"
-            >
-              单次查重
-            </el-button>
           </div>
           <el-descriptions :column="1" border>
             <el-descriptions-item label="状态">
@@ -262,8 +244,6 @@
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {
-  checkExamPlagiarism,
-  checkSubmissionPlagiarism,
   getExamMonitor,
   getExamRank,
   getSubmissionDetail
@@ -280,11 +260,10 @@ import {
   User,
   View
 } from '@element-plus/icons-vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {ElMessage} from 'element-plus'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/vs2015.css'
 import dayjs from 'dayjs'
-import {ENABLE_PLAGIARISM} from '@/utils/featureFlags'
 
 const route = useRoute()
 const examId = route.params.id
@@ -301,10 +280,6 @@ const codeDialogVisible = ref(false)
 const detailLoading = ref(false)
 const currentSubmission = ref(null)
 const currentProblem = ref(null)
-
-// Plagiarism State
-const plagiarismLoading = ref(false)
-const singlePlagiarismLoading = ref(false)
 
 // AI Analysis State
 const aiLoading = ref(false)
@@ -493,27 +468,6 @@ const analyzeCode = async () => {
   } finally {
     aiLoading.value = false
   }
-}
-
-const handleCheckExamPlagiarism = async () => {
-  try {
-    await ElMessageBox.confirm('确定要对整场考试进行查重吗？', '全场查重确认', { type: 'warning' })
-    plagiarismLoading.value = true
-    await checkExamPlagiarism(examId)
-    ElMessage.success('查重任务已提交')
-  } catch (error) {
-    if (error !== 'cancel') ElMessage.error('查重失败')
-  } finally { plagiarismLoading.value = false }
-}
-
-const handleCheckSinglePlagiarism = async () => {
-  if (!currentSubmission.value?.id) return
-  try {
-    singlePlagiarismLoading.value = true
-    await checkSubmissionPlagiarism(currentSubmission.value.id)
-    ElMessage.success('单次查重任务已提交')
-  } catch (error) { ElMessage.error('查重失败') }
-  finally { singlePlagiarismLoading.value = false }
 }
 
 const getAiTagType = (rating) => {

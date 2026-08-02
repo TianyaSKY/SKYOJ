@@ -45,10 +45,6 @@ class SubmissionRepository:
         """查询单条提交记录。"""
         return self._db.get(Submission, submission_id)
 
-    def list_ids_for_problem(self, problem_id: int) -> list[int]:
-        """查询题目的全部提交 ID。"""
-        return [item[0] for item in self._db.query(Submission.id).filter_by(problem_id=problem_id).all()]
-
     def list(
         self,
         problem_id: int | None,

@@ -42,12 +42,6 @@ class Submission(Base):
     user = relationship("User", back_populates="submissions")
     problem = relationship("Problem", back_populates="submissions")
     exam = relationship("Exam", back_populates="submissions")
-    plagiarism_log = relationship(
-        "PlagiarismLog",
-        foreign_keys="PlagiarismLog.submission_id",
-        back_populates="submission",
-        uselist=False,
-    )
 
     def __repr__(self):
         return f"<Submission {self.id} by User {self.user_id}>"

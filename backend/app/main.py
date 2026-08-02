@@ -1,4 +1,3 @@
-import threading
 import time
 
 from fastapi import FastAPI, HTTPException, Request
@@ -11,7 +10,6 @@ from app.api import (
     dataset,
     exam,
     llm,
-    plagiarism,
     problem,
     search,
     submission,
@@ -27,7 +25,6 @@ from app.domain.errors import (
     ResourceNotFoundError,
 )
 from app.models.sysdict import SysDict
-from app.utils.feature_flags import ENABLE_PLAGIARISM, ENABLE_SEMANTIC_SEARCH
 from app.utils.sys_dict import sys_dict_kv
 
 
@@ -66,31 +63,6 @@ def init_db():
             )
             time.sleep(3)
     logger.error("数据库多次连接失败，应用将以降级状态继续启动")
-
-
-def init_services():
-    """初始化搜索索引和查重模型"""
-    if not (ENABLE_PLAGIARISM or ENABLE_SEMANTIC_SEARCH):
-        logger.info(
-            "搜索和查重服务已由功能开关禁用，跳过初始化"
-        )
-        return
-
-    logger.info("开始初始化搜索索引与查重模型")
-    try:
-        if ENABLE_PLAGIARISM:
-            from app.services.plagiarism_service import plagiarism_service
-
-            plagiarism_service._ensure_model_loaded()
-
-        if ENABLE_SEMANTIC_SEARCH:
-            from app.services.search_service import search_service
-
-            search_service.rebuild_index()
-
-        logger.success("搜索索引与查重模型初始化完成")
-    except Exception:
-        logger.exception("搜索索引或查重模型初始化失败")
 
 
 def create_app() -> FastAPI:
@@ -152,14 +124,10 @@ def create_app() -> FastAPI:
     application.include_router(exam.router, prefix="/api/exams", tags=["exams"])
     application.include_router(llm.router, prefix="/api/llm", tags=["llm"])
     application.include_router(search.router, prefix="/api/search", tags=["search"])
-    application.include_router(
-        plagiarism.router, prefix="/api/plagiarism", tags=["plagiarism"]
-    )
 
     @application.on_event("startup")
     def on_startup():
         init_db()
-        threading.Thread(target=init_services, daemon=True).start()
 
     return application
 

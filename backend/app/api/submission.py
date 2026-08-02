@@ -2,11 +2,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
-from app.api.deps import get_plagiarism_service, get_submission_service
+from app.api.deps import get_submission_service
 from app.api.schemas.submission import SubmitCodeBody
-from app.domain.plagiarism import BatchCheckParams
 from app.domain.submission import SubmissionQuery, SubmitParams
-from app.services.plagiarism_facade_service import PlagiarismFacadeService
 from app.services.submission_service import SubmissionService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
@@ -132,21 +130,4 @@ def get_submission(
         "language": submission.language,
         "exam_id": submission.exam_id,
         "created_at": submission.created_at.isoformat(),
-    }
-
-
-@router.post("/{submission_id}/check_plagiarism", status_code=202)
-def check_single_submission_plagiarism(
-    submission_id: int,
-    auth: AuthContext = Depends(get_current_auth),
-    service: SubmissionService = Depends(get_submission_service),
-    plagiarism_service: PlagiarismFacadeService = Depends(get_plagiarism_service),
-):
-    submission_id = service.require_submission_for_plagiarism(submission_id, auth.user.role)
-    plagiarism_service.start_batch_check(
-        auth.user.role, BatchCheckParams([submission_id])
-    )
-
-    return {
-        "message": f"Plagiarism check started for submission #{submission_id}."
     }

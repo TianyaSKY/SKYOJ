@@ -7,12 +7,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_exam_service, get_plagiarism_service
+from app.api.deps import get_exam_service
 from app.api.schemas.exam import AddProblemToExamBody, CreateExamBody, EnterExamBody, UpdateExamBody
 from app.domain.exam import AddExamProblemParams, CreateExamParams, EnterExamParams, UpdateExamParams
-from app.domain.plagiarism import BatchCheckParams
 from app.services.exam_service import ExamService
-from app.services.plagiarism_facade_service import PlagiarismFacadeService
 from app.utils.auth_tools import AuthContext, encode_auth_token, get_current_auth
 
 router = APIRouter()
@@ -89,15 +87,6 @@ def add_problem_to_exam(exam_id: int, body: AddProblemToExamBody, auth: AuthCont
 def remove_problem_from_exam(exam_id: int, problem_id: int, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
     service.remove_problem(auth.user.role, exam_id, problem_id)
     return {"message": "Problem removed from exam"}
-
-
-@router.post("/{exam_id}/check_plagiarism", status_code=202)
-def check_exam_plagiarism(exam_id: int, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service), plagiarism_service: PlagiarismFacadeService = Depends(get_plagiarism_service)):
-    submission_ids = service.final_submission_ids(auth.user.role, exam_id)
-    if not submission_ids:
-        return {"message": "No submissions found for this exam"}
-    plagiarism_service.start_batch_check(auth.user.role, BatchCheckParams(submission_ids))
-    return {"message": f"Plagiarism check started for {len(submission_ids)} final submissions in exam #{exam_id}.", "count": len(submission_ids)}
 
 
 @router.get("/{exam_id}/export_scores")

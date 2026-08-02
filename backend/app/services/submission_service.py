@@ -87,26 +87,6 @@ class SubmissionService:
             created_at=submission.created_at,
         )
 
-    def require_submission_for_plagiarism(
-        self, submission_id: int, requester_role: str
-    ) -> int:
-        """校验教师权限及提交记录存在，返回可检测的提交 ID。"""
-        if requester_role != "teacher":
-            raise PermissionDeniedError("没有教师权限")
-        if self._submission_repository.get_by_id(submission_id) is None:
-            raise ResourceNotFoundError("提交记录不存在")
-        return submission_id
-
-    def submission_ids_for_problem(
-        self, problem_id: int, requester_role: str
-    ) -> list[int]:
-        """供教师发起题目级查重时获取提交 ID。"""
-        if requester_role != "teacher":
-            raise PermissionDeniedError("没有教师权限")
-        if self._submission_repository.get_problem(problem_id) is None:
-            raise ResourceNotFoundError("题目不存在")
-        return self._submission_repository.list_ids_for_problem(problem_id)
-
     @staticmethod
     def _to_list_item(submission) -> SubmissionListItem:
         return SubmissionListItem(

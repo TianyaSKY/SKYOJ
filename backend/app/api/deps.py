@@ -17,7 +17,6 @@ from app.repositories.submission_repository import SubmissionRepository
 from app.repositories.system_repository import SystemRepository
 from app.repositories.search_repository import SearchRepository
 from app.repositories.exam_repository import ExamRepository
-from app.repositories.plagiarism_repository import PlagiarismRepository
 from app.services.ai_draft_service import AiDraftService
 from app.services.auth_service import AuthService
 from app.services.problem_service import ProblemService
@@ -27,7 +26,6 @@ from app.services.system_service import SystemService
 from app.services.search_facade_service import SearchFacadeService
 from app.services.user_service import UserService
 from app.services.exam_service import ExamService
-from app.services.plagiarism_facade_service import PlagiarismFacadeService
 from app.services.llm_facade_service import LlmFacadeService
 from app.tasks.dataset_file_task import DatasetFileTask
 from app.tasks.queue import get_task_queue
@@ -66,17 +64,6 @@ def get_exam_service(db: Session = Depends(get_db)) -> ExamService:
     return ExamService(ExamRepository(db))
 
 
-def get_plagiarism_service(
-    db: Session = Depends(get_db),
-) -> PlagiarismFacadeService:
-    """构造剽窃检测领域服务。"""
-    from app.services.plagiarism_service import plagiarism_service
-    from app.utils.feature_flags import ENABLE_PLAGIARISM
-    return PlagiarismFacadeService(
-        PlagiarismRepository(db), plagiarism_service, ENABLE_PLAGIARISM
-    )
-
-
 def get_llm_facade_service() -> LlmFacadeService:
     """构造同步 LLM 功能服务。"""
     return LlmFacadeService(LlmClient())
@@ -106,5 +93,4 @@ def get_system_service(db: Session = Depends(get_db)) -> SystemService:
 
 def get_search_service(db: Session = Depends(get_db)) -> SearchFacadeService:
     """构造搜索服务。"""
-    from app.services.search_service import search_service
-    return SearchFacadeService(SearchRepository(db), search_service)
+    return SearchFacadeService(SearchRepository(db))

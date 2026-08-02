@@ -19,7 +19,7 @@
 
 **SKYOJ** 是一个专为高校计算机教学与数据科学竞赛设计的现代化在线判题系统（Online Judge）。
 
-不同于传统仅支持 ACM 模式的 OJ，SKYOJ 采用 **Vue3 + FastAPI + Docker** 微服务架构，创新性地引入了 **OOP 单元测试**与 **Kaggle 数据科学**评测模式。系统深度集成了 **LLM（大语言模型）** 与 **深度学习向量模型**，实现了从“代码查重”到“智能助教”的全方位智能化辅助。
+不同于传统仅支持 ACM 模式的 OJ，SKYOJ 采用 **Vue3 + FastAPI + Docker** 微服务架构，创新性地引入了 **OOP 单元测试**与 **Kaggle 数据科学**评测模式。系统深度集成 **LLM（大语言模型）**，提供智能助教能力。
 
 ---
 
@@ -35,10 +35,6 @@
 - **AI 助教 (Smart Tutor)**：
   - 集成 **DeepSeek/OpenAI** 接口。
   - 采用 **CoT (思维链)** 与 **角色扮演** 提示词工程，引导学生分析逻辑漏洞，而非直接提供答案。
-- **语义代码查重 (Semantic Plagiarism Detection)**：
-  - 摒弃传统的文本编辑距离算法。
-  - 内置微调过的 **Sentence-Transformers (UnixCoder)** 模型。
-  - 将代码转换为高维语义向量，有效识别“变量重命名”、“语句乱序”等洗稿行为，相似度识别准确率 > 0.85。
 
 ### 3. 企业级系统架构
 - **云原生架构**：基于 Docker Compose 编排，实现 Web 服务、数据库、评测沙箱的完全解耦。
@@ -59,7 +55,6 @@
 | **网关** | Nginx | 反向代理、负载均衡、静态资源加速 |
 | **数据库** | MySQL 8.0 | 事务支持，存储用户数据与提交记录 |
 | **容器化** | Docker & Compose | 全栈容器化部署，沙箱环境构建 |
-| **AI 模型** | Sentence-Transformers | 语义向量计算，用于查重 |
 | **LLM SDK** | OpenAI / DeepSeek | 智能助教推理服务 |
 
 ---
@@ -174,9 +169,7 @@ docker-compose up -d --build
 ![homepage-landing.png](images/homepage-landing.png)
 ![public-datasets.png](images/public-datasets.png)
 ![problem-list.png](images/problem-list.png)
-![plagiarism-log-list.png](images/plagiarism-log-list.png)
 ![teacher-dashboard.png](images/teacher-dashboard.png)
-![plagiarism-code-compare.png](images/plagiarism-code-compare.png)
 ![submission-result.png](images/submission-result.png)
 ![admin-problem-management.png](images/admin-problem-management.png)
 

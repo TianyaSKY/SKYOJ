@@ -42,23 +42,6 @@
       </div>
     </el-card>
 
-    <!-- Plagiarism Alert (Only for Teachers or if student has a log) -->
-    <el-alert
-      v-if="ENABLE_PLAGIARISM && plagiarismLog"
-      :title="`检测到代码相似度过高 (${(plagiarismLog.similarity_score * 100).toFixed(2)}%)`"
-      type="warning"
-      show-icon
-      class="mb-4"
-      :closable="false"
-    >
-      <template #default>
-        <p>该提交与提交记录 <el-link type="primary" @click="viewTargetSubmission">#{{ plagiarismLog.target_submission_id }}</el-link> 存在高度相似性。</p>
-        <div v-if="isTeacher" class="mt-2">
-          <el-button type="warning" size="small" @click="compareCode">对比代码</el-button>
-        </div>
-      </template>
-    </el-alert>
-
     <!-- Judge Log / Test Cases -->
     <el-card v-if="submission.log" class="log-card mb-4" shadow="hover">
       <template #header>
@@ -96,13 +79,10 @@
 
 <script setup>
 import {computed, onMounted, onUnmounted, ref} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
+import {useRoute} from 'vue-router'
 import {getSubmissionDetail} from '@/api/problem'
-import {getPlagiarismDetail} from '@/api/plagiarism'
-import {useUserStore} from '@/stores/user'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
-import {ENABLE_PLAGIARISM} from '@/utils/featureFlags'
 import {
   CircleCheckFilled,
   CircleCloseFilled,
@@ -115,8 +95,6 @@ import {
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
-const router = useRouter()
-const userStore = useUserStore()
 const submissionId = route.params.id
 const loading = ref(false)
 let timer = null
@@ -130,9 +108,6 @@ const submission = ref({
   language: 'python',
   created_at: ''
 })
-
-const plagiarismLog = ref(null)
-const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 const isPending = computed(() => {
   const pendingStatuses = ['Pending', 'Judging', 'Compiling', 'Loading...']
@@ -188,12 +163,6 @@ const fetchSubmission = async (silent = false) => {
       startPolling()
     } else {
       stopPolling()
-      // 判题结束后获取查重信息
-      if (ENABLE_PLAGIARISM) {
-        fetchPlagiarismInfo()
-      } else {
-        plagiarismLog.value = null
-      }
     }
   } catch (error) {
     ElMessage.error('Failed to load submission details')
@@ -201,35 +170,6 @@ const fetchSubmission = async (silent = false) => {
   } finally {
     if (!silent) loading.value = false
   }
-}
-
-const fetchPlagiarismInfo = async () => {
-  try {
-    const log = await getPlagiarismDetail(submissionId)
-    if (log) {
-      plagiarismLog.value = log
-    }
-  } catch (error) {
-    // 404 is expected if no plagiarism found
-    console.log('No plagiarism log found or access denied')
-  }
-}
-
-const viewTargetSubmission = () => {
-  if (!plagiarismLog.value) return
-  router.push({ name: 'submission-detail', params: { id: plagiarismLog.value.target_submission_id } })
-}
-
-const compareCode = () => {
-  if (!plagiarismLog.value) return
-  router.push({
-    name: 'code-compare',
-    query: {
-      id1: plagiarismLog.value.submission_id,
-      id2: plagiarismLog.value.target_submission_id,
-      similarity: plagiarismLog.value.similarity_score
-    }
-  })
 }
 
 const startPolling = () => {

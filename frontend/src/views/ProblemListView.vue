@@ -16,12 +16,6 @@
             style="width: 350px"
         />
         <div class="filter-group">
-          <el-switch
-              v-if="ENABLE_SEMANTIC_SEARCH"
-              v-model="isSemanticSearch"
-              active-text="语义搜索"
-              style="margin-right: 15px"
-          />
           <el-select v-model="typeFilter" clearable placeholder="题目类型" style="width: 140px">
             <el-option label="ACM" value="acm"/>
             <el-option label="Kaggle" value="kaggle"/>
@@ -129,7 +123,6 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
 import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
-import {ENABLE_SEMANTIC_SEARCH} from '@/utils/featureFlags'
 
 const loading = ref(false)
 const problems = ref([])
@@ -139,7 +132,6 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
 const typeFilter = ref('')
-const isSemanticSearch = ref(false)
 
 const capitalize = (str) => {
   if (!str) return ''
@@ -170,7 +162,6 @@ const handleSearch = async () => {
   try {
     const data = await searchProblems({
       query: searchQuery.value,
-      mode: ENABLE_SEMANTIC_SEARCH && isSemanticSearch.value ? 'semantic' : 'normal',
       top_k: 50
     })
     searchResults.value = data
@@ -208,13 +199,6 @@ watch(searchQuery, (newVal) => {
     searchResults.value = []
     fetchProblems()
     loading.value = false
-  }
-})
-
-watch(isSemanticSearch, () => {
-  if (!ENABLE_SEMANTIC_SEARCH) return
-  if (searchQuery.value) {
-    handleSearch()
   }
 })
 

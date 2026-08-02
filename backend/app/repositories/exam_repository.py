@@ -2,7 +2,6 @@
 
 from datetime import datetime
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.exam import Exam, ExamProblem
@@ -79,7 +78,3 @@ class ExamRepository:
 
     def get_user(self, user_id: int):
         return self._db.get(User, user_id)
-
-    def list_final_submission_ids(self, exam_id: int) -> list[int]:
-        subquery = self._db.query(Submission.user_id, Submission.problem_id, func.max(Submission.id).label("max_id")).filter(Submission.exam_id == exam_id).group_by(Submission.user_id, Submission.problem_id).subquery()
-        return [row.max_id for row in self._db.query(subquery.c.max_id).all()]
