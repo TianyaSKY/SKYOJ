@@ -6,12 +6,11 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY pyproject.toml ./
+COPY backend/ /app/
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
-
-COPY . .
+    && pip install --no-cache-dir .
 
 EXPOSE 5000
 

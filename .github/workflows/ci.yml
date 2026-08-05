@@ -25,30 +25,22 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
 
-      - name: Install backend dependencies
-        working-directory: backend
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+      - name: Install dependencies
+        run: uv sync --frozen
 
       - name: Compile backend sources
-        working-directory: backend
-        run: python -m compileall -q app tests
+        run: uv run python -m compileall -q backend/app backend/tests
 
       - name: Run backend tests
-        working-directory: backend
         env:
           DATABASE_URL: sqlite://
           SECRET_KEY: ci-secret-key-for-github-actions
           CELERY_BROKER_URL: memory://
-        run: python -m pytest -q
+        run: uv run python -m pytest -q backend/tests
 
   frontend-build:
     name: Frontend build

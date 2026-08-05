@@ -45,8 +45,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend/Dockerfile
+      context: .
+      dockerfile: docker/backend/Dockerfile
     container_name: skyoj-backend
     expose:
       - "5000"
@@ -71,8 +71,8 @@ services:
 
   outbox-dispatcher:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend/Dockerfile
+      context: .
+      dockerfile: docker/backend/Dockerfile
     container_name: skyoj-outbox-dispatcher
     command:
       - python
@@ -93,8 +93,8 @@ services:
 
   job-recovery:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend/Dockerfile
+      context: .
+      dockerfile: docker/backend/Dockerfile
     container_name: skyoj-job-recovery
     command:
       - python
@@ -116,8 +116,8 @@ services:
 
   judge-worker:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend/Dockerfile
+      context: .
+      dockerfile: docker/backend/Dockerfile
     container_name: skyoj-judge-worker
     command:
       - celery
@@ -148,8 +148,8 @@ services:
 
   ai-worker:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend/Dockerfile
+      context: .
+      dockerfile: docker/backend/Dockerfile
     container_name: skyoj-ai-worker
     command:
       - celery
@@ -181,8 +181,8 @@ services:
 
   file-worker:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend/Dockerfile
+      context: .
+      dockerfile: docker/backend/Dockerfile
     container_name: skyoj-file-worker
     command:
       - celery
