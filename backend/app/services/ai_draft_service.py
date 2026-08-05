@@ -3,6 +3,7 @@
 from typing import Optional
 
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from app.clients.llm_client import LlmClient
 from app.messaging.task_names import (
@@ -24,12 +25,19 @@ from app.domain.ai_draft import (
     SubmitTestDataExecutionParams,
     SubmitTestScriptGenerationParams,
 )
+from app.domain.ai_prompts import (
+    PROBLEM_GENERATION_OUTPUT_FORMAT,
+    PROBLEM_GENERATION_SYSTEM_SETTING,
+    TEST_SCRIPT_MODE_CONFIGS,
+    TEST_SCRIPT_OUTPUT_FORMAT,
+)
 from app.domain.errors import (
     InvalidStateError,
     LlmConfigError,
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.mappers import from_ai_draft_orm
 from app.repositories.ai_draft_repository import AiDraftRepository
 from app.repositories.problem_repository import ProblemRepository
 from app.services.async_job_service import AsyncJobService
@@ -37,6 +45,17 @@ from app.services.async_job_service import AsyncJobService
 
 class AiDraftService:
     """AI 异步出题 / 测例生成与草稿箱业务。"""
+
+    # 草稿任务类型 → 入队方法（dedupe 前缀由各 enqueue 方法决定，保持不变）
+    _TASK_TYPE_TO_ENQUEUE = {
+        TASK_PROBLEM_GENERATION: "enqueue_ai_draft",
+        TASK_TEST_SCRIPT_GENERATION: "enqueue_ai_draft",
+        TASK_TEST_DATA_EXECUTION: "enqueue_test_data_execution",
+    }
+    _AI_TASK_TYPE_TO_NAME = {
+        TASK_PROBLEM_GENERATION: GENERATE_PROBLEM_TASK,
+        TASK_TEST_SCRIPT_GENERATION: GENERATE_TEST_SCRIPT_TASK,
+    }
 
     def __init__(
         self,
@@ -79,7 +98,7 @@ class AiDraftService:
             request_payload=request_payload,
             status=STATUS_PENDING,
         )
-        self._enqueue_draft_job(draft.id, GENERATE_PROBLEM_TASK)
+        self._enqueue_draft_job(draft)
         logger.info(
             "已提交 AI 出题任务 draft_id={} user_id={}",
             draft.id,
@@ -115,7 +134,7 @@ class AiDraftService:
             problem_id=params.problem_id,
             status=STATUS_PENDING,
         )
-        self._enqueue_draft_job(draft.id, GENERATE_TEST_SCRIPT_TASK)
+        self._enqueue_draft_job(draft)
         logger.info(
             "已提交测例脚本任务 draft_id={} problem_id={}",
             draft.id,
@@ -160,7 +179,7 @@ class AiDraftService:
             problem_id=params.problem_id,
             status=STATUS_PENDING,
         )
-        self._job_service.enqueue_test_data_execution(draft.id)
+        self._enqueue_draft_job(draft)
         logger.info(
             "已提交测例执行任务 draft_id={} problem_id={}",
             draft.id,
@@ -173,9 +192,104 @@ class AiDraftService:
             title=draft.title,
         )
 
-    def _enqueue_draft_job(self, draft_id: int, task_name: str) -> None:
-        """创建 AI 任务；生产实现只写入 AsyncJob/Outbox。"""
-        self._job_service.enqueue_ai_draft(draft_id, task_name)
+    def _enqueue_draft_job(self, draft) -> None:
+        """创建异步任务；按草稿任务类型选择入队方法。"""
+        enqueue_name = self._TASK_TYPE_TO_ENQUEUE.get(draft.task_type)
+        if enqueue_name is None:
+            raise ValueError(f"不支持的草稿任务类型: {draft.task_type}")
+        if enqueue_name == "enqueue_ai_draft":
+            self._job_service.enqueue_ai_draft(
+                draft.id, self._AI_TASK_TYPE_TO_NAME[draft.task_type]
+            )
+        else:
+            self._job_service.enqueue_test_data_execution(draft.id)
+
+    def generate_problem(self, draft_id: int, db: Session) -> dict:
+        """执行 AI 出题任务（Worker 内调用）。"""
+        draft = self._drafts.get_by_id(draft_id)
+        if draft is None:
+            raise ValueError(f"AI 草稿不存在: {draft_id}")
+        self._drafts.mark_running(draft_id)
+        request = AiDraftRepository.parse_json_field(draft.request_payload)
+
+        background = str(request.get("background", "")).strip()
+        difficulty = str(request.get("difficulty", "简单")).strip() or "简单"
+        prompt = f"题目背景: {background}\n难度: {difficulty}"
+
+        result = self._llm_client.chat_json(
+            system_setting=PROBLEM_GENERATION_SYSTEM_SETTING,
+            prompt=prompt,
+            output_format=PROBLEM_GENERATION_OUTPUT_FORMAT,
+        )
+        title = str(result.get("title") or "AI 生成题目").strip() or "AI 生成题目"
+        self._drafts.mark_success(draft_id, result_payload=result, title=title)
+        logger.info("AI 出题完成 draft_id={} title={}", draft_id, title)
+        return result
+
+    def generate_test_script(self, draft_id: int, db: Session) -> dict:
+        """执行测例脚本生成任务（Worker 内调用）。"""
+        draft = self._drafts.get_by_id(draft_id)
+        if draft is None:
+            raise ValueError(f"AI 草稿不存在: {draft_id}")
+        self._drafts.mark_running(draft_id)
+        request = AiDraftRepository.parse_json_field(draft.request_payload)
+
+        problem_id = int(request["problem_id"])
+        direction = str(request.get("direction") or "").strip()
+        problem = self._problems.get_by_id(problem_id)
+        if problem is None:
+            raise ValueError(f"题目不存在: {problem_id}")
+
+        problem_type = problem.type or "acm"
+        language = problem.language or "python"
+        problem_snapshot = {
+            "id": problem.id,
+            "title": problem.title,
+            "content": problem.content,
+            "type": problem_type,
+            "language": language,
+            "time_limit": problem.time_limit,
+            "memory_limit": problem.memory_limit,
+            "template_code": problem.template_code or "",
+        }
+        config = TEST_SCRIPT_MODE_CONFIGS.get(problem_type, TEST_SCRIPT_MODE_CONFIGS["acm"])
+        script_language = language if problem_type == "oop" else "python"
+        system_setting = (
+            f"你是一个专业的{config['role']}。\n"
+            f"当前题目类型：{problem_type.upper()}\n"
+            f"题目目标语言：{language}\n\n"
+            f"任务目标：{config['task']}\n\n"
+            "具体要求：\n"
+            f"1. 语言：使用 {script_language}。\n"
+            f"2. 逻辑：{config['rule']}\n"
+            "3. 输出控制：你可以打印调试日志，但脚本执行的最后一行输出必须且只能是一个整数（0-100），代表得分。\n"
+            "4. 依赖：尽量使用基础库（如 csv, math, json），如果使用 pandas 或 sklearn，请确保逻辑简洁。"
+        )
+        prompt = f"题目内容: {problem_snapshot}\n生成要求: {direction or '执行标准评估逻辑'}"
+
+        result = self._llm_client.chat_json(
+            system_setting=system_setting,
+            prompt=prompt,
+            output_format=TEST_SCRIPT_OUTPUT_FORMAT,
+        )
+        payload = {
+            "code": str(result.get("code") or ""),
+            "language": str(
+                result.get("language")
+                or (language if problem_type == "oop" else "python")
+            ),
+            "problem_id": problem_id,
+            "problem_type": problem_type,
+            "problem_title": problem.title,
+            "direction": direction,
+        }
+        self._drafts.mark_success(
+            draft_id,
+            result_payload=payload,
+            title=f"测例脚本 · {problem.title}",
+        )
+        logger.info("测例脚本生成完成 draft_id={} problem_id={}", draft_id, problem_id)
+        return payload
 
     def list_drafts(
         self,
@@ -192,12 +306,12 @@ class AiDraftService:
             task_type=task_type,
             limit=limit,
         )
-        return [self._to_summary(d) for d in drafts]
+        return [from_ai_draft_orm(d) for d in drafts]
 
     def get_draft(self, user_id: int, draft_id: int) -> AiDraftDetail:
         """获取草稿详情。"""
         draft = self._require_owned_draft(user_id, draft_id)
-        return self._to_detail(draft)
+        return from_ai_draft_orm(draft, detail=True)
 
     def delete_draft(self, user_id: int, draft_id: int) -> None:
         """删除草稿。"""
@@ -283,33 +397,3 @@ class AiDraftService:
         if draft.user_id != user_id:
             raise PermissionDeniedError("无权访问该草稿")
         return draft
-
-    @staticmethod
-    def _to_summary(draft) -> AiDraftSummary:
-        return AiDraftSummary(
-            id=draft.id,
-            task_type=draft.task_type,
-            status=draft.status,
-            title=draft.title or "",
-            problem_id=draft.problem_id,
-            error_message=draft.error_message,
-            created_at=draft.created_at,
-            updated_at=draft.updated_at,
-            consumed_at=draft.consumed_at,
-        )
-
-    @staticmethod
-    def _to_detail(draft) -> AiDraftDetail:
-        return AiDraftDetail(
-            id=draft.id,
-            task_type=draft.task_type,
-            status=draft.status,
-            title=draft.title or "",
-            problem_id=draft.problem_id,
-            request_payload=AiDraftRepository.parse_json_field(draft.request_payload),
-            result_payload=AiDraftRepository.parse_json_field(draft.result_payload),
-            error_message=draft.error_message,
-            created_at=draft.created_at,
-            updated_at=draft.updated_at,
-            consumed_at=draft.consumed_at,
-        )

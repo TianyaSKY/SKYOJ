@@ -2,6 +2,8 @@
 
 from typing import BinaryIO
 
+from loguru import logger
+
 from app.clients.dataset_storage_client import DatasetStorageClient
 from app.domain.dataset import (
     CreateDatasetParams,
@@ -12,6 +14,7 @@ from app.domain.dataset import (
     UploadDatasetParams,
 )
 from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.mappers import from_dataset_detail_orm, from_dataset_orm
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.async_job_service import AsyncJobService
 
@@ -33,8 +36,8 @@ class DatasetService:
         self, page: int | None = None, page_size: int | None = None
     ) -> list[DatasetListItem] | PaginatedDatasets:
         """查询数据集列表。"""
-        datasets, total = self._dataset_repository.list(page=page, page_size=page_size)
-        items = [self._to_list_item(dataset) for dataset in datasets]
+        datasets, total = self._dataset_repository.list_all(page=page, page_size=page_size)
+        items = [from_dataset_orm(dataset) for dataset in datasets]
         if page is None or page_size is None:
             return items
         return PaginatedDatasets(
@@ -67,7 +70,7 @@ class DatasetService:
             if temporary_path:
                 self._storage_client.remove_staged(temporary_path)
             raise
-        return self._to_detail(dataset)
+        return from_dataset_detail_orm(dataset)
 
     def upload_dataset(self, params: UploadDatasetParams) -> DatasetDetail:
         """校验上传权限、大小和文件路径后创建数据集。"""
@@ -91,7 +94,7 @@ class DatasetService:
 
     def get_dataset(self, dataset_id: int) -> DatasetDetail:
         """获取数据集详情。"""
-        return self._to_detail(self._require_dataset(dataset_id))
+        return from_dataset_detail_orm(self._require_dataset(dataset_id))
 
     def delete_dataset(self, requester_role: str, dataset_id: int) -> None:
         """删除数据集文件和记录。"""
@@ -121,6 +124,36 @@ class DatasetService:
             filename=detail.file_path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1],
         )
 
+    def finalize_dataset(self, dataset_id: int) -> DatasetDetail:
+        """校验临时文件、计算哈希并移动数据集文件；失败时标记数据集并抛出。
+
+        在 File Worker 中调用；任务侧状态由 run_job 统一处理。
+        """
+        dataset = self._dataset_repository.get_by_id(dataset_id)
+        if dataset is None:
+            raise ValueError(f"数据集不存在: {dataset_id}")
+        if dataset.status == "ready" and self._storage_client.exists(dataset.file_path):
+            return from_dataset_detail_orm(dataset)
+        try:
+            if not dataset.temp_path:
+                raise ValueError(f"数据集缺少临时文件: {dataset_id}")
+
+            byte_size, file_hash = self._storage_client.finalize(
+                dataset.temp_path,
+                dataset.file_path,
+                dataset.id,
+            )
+            self._dataset_repository.mark_ready(
+                dataset.id,
+                file_size=self._format_file_size(byte_size),
+                file_hash=file_hash,
+            )
+            logger.info("数据集文件落盘完成 dataset_id={} sha256={}", dataset.id, file_hash)
+            return from_dataset_detail_orm(dataset)
+        except Exception as exc:
+            self._dataset_repository.mark_failed(dataset_id, str(exc))
+            raise
+
     def _require_dataset(self, dataset_id: int):
         dataset = self._dataset_repository.get_by_id(dataset_id)
         if dataset is None:
@@ -139,30 +172,3 @@ class DatasetService:
         if size_bytes < 1024 * 1024:
             return f"{size_bytes / 1024:.2f} KB"
         return f"{size_bytes / (1024 * 1024):.2f} MB"
-
-    @staticmethod
-    def _to_list_item(dataset) -> DatasetListItem:
-        return DatasetListItem(
-            id=dataset.id,
-            name=dataset.name,
-            description=dataset.description or "",
-            uploader=dataset.uploader.username if dataset.uploader else "Unknown",
-            file_size=dataset.file_size or "",
-            created_at=dataset.created_at,
-            status=getattr(dataset, "status", "ready") or "ready",
-            download_url=f"/api/datasets/{dataset.id}/download",
-        )
-
-    @staticmethod
-    def _to_detail(dataset) -> DatasetDetail:
-        return DatasetDetail(
-            id=dataset.id,
-            name=dataset.name,
-            description=dataset.description or "",
-            file_path=dataset.file_path,
-            file_size=dataset.file_size or "",
-            uploader_id=dataset.uploader_id,
-            uploader=dataset.uploader.username if dataset.uploader else "Unknown",
-            created_at=dataset.created_at,
-            status=getattr(dataset, "status", "ready") or "ready",
-        )

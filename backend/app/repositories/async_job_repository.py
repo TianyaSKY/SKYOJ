@@ -225,19 +225,6 @@ class AsyncJobRepository:
         self._db.refresh(job)
         return job
 
-    def renew_lease(
-        self, job_id: int, *, now: datetime, lease_until: datetime
-    ) -> Optional[AsyncJob]:
-        """主动延长任务租约。"""
-        job = self.get_by_id(job_id)
-        if job is None or job.status != JOB_RUNNING:
-            return None
-        job.lease_until = lease_until
-        job.updated_at = now
-        self._db.commit()
-        self._db.refresh(job)
-        return job
-
     def recover_expired(self, *, now: datetime, limit: int) -> int:
         """将过期运行中任务重新放回 Outbox；超过次数的任务标记失败。"""
         jobs = (

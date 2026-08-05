@@ -2,93 +2,70 @@
 
 from typing import Any
 
-from loguru import logger
+from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.domain.ai_draft import TASK_TEST_DATA_EXECUTION
-from app.domain.async_job import EXECUTE_TEST_DATA_TASK, JUDGE_SUBMISSION_TASK
 from app.messaging.celery_app import celery_app
+from app.messaging.task_names import EXECUTE_TEST_DATA_TASK, JUDGE_SUBMISSION_TASK
 from app.repositories.ai_draft_repository import AiDraftRepository
-from app.repositories.async_job_repository import AsyncJobRepository
-from app.services.async_job_service import AsyncJobService
 from app.services.judge_service import (
     judge_submission as run_submission_judge,
     save_non_acm_script,
 )
 from app.services.test_gen_service import run_test_generation
+from app.tasks.base import run_job
 
 
 @celery_app.task(name=JUDGE_SUBMISSION_TASK, ignore_result=True)
 def judge_submission(job_id: int) -> None:
     """执行一条提交的判题任务。"""
-    db = SessionLocal()
-    job_service = AsyncJobService.from_session(db)
-    started = job_service.start_job(
+    run_job(
         job_id,
-        lease_seconds=job_service.lease_seconds(JUDGE_SUBMISSION_TASK),
+        task_name=JUDGE_SUBMISSION_TASK,
+        handler=_handle_judge_submission,
     )
-    if started is None:
-        db.close()
-        return
-
-    try:
-        job = AsyncJobRepository(db).get_by_id(job_id)
-        if job is None:
-            raise ValueError(f"异步任务不存在: {job_id}")
-        payload = job_service.parse_payload(job.payload)
-        submission_id = int(payload["submission_id"])
-        run_submission_judge(submission_id, db=db)
-        job_service.complete_job(job_id)
-    except Exception as exc:
-        logger.exception("判题任务执行失败 job_id={}", job_id)
-        job_service.fail_job(job_id, str(exc))
-    finally:
-        db.close()
 
 
 @celery_app.task(name=EXECUTE_TEST_DATA_TASK, ignore_result=True)
 def execute_test_data(job_id: int) -> None:
     """在 Judge Worker 中执行生成测试数据的脚本。"""
-    db = SessionLocal()
-    job_service = AsyncJobService.from_session(db)
-    started = job_service.start_job(
+    run_job(
         job_id,
-        lease_seconds=job_service.lease_seconds(EXECUTE_TEST_DATA_TASK),
+        task_name=EXECUTE_TEST_DATA_TASK,
+        handler=_handle_test_data_execution,
+        on_failed=_mark_draft_failed,
+        permanent_errors=(_PermanentTestDataError,),
     )
-    if started is None:
-        db.close()
-        return
 
-    draft_id: int | None = None
-    draft_repository = AiDraftRepository(db)
+
+def _handle_judge_submission(db: Session, payload: dict[str, Any]) -> None:
+    """执行提交判题。"""
+    run_submission_judge(int(payload["submission_id"]), db)
+
+
+def _handle_test_data_execution(db: Session, payload: dict[str, Any]) -> dict[str, Any]:
+    """执行 ACM 测试数据脚本或保存非 ACM 测试脚本，并更新草稿状态。"""
+    draft_id = int(payload["draft_id"])
+    draft = AiDraftRepository(db).get_by_id(draft_id)
+    if draft is None:
+        raise ValueError(f"AI 草稿不存在: {draft_id}")
+    AiDraftRepository(db).mark_running(draft_id)
+    request = AiDraftRepository.parse_json_field(draft.request_payload)
+    result_payload = _run_test_data_execution(request)
+    AiDraftRepository(db).mark_success(
+        draft_id,
+        result_payload=result_payload,
+        title=f"测例执行 · 题目 #{result_payload['problem_id']}",
+    )
+    return result_payload
+
+
+def _mark_draft_failed(payload: dict[str, Any], result) -> None:
+    """任务失败后将草稿标记为失败。"""
+    db = SessionLocal()
     try:
-        job = AsyncJobRepository(db).get_by_id(job_id)
-        if job is None:
-            raise ValueError(f"异步任务不存在: {job_id}")
-        payload = job_service.parse_payload(job.payload)
-        draft_id = int(payload["draft_id"])
-        draft = draft_repository.get_by_id(draft_id)
-        if draft is None:
-            raise ValueError(f"AI 草稿不存在: {draft_id}")
-        draft_repository.mark_running(draft_id)
-        request = draft_repository.parse_json_field(draft.request_payload)
-        result_payload = _run_test_data_execution(request)
-        draft_repository.mark_success(
-            draft_id,
-            result_payload=result_payload,
-            title=f"测例执行 · 题目 #{result_payload['problem_id']}",
-        )
-        job_service.complete_job(job_id)
-    except _PermanentTestDataError as exc:
-        logger.warning("测试数据任务失败且不再重试 job_id={} draft_id={}", job_id, draft_id)
-        if draft_id is not None:
-            draft_repository.mark_failed(draft_id, str(exc))
-        job_service.fail_job(job_id, str(exc), retry=False)
-    except Exception as exc:
-        logger.exception("测试数据任务执行失败 job_id={} draft_id={}", job_id, draft_id)
-        result = job_service.fail_job(job_id, str(exc))
-        if draft_id is not None and result is not None and result.status == "failed":
-            draft_repository.mark_failed(draft_id, str(exc))
+        AiDraftRepository(db).mark_failed(int(payload["draft_id"]), str(result))
     finally:
         db.close()
 

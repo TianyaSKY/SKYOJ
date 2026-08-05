@@ -17,7 +17,7 @@ class DatasetRepository:
         """按主键查询数据集。"""
         return self._db.get(Dataset, dataset_id)
 
-    def list(
+    def list_all(
         self, page: int | None = None, page_size: int | None = None
     ) -> tuple[list[Dataset], int | None]:
         """倒序查询数据集，必要时在数据库侧分页。"""
