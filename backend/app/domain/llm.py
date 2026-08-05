@@ -11,13 +11,3 @@ class AskLlmParams:
     system_setting: str
     prompt: str
     output_format: Optional[dict[str, Any]] = None
-
-
-@dataclass(frozen=True)
-class ExecuteTestGenerationParams:
-    """执行测试数据生成的参数。"""
-
-    problem_id: int
-    code: str
-    problem_type: Optional[str]
-    language: str

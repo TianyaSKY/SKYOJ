@@ -22,14 +22,3 @@ class Dataset(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     uploader = relationship("User", back_populates="datasets")
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "uploader": self.uploader.username if self.uploader else "Unknown",
-            "file_size": self.file_size,
-            "created_at": self.created_at.isoformat(),
-            "download_url": f"/api/datasets/{self.id}/download",
-        }

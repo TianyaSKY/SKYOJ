@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -25,20 +25,10 @@ class Exam(Base):
     )
     submissions = relationship("Submission", back_populates="exam", lazy=True)
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "title": self.title,
-            "description": self.description,
-            "start_time": self.start_time.isoformat(),
-            "end_time": self.end_time.isoformat(),
-            "is_visible": self.is_visible,
-            "created_by": self.created_by,
-        }
-
 
 class ExamProblem(Base):
     __tablename__ = "exam_problems"
+    __table_args__ = (Index("ix_exam_problems_exam_id", "exam_id"),)
 
     id = Column(Integer, primary_key=True)
     exam_id = Column(Integer, ForeignKey("exams.id"), nullable=False)

@@ -23,14 +23,6 @@ class UpdateProfileParams:
 
 
 @dataclass(frozen=True)
-class UserSubmissionSummary:
-    """用户提交汇总。"""
-
-    total: int
-    accepted: int
-
-
-@dataclass(frozen=True)
 class UserSubmissionItem:
     """用户提交记录的展示信息。"""
 
