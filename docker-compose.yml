@@ -9,6 +9,8 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
     expose:
       - "3306"
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
@@ -34,6 +36,8 @@ services:
     expose:
       - "5672"
       - "15672"
+    ports:
+      - "127.0.0.1:5672:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s

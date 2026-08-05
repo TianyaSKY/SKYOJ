@@ -44,8 +44,6 @@
   - **资源配额**：基于 Linux Cgroups 严格限制 CPU、内存及 PID 数，防止 Fork 炸弹与资源耗尽攻击。
 
 ---
-![project-timeline-1.gif](images/project-timeline-1.gif)
-![project-timeline-2.gif](images/project-timeline-2.gif)
 ## 技术栈
 
 | 模块 | 技术选型 | 说明 |
@@ -182,25 +180,10 @@ uv sync
 cd frontend && npm install && cd ..
 ```
 
-### 最小启动（API + SQLite，无消息队列）
 
-适合只调试前端 / API，不跑判题任务：
+### 启动（MySQL + RabbitMQ + 全部 Worker）
 
-```bash
-# 终端 1：后端 API（端口 5000）
-cd backend
-DATABASE_URL=sqlite:///./skyoj.db SECRET_KEY=dev-only-secret-change-me CELERY_BROKER_URL=memory:// uv run python run.py
-```
-
-```bash
-# 终端 2：前端开发服务器（端口 5173，/api 自动代理到 5000）
-cd frontend
-npm run dev
-```
-
-### 完整本地联调（MySQL + RabbitMQ + 全部 Worker）
-
-先启动基础设施容器，再在本地逐个起进程（`config.py` 会把 `DATABASE_URL` 中的 `@mysql:` 自动替换为 `@127.0.0.1:`，`CELERY_BROKER_URL` 需手动改成 `127.0.0.1`）：
+mysql 与 rabbitmq 已映射到宿主机 `127.0.0.1`（仅本机可访问），先启动基础设施容器，再在本地逐个起进程：
 
 ```bash
 # 终端 0：基础设施（仅 mysql + rabbitmq）
@@ -208,10 +191,10 @@ docker compose up -d mysql rabbitmq
 ```
 
 ```bash
-# 终端 1：后端 API（也可在 .env 中配置，config 会自动加载）
+# 终端 1：后端 API（密码必须是 docker compose 启动时 MYSQL_PASSWORD 的实际值）
 cd backend
-DATABASE_URL=mysql+pymysql://skyoj:你的密码@127.0.0.1:3306/oj_db \
-SECRET_KEY=替换为强随机值 \
+DATABASE_URL=mysql+pymysql://skyoj:MYSQL_PASSWORD的实际值@127.0.0.1:3306/oj_db \
+SECRET_KEY=hajimiyounanbeiluduoxixigahaayoudingdongji \
 CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672// \
 uv run python run.py
 ```
@@ -252,7 +235,7 @@ npm run dev
 uv run python -m pytest -q backend/tests
 ```
 
-> 说明：测试固定使用 SQLite 内存库与 `memory://` broker（conftest 注入），不依赖外部服务；本地 `run.py` 依赖 `DATABASE_URL` / `SECRET_KEY` / `CELERY_BROKER_URL` 三个环境变量，缺失会拒绝启动。
+> 说明：测试固定使用 SQLite 内存库与 `memory://` broker（conftest 注入），不依赖外部服务；本地 `run.py` 依赖 `DATABASE_URL` / `SECRET_KEY` / `CELERY_BROKER_URL` 三个环境变量，缺失会拒绝启动。若提示 `[Errno 98] address already in use`，说明已有后端实例占用 5000 端口，先执行 `fuser -k 5000/tcp` 再启动；`DATABASE_URL` 中的密码必须是 MySQL 实际口令，不能是中文占位符。
 
 ---
 

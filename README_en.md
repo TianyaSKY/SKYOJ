@@ -199,7 +199,7 @@ npm run dev
 
 ### Full Local Setup (MySQL + RabbitMQ + all Workers)
 
-Start the infrastructure containers, then run each process locally (`config.py` rewrites `@mysql:` to `@127.0.0.1:` in `DATABASE_URL` automatically; change the host in `CELERY_BROKER_URL` to `127.0.0.1` yourself):
+mysql and rabbitmq are mapped to `127.0.0.1` on the host (localhost only). Start the infrastructure containers, then run each process locally:
 
 ```bash
 # Terminal 0: infrastructure (mysql + rabbitmq only)
@@ -207,9 +207,9 @@ docker compose up -d mysql rabbitmq
 ```
 
 ```bash
-# Terminal 1: backend API (or configure via .env, which config.py loads)
+# Terminal 1: backend API (the password must be the actual MYSQL_PASSWORD used by docker compose)
 cd backend
-DATABASE_URL=mysql+pymysql://skyoj:your_password@127.0.0.1:3306/oj_db \
+DATABASE_URL=mysql+pymysql://skyoj:REPLACE_WITH_ACTUAL_MYSQL_PASSWORD@127.0.0.1:3306/oj_db \
 SECRET_KEY=replace_with_strong_value \
 CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672// \
 uv run python run.py
@@ -251,7 +251,7 @@ npm run dev
 uv run python -m pytest -q backend/tests
 ```
 
-> Note: tests always use an in-memory SQLite database and the `memory://` broker (injected by conftest) and need no external services. Local `run.py` requires `DATABASE_URL`, `SECRET_KEY`, and `CELERY_BROKER_URL` and refuses to start without them.
+> Note: tests always use an in-memory SQLite database and the `memory://` broker (injected by conftest) and need no external services. Local `run.py` requires `DATABASE_URL`, `SECRET_KEY`, and `CELERY_BROKER_URL` and refuses to start without them. If you see `[Errno 98] address already in use`, a previous backend instance still holds port 5000 — run `fuser -k 5000/tcp` first. The password in `DATABASE_URL` must be the real MySQL password, not a placeholder.
 
 ---
 
