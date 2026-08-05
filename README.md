@@ -1,4 +1,4 @@
-﻿
+
 <h2 align="center">SKYOJ - 新一代 AI 驱动的在线评测系统</h2>
 
 <p align="center">
@@ -81,7 +81,7 @@ SKYOJ/
 
 ### 异步任务进程
 
-系统只保留 `judge`、`ai`、`file` 三个队列。API 将任务参数写入 MySQL，Outbox Dispatcher 再向 RabbitMQ 发布任务 ID；Worker 使用 `--pool=solo --concurrency=1`，不在进程内创建线程池。判题 Worker 是唯一挂载 Docker Socket 的服务。
+系统只保留 `judge`、`ai`、`file` 三个队列。API 入队时把任务写入 MySQL 并直接向 RabbitMQ 发布任务 ID；Worker 使用 `--pool=solo --concurrency=1`，不在进程内创建线程池。判题 Worker 是唯一挂载 Docker Socket 的服务，`job-recovery` 进程负责回收租约过期的任务并重新投递。
 
 ---
 
@@ -165,6 +165,94 @@ docker-compose up -d --build
 * **前端页面**：http://localhost
 * **后端 API**：http://localhost/api
 * **数据库管理**：(如配置了 phpMyAdmin) http://localhost:8080
+
+---
+
+## 本地开发启动 (Local Development)
+
+不想用 Docker 跑全栈时，可以按下面方式在本地逐个启动进程。所有命令在仓库根目录执行，需要 `uv`（Python 3.12）与 Node.js 20+。
+
+### 安装依赖
+
+```bash
+# 后端依赖（根目录 pyproject.toml + uv.lock）
+uv sync
+
+# 前端依赖
+cd frontend && npm install && cd ..
+```
+
+### 最小启动（API + SQLite，无消息队列）
+
+适合只调试前端 / API，不跑判题任务：
+
+```bash
+# 终端 1：后端 API（端口 5000）
+cd backend
+DATABASE_URL=sqlite:///./skyoj.db SECRET_KEY=dev-only-secret-change-me CELERY_BROKER_URL=memory:// uv run python run.py
+```
+
+```bash
+# 终端 2：前端开发服务器（端口 5173，/api 自动代理到 5000）
+cd frontend
+npm run dev
+```
+
+### 完整本地联调（MySQL + RabbitMQ + 全部 Worker）
+
+先启动基础设施容器，再在本地逐个起进程（`config.py` 会把 `DATABASE_URL` 中的 `@mysql:` 自动替换为 `@127.0.0.1:`，`CELERY_BROKER_URL` 需手动改成 `127.0.0.1`）：
+
+```bash
+# 终端 0：基础设施（仅 mysql + rabbitmq）
+docker compose up -d mysql rabbitmq
+```
+
+```bash
+# 终端 1：后端 API（也可在 .env 中配置，config 会自动加载）
+cd backend
+DATABASE_URL=mysql+pymysql://skyoj:你的密码@127.0.0.1:3306/oj_db \
+SECRET_KEY=替换为强随机值 \
+CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672// \
+uv run python run.py
+```
+
+```bash
+# 终端 2：判题 Worker（需先构建沙箱镜像：./scripts/build-sandbox.sh）
+cd backend
+uv run celery -A app.messaging.celery_app:celery_app worker --queues=judge --pool=solo --concurrency=1
+```
+
+```bash
+# 终端 3：AI Worker
+cd backend
+uv run celery -A app.messaging.celery_app:celery_app worker --queues=ai --pool=solo --concurrency=1
+```
+
+```bash
+# 终端 4：文件 Worker
+cd backend
+uv run celery -A app.messaging.celery_app:celery_app worker --queues=file --pool=solo --concurrency=1
+```
+
+```bash
+# 终端 5（可选）：任务恢复器（回收租约过期任务并重新投递）
+cd backend
+uv run python -m app.workers.job_recovery
+```
+
+```bash
+# 终端 6：前端
+cd frontend
+npm run dev
+```
+
+### 运行测试
+
+```bash
+uv run python -m pytest -q backend/tests
+```
+
+> 说明：测试固定使用 SQLite 内存库与 `memory://` broker（conftest 注入），不依赖外部服务；本地 `run.py` 依赖 `DATABASE_URL` / `SECRET_KEY` / `CELERY_BROKER_URL` 三个环境变量，缺失会拒绝启动。
 
 ---
 

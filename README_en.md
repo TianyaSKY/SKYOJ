@@ -1,4 +1,4 @@
-﻿
+
 <h2 align="center">SKYOJ - Next-Generation AI-Powered Online Judge System</h2>
 
 <p align="center">
@@ -38,7 +38,7 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 
 ### 3. Enterprise-Grade Architecture
 - **Cloud-Native Architecture**: Orchestrated based on Docker Compose, achieving complete decoupling of Web services, databases, and evaluation sandboxes.
-- **Asynchronous Evaluation Scheduling**: Uses RabbitMQ and Celery `solo` workers. The API persists jobs and Outbox records, while dedicated single-process workers serially handle judging, AI, and file tasks; scale out by adding worker containers.
+- **Asynchronous Evaluation Scheduling**: Uses RabbitMQ and Celery `solo` workers. The API persists jobs and publishes task IDs to RabbitMQ directly at enqueue time, while dedicated single-process workers serially handle judging, AI, and file tasks; scale out by adding worker containers.
 - **Security Sandbox Isolation**:
   - **Network Circuit Breaking**: Containers are configured with `network_mode="none"` to block malicious networking.
   - **Resource Quotas**: Strictly limits CPU, memory, and PID counts based on Linux Cgroups to prevent Fork bombs and resource exhaustion attacks.
@@ -81,7 +81,7 @@ SKYOJ/
 
 ### Asynchronous task processes
 
-The system keeps only the `judge`, `ai`, and `file` queues. The API stores task parameters in MySQL, and an Outbox Dispatcher publishes task IDs to RabbitMQ. Workers run with `--pool=solo --concurrency=1`; no in-process thread pool is used. The Judge Worker is the only service that mounts the Docker Socket.
+The system keeps only the `judge`, `ai`, and `file` queues. At enqueue time the API persists the job in MySQL and publishes the task ID to RabbitMQ directly. Workers run with `--pool=solo --concurrency=1`; no in-process thread pool is used. The Judge Worker is the only service that mounts the Docker Socket, and the `job-recovery` process re-publishes tasks whose lease has expired.
 
 ---
 
@@ -164,6 +164,94 @@ Wait about 30 seconds (database initialization) and then access:
 * **Frontend Page**: http://localhost
 * **Backend API**: http://localhost/api
 * **Database Management**: (if phpMyAdmin is configured) http://localhost:8080
+
+---
+
+## Local Development
+
+To develop without Docker, start each process locally from the repository root. You need `uv` (Python 3.12) and Node.js 20+.
+
+### Install Dependencies
+
+```bash
+# Backend (root pyproject.toml + uv.lock)
+uv sync
+
+# Frontend
+cd frontend && npm install && cd ..
+```
+
+### Minimal Startup (API + SQLite, no message queue)
+
+Good for frontend/API-only work without judging tasks:
+
+```bash
+# Terminal 1: backend API (port 5000)
+cd backend
+DATABASE_URL=sqlite:///./skyoj.db SECRET_KEY=dev-only-secret-change-me CELERY_BROKER_URL=memory:// uv run python run.py
+```
+
+```bash
+# Terminal 2: frontend dev server (port 5173, /api proxied to 5000)
+cd frontend
+npm run dev
+```
+
+### Full Local Setup (MySQL + RabbitMQ + all Workers)
+
+Start the infrastructure containers, then run each process locally (`config.py` rewrites `@mysql:` to `@127.0.0.1:` in `DATABASE_URL` automatically; change the host in `CELERY_BROKER_URL` to `127.0.0.1` yourself):
+
+```bash
+# Terminal 0: infrastructure (mysql + rabbitmq only)
+docker compose up -d mysql rabbitmq
+```
+
+```bash
+# Terminal 1: backend API (or configure via .env, which config.py loads)
+cd backend
+DATABASE_URL=mysql+pymysql://skyoj:your_password@127.0.0.1:3306/oj_db \
+SECRET_KEY=replace_with_strong_value \
+CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672// \
+uv run python run.py
+```
+
+```bash
+# Terminal 2: Judge worker (build sandbox images first: ./scripts/build-sandbox.sh)
+cd backend
+uv run celery -A app.messaging.celery_app:celery_app worker --queues=judge --pool=solo --concurrency=1
+```
+
+```bash
+# Terminal 3: AI worker
+cd backend
+uv run celery -A app.messaging.celery_app:celery_app worker --queues=ai --pool=solo --concurrency=1
+```
+
+```bash
+# Terminal 4: File worker
+cd backend
+uv run celery -A app.messaging.celery_app:celery_app worker --queues=file --pool=solo --concurrency=1
+```
+
+```bash
+# Terminal 5 (optional): job recovery (re-publishes tasks with expired leases)
+cd backend
+uv run python -m app.workers.job_recovery
+```
+
+```bash
+# Terminal 6: frontend
+cd frontend
+npm run dev
+```
+
+### Running Tests
+
+```bash
+uv run python -m pytest -q backend/tests
+```
+
+> Note: tests always use an in-memory SQLite database and the `memory://` broker (injected by conftest) and need no external services. Local `run.py` requires `DATABASE_URL`, `SECRET_KEY`, and `CELERY_BROKER_URL` and refuses to start without them.
 
 ---
 
