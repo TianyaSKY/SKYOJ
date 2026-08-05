@@ -6,11 +6,11 @@ from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.domain.submission import (
     PaginatedSubmissions,
     SubmissionDetail,
-    SubmissionListItem,
     SubmissionQuery,
     SubmitParams,
     SubmitResult,
 )
+from app.mappers import from_submission_detail_orm, from_submission_orm
 from app.repositories.submission_repository import SubmissionRepository
 from app.clients.submission_storage_client import SubmissionStorageClient
 from app.services.async_job_service import AsyncJobService
@@ -58,13 +58,13 @@ class SubmissionService:
     def list_submissions(self, params: SubmissionQuery) -> PaginatedSubmissions:
         """按访问者权限和筛选条件分页查询提交记录。"""
         user_id = params.requester_id if params.requester_role == "student" else params.user_id
-        submissions, total, pages = self._submission_repository.list(
+        submissions, total, pages = self._submission_repository.list_all(
             params.problem_id, user_id, params.exam_id, params.status,
             params.username, params.page, params.page_size,
         )
         return PaginatedSubmissions(
             total=total, pages=pages, current_page=params.page,
-            submissions=[self._to_list_item(item) for item in submissions],
+            submissions=[from_submission_orm(item) for item in submissions],
         )
 
     def get_submission(
@@ -76,19 +76,4 @@ class SubmissionService:
             raise ResourceNotFoundError("提交记录不存在")
         if requester_role == "student" and submission.user_id != requester_id:
             raise PermissionDeniedError("无权查看该提交记录")
-        return SubmissionDetail(
-            id=submission.id, status=submission.status, score=submission.score,
-            log=submission.output_log, code=submission.code_content,
-            language=submission.language, exam_id=submission.exam_id,
-            created_at=submission.created_at,
-        )
-
-    @staticmethod
-    def _to_list_item(submission) -> SubmissionListItem:
-        return SubmissionListItem(
-            id=submission.id, user_id=submission.user_id,
-            username=submission.user.username, problem_id=submission.problem_id,
-            exam_id=submission.exam_id, status=submission.status,
-            score=submission.score, language=submission.language,
-            created_at=submission.created_at,
-        )
+        return from_submission_detail_orm(submission)

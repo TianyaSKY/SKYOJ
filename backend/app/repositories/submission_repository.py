@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy import update
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.exam import Exam
 from app.models.problem import Problem
@@ -45,7 +46,17 @@ class SubmissionRepository:
         """查询单条提交记录。"""
         return self._db.get(Submission, submission_id)
 
-    def list(
+    def update_result(
+        self, submission_id: int, *, status: str, score: float, output_log: str
+    ) -> None:
+        """更新判题结果；不提交事务，由调用方 commit。"""
+        self._db.execute(
+            update(Submission)
+            .where(Submission.id == submission_id)
+            .values(status=status, score=score, output_log=output_log)
+        )
+
+    def list_all(
         self,
         problem_id: int | None,
         user_id: int | None,
@@ -70,7 +81,8 @@ class SubmissionRepository:
         total = query.count()
         pages = (total + page_size - 1) // page_size if total else 0
         return (
-            query.order_by(Submission.created_at.desc())
+            query.options(selectinload(Submission.user))
+            .order_by(Submission.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all(),

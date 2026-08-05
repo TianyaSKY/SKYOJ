@@ -5,8 +5,8 @@ import re
 
 from loguru import logger
 
-from app.models.problem import Problem
-from app.services.judge_service import IMAGE_NAME, client, create_tar_stream
+from app.repositories.problem_repository import ProblemRepository
+from app.services.sandbox_runner import SandboxRunner
 
 
 def natural_sort_key(value: str) -> list[int | str]:
@@ -17,52 +17,33 @@ def natural_sort_key(value: str) -> list[int | str]:
     ]
 
 
-def _decode_output(output: bytes | str) -> str:
-    """兼容 Docker SDK 返回 bytes 或字符串。"""
-    if isinstance(output, bytes):
-        return output.decode("utf-8", errors="replace")
-    return str(output)
-
-
-def _stop_container(container) -> None:
-    """尽力停止沙箱容器，并保留诊断日志。"""
-    try:
-        container.stop()
-    except Exception as exc:
-        logger.warning("停止 ACM 沙箱失败: {}", exc)
-
-
 def _prepare_container(lang_config, user_code, memory_limit):
     """创建一个提交专用容器并完成源码上传与编译。"""
-    container = None
+    runner = None
     try:
-        container = client.containers.run(
-            image=IMAGE_NAME,
-            command="sleep 600",
-            detach=True,
-            network_mode="none",
+        runner = SandboxRunner()
+        runner.launch(
+            pids_limit=50,
             mem_limit=f"{memory_limit}m",
             nano_cpus=1000000000,
-            remove=True,
-            pids_limit=50,
+            workdir="/app",
         )
-        container.put_archive("/app", create_tar_stream(lang_config["src"], user_code))
+        runner.put_file(lang_config["src"], user_code)
 
         if lang_config["compile"]:
-            compile_result = container.exec_run(lang_config["compile"], workdir="/app")
-            if compile_result.exit_code != 0:
-                message = _decode_output(compile_result.output)
-                _stop_container(container)
-                return None, "compile", message
-        return container, None, None
+            exit_code, output = runner.exec_run(lang_config["compile"])
+            if exit_code != 0:
+                runner.stop()
+                return None, "compile", output
+        return runner, None, None
     except Exception as exc:
-        if container is not None:
-            _stop_container(container)
+        if runner is not None:
+            runner.stop()
         return None, "system", str(exc)
 
 
 def _judge_single_case(
-    container,
+    runner: SandboxRunner,
     case_name,
     input_data,
     expected_output,
@@ -71,15 +52,15 @@ def _judge_single_case(
 ):
     """在同一个提交容器中串行执行一个测试点。"""
     try:
-        container.put_archive("/app", create_tar_stream("input.txt", input_data))
+        runner.put_file("input.txt", input_data)
         time_limit_s = max(1, int(time_limit_ms) // 1000)
         run_cmd = f"sh -c 'timeout {time_limit_s}s {run_entry} < /app/input.txt'"
-        result = container.exec_run(run_cmd, workdir="/app")
-        output = _decode_output(result.output).strip()
+        exit_code, output = runner.exec_run(run_cmd)
+        output = output.strip()
 
-        if result.exit_code == 124:
+        if runner.is_tle(exit_code):
             return case_name, "tle", None
-        if result.exit_code != 0:
+        if exit_code != 0:
             return case_name, "runtime_error", output
         if output == expected_output:
             return case_name, "passed", None
@@ -88,7 +69,7 @@ def _judge_single_case(
         return case_name, "runtime_error", str(exc)
     finally:
         try:
-            container.exec_run("rm -f /app/input.txt", workdir="/app")
+            runner.exec_run("rm -f /app/input.txt")
         except Exception as exc:
             logger.warning("清理 ACM 测试输入失败 case_name={}: {}", case_name, exc)
 
@@ -116,7 +97,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
 
         temporary_db = SessionLocal()
         try:
-            problem = temporary_db.get(Problem, problem_id)
+            problem = ProblemRepository(temporary_db).get_by_id(problem_id)
             if not problem:
                 return "System Error", 0, "Problem not found"
             memory_limit = problem.memory_limit
@@ -124,7 +105,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         finally:
             temporary_db.close()
     else:
-        problem = db.get(Problem, problem_id)
+        problem = ProblemRepository(db).get_by_id(problem_id)
         if not problem:
             return "System Error", 0, "Problem not found"
         memory_limit = problem.memory_limit
@@ -163,7 +144,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
     except (TypeError, ValueError):
         time_limit_ms = 1000
 
-    container, prep_error_type, prep_error_message = _prepare_container(
+    runner, prep_error_type, prep_error_message = _prepare_container(
         lang_config,
         user_code,
         memory_limit,
@@ -172,13 +153,13 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         return "Compile Error", 0, prep_error_message
     if prep_error_type == "system":
         return "System Error", 0, prep_error_message
-    if container is None:
+    if runner is None:
         return "System Error", 0, "Failed to prepare runtime container"
 
     try:
         ordered_results = [
             _judge_single_case(
-                container,
+                runner,
                 case_name,
                 input_data,
                 expected_output,
@@ -190,7 +171,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
     except Exception as exc:
         return "Runtime Error", 0, str(exc)
     finally:
-        _stop_container(container)
+        runner.stop()
 
     passed_count = 0
     has_tle = False
