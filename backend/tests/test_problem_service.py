@@ -33,7 +33,7 @@ class FakeProblemRepository:
     def get_by_id(self, problem_id: int):
         return next((item for item in self.items if item.id == problem_id), None)
 
-    def list(self, page=None, page_size=None):
+    def list_all(self, page=None, page_size=None):
         items = list(reversed(self.items))
         if page is None or page_size is None:
             return items, None

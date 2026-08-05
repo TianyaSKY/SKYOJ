@@ -43,7 +43,7 @@ class ProblemRepository:
         self._db.refresh(problem)
         return problem
 
-    def list(
+    def list_all(
         self, page: int | None = None, page_size: int | None = None
     ) -> tuple[list[Problem], int | None]:
         """按创建顺序倒序查询题目，必要时在数据库侧分页。"""

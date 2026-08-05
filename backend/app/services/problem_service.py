@@ -11,6 +11,7 @@ from app.domain.problem import (
 )
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
 from app.domain.errors import PermissionDeniedError
+from app.mappers import from_problem_orm
 from app.repositories.problem_repository import ProblemRepository
 
 
@@ -39,14 +40,14 @@ class ProblemService:
             memory_limit=params.memory_limit,
             template_code=params.template_code,
         )
-        return self._to_detail(problem)
+        return from_problem_orm(problem, with_content=True)
 
     def list_problems(
         self, page: int | None = None, page_size: int | None = None
     ) -> list[ProblemListItem] | PaginatedProblems:
         """查询题目列表，并在指定页码时返回分页结果。"""
-        problems, total = self._problem_repository.list(page=page, page_size=page_size)
-        items = [self._to_list_item(problem) for problem in problems]
+        problems, total = self._problem_repository.list_all(page=page, page_size=page_size)
+        items = [from_problem_orm(problem) for problem in problems]
         if page is None or page_size is None:
             return items
 
@@ -59,7 +60,7 @@ class ProblemService:
 
     def get_problem(self, problem_id: int) -> ProblemDetail:
         """获取题目详情。"""
-        return self._to_detail(self._require_problem(problem_id))
+        return from_problem_orm(self._require_problem(problem_id), with_content=True)
 
     def update_problem(
         self, requester_role: str, problem_id: int, params: UpdateProblemParams
@@ -79,7 +80,7 @@ class ProblemService:
             if value is not None:
                 setattr(problem, attribute, value)
 
-        return self._to_detail(self._problem_repository.update(problem))
+        return from_problem_orm(self._problem_repository.update(problem), with_content=True)
 
     def delete_problem(self, requester_role: str, problem_id: int) -> None:
         """删除题目记录。"""
@@ -120,29 +121,3 @@ class ProblemService:
     def _require_teacher(role: str) -> None:
         if role != "teacher":
             raise PermissionDeniedError("没有教师权限")
-
-    @staticmethod
-    def _to_list_item(problem) -> ProblemListItem:
-        return ProblemListItem(
-            id=problem.id,
-            title=problem.title,
-            problem_type=problem.type,
-            language=problem.language,
-            time_limit=problem.time_limit,
-            memory_limit=problem.memory_limit,
-        )
-
-    @staticmethod
-    def _to_detail(problem) -> ProblemDetail:
-        return ProblemDetail(
-            id=problem.id,
-            title=problem.title,
-            content=problem.content,
-            problem_type=problem.type,
-            language=problem.language,
-            time_limit=problem.time_limit,
-            memory_limit=problem.memory_limit,
-            template_code=problem.template_code or "",
-            test_case_path=problem.test_case_path,
-            created_at=problem.created_at,
-        )

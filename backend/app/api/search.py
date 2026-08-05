@@ -16,4 +16,15 @@ def search_problems(
     auth: AuthContext = Depends(get_current_auth),
     service: SearchFacadeService = Depends(get_search_service),
 ):
-    return service.search(auth.user.id, query, top_k)
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "content": p.content,
+            "type": p.problem_type,
+            "language": p.language,
+            "time_limit": p.time_limit,
+            "memory_limit": p.memory_limit,
+        }
+        for p in service.search(auth.user.id, query, top_k)
+    ]

@@ -7,17 +7,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.async_job import (
-    AI_QUEUE,
     AsyncJobResult,
     CreateAsyncJobParams,
+    LEASE_SECONDS,
+)
+from app.mappers import from_async_job_orm
+from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
+from app.messaging.task_names import (
     EXECUTE_TEST_DATA_TASK,
     FINALIZE_DATASET_TASK,
     GENERATE_PROBLEM_TASK,
     GENERATE_TEST_SCRIPT_TASK,
-    FILE_QUEUE,
-    JUDGE_QUEUE,
     JUDGE_SUBMISSION_TASK,
-    LEASE_SECONDS,
 )
 from app.repositories.async_job_repository import AsyncJobRepository
 from app.utils.time import utcnow
@@ -39,7 +40,7 @@ class AsyncJobService:
         if params.dedupe_key:
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is not None:
-                return self._to_result(existing)
+                return from_async_job_orm(existing)
 
         available_at = params.available_at or utcnow()
         try:
@@ -58,14 +59,14 @@ class AsyncJobService:
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is None:
                 raise
-            return self._to_result(existing)
+            return from_async_job_orm(existing)
         logger.info(
             "已创建异步任务 job_id={} task={} queue={}",
             job.id,
             job.task_name,
             job.queue,
         )
-        return self._to_result(job)
+        return from_async_job_orm(job)
 
     def enqueue_judge_submission(self, submission_id: int) -> AsyncJobResult:
         """创建判题任务。"""
@@ -158,12 +159,12 @@ class AsyncJobService:
             now=now,
             lease_until=now + timedelta(seconds=max(1, lease_seconds)),
         )
-        return self._to_result(job) if job is not None else None
+        return from_async_job_orm(job) if job is not None else None
 
     def complete_job(self, job_id: int) -> AsyncJobResult | None:
         """标记任务成功。"""
         job = self._repository.mark_succeeded(job_id, now=utcnow())
-        return self._to_result(job) if job is not None else None
+        return from_async_job_orm(job) if job is not None else None
 
     def fail_job(
         self,
@@ -194,17 +195,7 @@ class AsyncJobService:
                 failed.status,
                 error_message,
             )
-        return self._to_result(failed) if failed is not None else None
-
-    def renew_lease(self, job_id: int, *, lease_seconds: int) -> AsyncJobResult | None:
-        """在任务关键阶段主动续租。"""
-        now = utcnow()
-        job = self._repository.renew_lease(
-            job_id,
-            now=now,
-            lease_until=now + timedelta(seconds=max(1, lease_seconds)),
-        )
-        return self._to_result(job) if job is not None else None
+        return from_async_job_orm(failed) if failed is not None else None
 
     def recover_expired_jobs(self, *, limit: int = 100) -> int:
         """恢复过期租约任务。"""
@@ -222,20 +213,6 @@ class AsyncJobService:
     def parse_payload(raw: str) -> dict:
         """解析任务 JSON 参数。"""
         return AsyncJobRepository.parse_payload(raw)
-
-    @staticmethod
-    def _to_result(job) -> AsyncJobResult:
-        return AsyncJobResult(
-            id=job.id,
-            task_name=job.task_name,
-            queue=job.queue,
-            status=job.status,
-            attempts=job.attempts,
-            max_attempts=job.max_attempts,
-            lease_until=job.lease_until,
-            created_at=job.created_at,
-            updated_at=job.updated_at,
-        )
 
 
 __all__ = ["AsyncJobService"]

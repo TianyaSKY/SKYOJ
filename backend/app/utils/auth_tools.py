@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import SECRET_KEY
 from app.database import get_db
+from app.domain.auth import AuthUserInfo
 from app.models.user import User
 
 
@@ -46,7 +47,7 @@ def decode_auth_token(auth_token):
 
 @dataclass
 class AuthContext:
-    user: User
+    user: AuthUserInfo
     exam_id: int = -1
 
 
@@ -76,7 +77,11 @@ def get_current_auth(
                 detail={"message": "User not found, token is invalid."},
             )
         return AuthContext(
-            user=current_user,
+            user=AuthUserInfo(
+                id=current_user.id,
+                username=current_user.username,
+                role=current_user.role,
+            ),
             exam_id=payload.get("exam_id", -1),
         )
     except HTTPException:
