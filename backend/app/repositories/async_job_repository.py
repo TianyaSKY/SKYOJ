@@ -158,13 +158,23 @@ class AsyncJobRepository:
         return job
 
     def recover_expired(self, *, now: datetime, limit: int) -> list[AsyncJob]:
-        """将过期运行中任务重新置为待处理；超过次数的任务标记失败。"""
+        """恢复失联任务：RUNNING 租约过期置回待处理，PENDING 且已到
+        available_at 的任务重新投递（消息可能发布时被丢弃或提前到达被
+        claim 拒收）。重复投递由 claim 的原子领取吸收。"""
         jobs = (
             self._db.query(AsyncJob)
             .filter(
-                AsyncJob.status == JOB_RUNNING,
-                AsyncJob.lease_until.is_not(None),
-                AsyncJob.lease_until <= now,
+                or_(
+                    and_(
+                        AsyncJob.status == JOB_RUNNING,
+                        AsyncJob.lease_until.is_not(None),
+                        AsyncJob.lease_until <= now,
+                    ),
+                    and_(
+                        AsyncJob.status == JOB_PENDING,
+                        AsyncJob.available_at <= now,
+                    ),
+                )
             )
             .order_by(AsyncJob.id.asc())
             .limit(max(1, min(limit, 100)))
@@ -172,14 +182,17 @@ class AsyncJobRepository:
         )
         recovered = []
         for job in jobs:
-            if job.attempts >= job.max_attempts:
-                job.status = JOB_FAILED
-                job.finished_at = now
-                job.lease_until = None
+            if job.status == JOB_RUNNING:
+                if job.attempts >= job.max_attempts:
+                    job.status = JOB_FAILED
+                    job.finished_at = now
+                    job.lease_until = None
+                else:
+                    job.status = JOB_PENDING
+                    job.available_at = now
+                    job.lease_until = None
+                    recovered.append(job)
             else:
-                job.status = JOB_PENDING
-                job.available_at = now
-                job.lease_until = None
                 recovered.append(job)
             job.updated_at = now
         self._db.commit()

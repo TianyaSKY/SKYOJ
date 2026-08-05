@@ -107,8 +107,9 @@ def test_fail_job_with_retry_republishes(monkeypatch):
         assert result.status == "pending"  # 仍有重试次数
         assert len(sent) == 1
         assert sent[0][1]["args"] == [job.id]
-        # attempts 已在 claim 时 +1，重投递使用新 task_id
+        # attempts 已在 claim 时 +1，重投递使用新 task_id，且延迟到 available_at
         assert sent[0][1]["task_id"] == f"async-job-{job.id}-1"
+        assert sent[0][1]["countdown"] == 1  # 2 ** (attempts - 1) = 1 秒退避
     finally:
         db.close()
         engine.dispose()
@@ -156,6 +157,31 @@ def test_job_lease_expiry_recovery_republishes(monkeypatch):
         assert recovered.lease_until is None
         assert len(sent) == 1
         assert sent[0][1]["args"] == [job.id]
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_recovery_republishes_stuck_pending_jobs(monkeypatch):
+    """消息丢失/提前到达被拒后，pending 且已到 available_at 的任务应被重新投递。"""
+    engine, db = make_session()
+    try:
+        service = AsyncJobService.from_session(db)
+        job = service.enqueue(
+            make_params(payload={"submission_id": 12}, dedupe_key=None)
+        )
+        # 模拟消息丢失：任务仍 pending 且早已可领取，但从未被消费
+        model = service._repository.get_by_id(job.id)
+        model.available_at = (
+            datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=60)
+        )
+        db.commit()
+        sent = capture_send_task(monkeypatch)
+
+        assert service.recover_expired_jobs() == 1
+        assert len(sent) == 1
+        assert sent[0][1]["args"] == [job.id]
+        assert service._repository.get_by_id(job.id).status == "pending"
     finally:
         db.close()
         engine.dispose()

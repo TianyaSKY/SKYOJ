@@ -234,7 +234,7 @@ uv run celery -A app.messaging.celery_app:celery_app worker --queues=file --pool
 ```
 
 ```bash
-# Terminal 5 (optional): job recovery (re-publishes tasks with expired leases)
+# Terminal 5 (recommended): job recovery (re-publishes lost/expired task messages)
 cd backend
 uv run python -m app.workers.job_recovery
 ```

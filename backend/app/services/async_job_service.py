@@ -75,15 +75,18 @@ class AsyncJobService:
             raise
         return from_async_job_orm(job)
 
-    def _publish(self, job) -> None:
+    def _publish(self, job, *, countdown: int | None = None) -> None:
         """向 Celery 投递任务消息；消息体只包含任务 ID。"""
         from app.messaging.celery_app import celery_app
 
+        kwargs = {"task_id": f"async-job-{job.id}-{job.attempts}"}
+        if countdown is not None:
+            kwargs["countdown"] = countdown
         celery_app.send_task(
             job.task_name,
             args=[job.id],
             queue=job.queue,
-            task_id=f"async-job-{job.id}-{job.attempts}",
+            **kwargs,
         )
         logger.info("异步任务已发布 job_id={} queue={}", job.id, job.queue)
 
@@ -182,8 +185,9 @@ class AsyncJobService:
                 error_message,
             )
             if retry_at is not None:
+                delay = max(0, int((retry_at - now).total_seconds()))
                 try:
-                    self._publish(failed)
+                    self._publish(failed, countdown=delay)
                 except Exception as exc:
                     logger.exception(
                         "重新投递失败任务 job_id={} queue={}",

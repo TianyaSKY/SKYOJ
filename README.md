@@ -193,7 +193,7 @@ docker compose up -d mysql rabbitmq
 ```bash
 # 终端 1：后端 API（密码必须是 docker compose 启动时 MYSQL_PASSWORD 的实际值）
 cd backend
-DATABASE_URL=mysql+pymysql://skyoj:MYSQL_PASSWORD的实际值@127.0.0.1:3306/oj_db \
+DATABASE_URL=mysql+pymysql://skyoj:replace_with_strong_app_password@127.0.0.1:3306/oj_db \
 SECRET_KEY=hajimiyounanbeiluduoxixigahaayoudingdongji \
 CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672// \
 uv run python run.py
@@ -218,7 +218,7 @@ uv run celery -A app.messaging.celery_app:celery_app worker --queues=file --pool
 ```
 
 ```bash
-# 终端 5（可选）：任务恢复器（回收租约过期任务并重新投递）
+# 终端 5：任务恢复器（兜底：重新投递消息丢失/超时的任务，建议常驻）
 cd backend
 uv run python -m app.workers.job_recovery
 ```
