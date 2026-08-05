@@ -88,7 +88,8 @@ class SandboxRunner:
         if nano_cpus is not None:
             kwargs["nano_cpus"] = nano_cpus
         if workdir is not None:
-            kwargs["workdir"] = workdir
+            # docker SDK 的 create_container/run 使用 working_dir（exec_run 才用 workdir）
+            kwargs["working_dir"] = workdir
         self._container = client.containers.run(
             self._image,
             ["sleep", "600"],

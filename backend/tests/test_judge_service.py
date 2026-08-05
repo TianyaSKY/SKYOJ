@@ -232,7 +232,7 @@ def test_sandbox_runner_launch_forwards_limits(monkeypatch):
         "pids_limit": 50,
         "mem_limit": "128m",
         "nano_cpus": 1000000000,
-        "workdir": "/app",
+        "working_dir": "/app",
     }
 
     exit_code, output = runner.exec_run("ls", timeout=5)
