@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -8,6 +8,10 @@ from app.database import Base
 
 class Submission(Base):
     __tablename__ = "submissions"
+    __table_args__ = (
+        Index("ix_submissions_exam_problem_user", "exam_id", "problem_id", "user_id"),
+        Index("ix_submissions_created_at", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True)
 

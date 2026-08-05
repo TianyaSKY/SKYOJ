@@ -33,6 +33,42 @@ def create_tables() -> None:
 
     Base.metadata.create_all(bind=engine)
     _ensure_dataset_columns()
+    _ensure_indexes()
+
+
+def _ensure_indexes() -> None:
+    """为没有迁移框架的旧数据库补齐查询索引。"""
+    inspector = inspect(engine)
+    required_indexes = {
+        "submissions": {
+            "ix_submissions_exam_problem_user": (
+                "CREATE INDEX ix_submissions_exam_problem_user "
+                "ON submissions (exam_id, problem_id, user_id)"
+            ),
+            "ix_submissions_created_at": (
+                "CREATE INDEX ix_submissions_created_at ON submissions (created_at)"
+            ),
+        },
+        "exam_problems": {
+            "ix_exam_problems_exam_id": (
+                "CREATE INDEX ix_exam_problems_exam_id ON exam_problems (exam_id)"
+            ),
+        },
+    }
+    missing = []
+    for table, indexes in required_indexes.items():
+        if table not in inspector.get_table_names():
+            continue
+        existing = {index["name"] for index in inspector.get_indexes(table)}
+        for name, ddl in indexes.items():
+            if name not in existing:
+                missing.append(ddl)
+    if not missing:
+        return
+
+    with engine.begin() as connection:
+        for ddl in missing:
+            connection.execute(text(ddl))
 
 
 def _ensure_dataset_columns() -> None:

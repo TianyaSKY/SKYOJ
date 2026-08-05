@@ -7,10 +7,11 @@ from app.config import SECRET_KEY
 from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
 from app.domain.exam import (
     AddExamProblemParams, CreateExamParams, EnterExamParams, ExamDetail, ExamListItem,
-    ExamProblemItem, ExamProblemStatus, ExamScoreRow, MonitorEntry, MonitorProblemInfo,
+    ExamProblemStatus, ExamScoreRow, MonitorEntry, MonitorProblemInfo,
     MonitorResult, MonitorSubmissionInfo, RankEntry, RankProblemInfo, RankProblemStats,
     RankResult, UpdateExamParams,
 )
+from app.mappers import from_exam_detail_orm, from_exam_orm
 from app.repositories.exam_repository import ExamRepository
 
 
@@ -24,14 +25,25 @@ class ExamService:
         self._require_teacher(requester_role)
         self._validate_times(params.start_time, params.end_time)
         exam = self._repository.create(title=params.title, description=params.description, start_time=params.start_time, end_time=params.end_time, password=self._hash_password(params.password), is_visible=params.is_visible, created_by=params.created_by)
-        return self._to_detail(exam, [])
+        return from_exam_detail_orm(exam, [])
 
     def list_exams(self, requester_role: str) -> list[ExamListItem]:
-        return [self._to_list_item(exam) for exam in self._repository.list_visible_for(requester_role)]
+        exams = self._repository.list_visible_for(requester_role)
+        exam_ids = [exam.id for exam in exams]
+        problem_counts = self._repository.count_problems_batch(exam_ids)
+        submission_counts = self._repository.count_submissions_batch(exam_ids)
+        return [
+            from_exam_orm(
+                exam,
+                problem_count=problem_counts.get(exam.id, 0),
+                submission_count=submission_counts.get(exam.id, 0),
+            )
+            for exam in exams
+        ]
 
     def get_detail(self, exam_id: int) -> ExamDetail:
         exam = self._require_exam(exam_id)
-        return self._to_detail(exam, self._repository.list_problems(exam_id))
+        return from_exam_detail_orm(exam, self._repository.list_problems(exam_id))
 
     def enter_exam(self, user_id: int, current_exam_id: int, params: EnterExamParams) -> int:
         exam = self._require_exam(params.exam_id)
@@ -47,9 +59,15 @@ class ExamService:
     def get_status(self, user_id: int, exam_id: int) -> list[ExamProblemStatus]:
         if exam_id == -1:
             raise InvalidStateError("当前未处于考试会话")
+        problems = self._repository.list_problems(exam_id)
+        latest = self._repository.list_latest_submissions(
+            exam_id,
+            user_ids=[user_id],
+            problem_ids=[item.problem_id for item in problems],
+        )
         items = []
-        for item in self._repository.list_problems(exam_id):
-            last = self._repository.get_latest_submission(exam_id, user_id, item.problem_id)
+        for item in problems:
+            last = latest.get((user_id, item.problem_id))
             items.append(ExamProblemStatus(item.problem_id, item.display_id, item.problem.title, item.score, last.status if last else "Not Attempted", last.score if last else 0, last.created_at if last else None))
         return items
 
@@ -64,7 +82,7 @@ class ExamService:
                 setattr(exam, field, value)
         if params.password is not None:
             exam.password = self._hash_password(params.password)
-        return self._to_detail(self._repository.update(exam), self._repository.list_problems(exam_id))
+        return from_exam_detail_orm(self._repository.update(exam), self._repository.list_problems(exam_id))
 
     def delete_exam(self, requester_role: str, exam_id: int) -> None:
         self._require_teacher(requester_role)
@@ -86,12 +104,18 @@ class ExamService:
         self._require_teacher(requester_role)
         exam = self._require_exam(exam_id)
         problems = self._repository.list_problems(exam_id)
+        problem_ids = [item.problem_id for item in problems]
+        user_ids = self._repository.list_submission_user_ids(exam_id)
+        users_map = self._repository.list_users(user_ids)
+        latest = self._repository.list_latest_submissions(
+            exam_id, user_ids=user_ids, problem_ids=problem_ids
+        )
         users = []
-        for user_id in self._repository.list_submission_user_ids(exam_id):
-            user = self._repository.get_user(user_id)
+        for user_id in user_ids:
+            user = users_map[user_id]
             submissions, total = {}, 0.0
             for item in problems:
-                last = self._repository.get_latest_submission(exam_id, user_id, item.problem_id)
+                last = latest.get((user_id, item.problem_id))
                 info = MonitorSubmissionInfo(last.id if last else None, last.status if last else "Not Attempted", last.score if last else 0, last.created_at.isoformat() if last else None)
                 submissions[item.problem_id] = info
                 total += info.score
@@ -105,7 +129,9 @@ class ExamService:
         problem_ids = [item.problem_id for item in problems]
         ranks: dict[int, RankEntry] = {}
         for submission in self._repository.list_submissions(exam_id, problem_ids):
-            entry = ranks.setdefault(submission.user_id, RankEntry(submission.user_id, submission.user.username, 0, 0, {pid: RankProblemStats(False, 0, 0) for pid in problem_ids}))
+            if submission.user_id not in ranks:
+                ranks[submission.user_id] = RankEntry(submission.user_id, submission.user.username, 0, 0, {pid: RankProblemStats(False, 0, 0) for pid in problem_ids})
+            entry = ranks[submission.user_id]
             stats = entry.problems.get(submission.problem_id)
             if stats is None or stats.solved:
                 continue
@@ -120,24 +146,21 @@ class ExamService:
     def score_rows(self, requester_role: str, exam_id: int) -> tuple[ExamDetail, list[ExamScoreRow]]:
         self._require_teacher(requester_role)
         detail = self.get_detail(exam_id)
+        problem_ids = [problem.problem_id for problem in detail.problems]
+        user_ids = self._repository.list_submission_user_ids(exam_id)
+        users_map = self._repository.list_users(user_ids)
+        latest = self._repository.list_latest_submissions(
+            exam_id, user_ids=user_ids, problem_ids=problem_ids
+        )
         rows = []
-        for user_id in self._repository.list_submission_user_ids(exam_id):
-            user = self._repository.get_user(user_id)
+        for user_id in user_ids:
+            user = users_map[user_id]
             scores = []
             for problem in detail.problems:
-                submission = self._repository.get_latest_submission(
-                    exam_id, user_id, problem.problem_id
-                )
+                submission = latest.get((user_id, problem.problem_id))
                 scores.append(submission.score if submission else 0)
             rows.append(ExamScoreRow(user.id, user.username, scores, sum(scores)))
         return detail, rows
-
-    def _to_list_item(self, exam) -> ExamListItem:
-        return ExamListItem(exam.id, exam.title, exam.description or "", exam.start_time, exam.end_time, exam.is_visible, exam.created_by, self._repository.count_problems(exam.id), self._repository.count_submissions(exam.id), bool(exam.password))
-
-    @staticmethod
-    def _to_detail(exam, problems) -> ExamDetail:
-        return ExamDetail(exam.id, exam.title, exam.description or "", exam.start_time, exam.end_time, exam.is_visible, exam.created_by, bool(exam.password), [ExamProblemItem(item.problem_id, item.display_id, item.score, item.problem.title) for item in problems])
 
     def _require_exam(self, exam_id: int):
         exam = self._repository.get_by_id(exam_id)
