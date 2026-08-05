@@ -43,19 +43,46 @@ class ProblemService:
         return from_problem_orm(problem, with_content=True)
 
     def list_problems(
-        self, page: int | None = None, page_size: int | None = None
+        self,
+        requester_role: str,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> list[ProblemListItem] | PaginatedProblems:
-        """查询题目列表，并在指定页码时返回分页结果。"""
-        problems, total = self._problem_repository.list_all(page=page, page_size=page_size)
-        items = [from_problem_orm(problem) for problem in problems]
-        if page is None or page_size is None:
-            return items
+        """查询题目列表，并在指定页码时返回分页结果。
 
+        教师可见全部题目；其他角色仅可见已上传测试用例的题目。
+        """
+        if requester_role == "teacher":
+            problems, total = self._problem_repository.list_all(
+                page=page, page_size=page_size
+            )
+            items = [from_problem_orm(problem) for problem in problems]
+            if page is None or page_size is None:
+                return items
+
+            return PaginatedProblems(
+                total=total or 0,
+                page=page,
+                page_size=page_size,
+                problems=items,
+            )
+
+        problems, _ = self._problem_repository.list_all()
+        visible = [
+            problem
+            for problem in problems
+            if self._test_case_storage.has_test_cases(problem.id)
+        ]
+        if page is None or page_size is None:
+            return [from_problem_orm(problem) for problem in visible]
+
+        start = (page - 1) * page_size
+        paged = visible[start : start + page_size]
         return PaginatedProblems(
-            total=total or 0,
+            total=len(visible),
             page=page,
             page_size=page_size,
-            problems=items,
+            problems=[from_problem_orm(problem) for problem in paged],
         )
 
     def get_problem(self, problem_id: int) -> ProblemDetail:

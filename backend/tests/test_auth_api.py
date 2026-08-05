@@ -60,6 +60,13 @@ def test_missing_token_returns_401(client):
     assert response.json()["message"] == "Token 丢失"
 
 
+def test_problems_list_requires_token(client):
+    response = client.get("/api/problems")
+
+    assert response.status_code == 401
+    assert response.json()["message"] == "Token 丢失"
+
+
 def test_invalid_token_returns_401(client):
     response = client.get(
         "/api/user/submissions",

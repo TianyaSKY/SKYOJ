@@ -26,5 +26,5 @@ def search_problems(
             "time_limit": p.time_limit,
             "memory_limit": p.memory_limit,
         }
-        for p in service.search(auth.user.id, query, top_k)
+        for p in service.search(auth.user.id, query, top_k, auth.user.role)
     ]

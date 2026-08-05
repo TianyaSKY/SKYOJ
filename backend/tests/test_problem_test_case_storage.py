@@ -123,3 +123,15 @@ def test_extracted_size_limit_is_enforced(tmp_path: Path, monkeypatch):
 
     with pytest.raises(InvalidStateError, match="总大小"):
         client.save_zip(1, "cases.zip", make_zip(("1.in", b"input")))
+
+
+def test_has_test_cases_tracks_upload_and_delete(tmp_path: Path):
+    client = ProblemTestCaseStorageClient(str(tmp_path / "problems"))
+
+    assert client.has_test_cases(1) is False
+
+    client.save_zip(1, "cases.zip", make_zip(("1.in", b"input")))
+    assert client.has_test_cases(1) is True
+
+    client.delete_all(1)
+    assert client.has_test_cases(1) is False

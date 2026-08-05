@@ -92,4 +92,6 @@ def get_system_service(db: Session = Depends(get_db)) -> SystemService:
 
 def get_search_service(db: Session = Depends(get_db)) -> SearchFacadeService:
     """构造搜索服务。"""
-    return SearchFacadeService(SearchRepository(db))
+    return SearchFacadeService(
+        SearchRepository(db), test_case_storage=ProblemTestCaseStorageClient()
+    )

@@ -89,6 +89,12 @@ class ProblemTestCaseStorageClient:
             raise ResourceNotFoundError("测试用例目录不存在")
         self._remove_path(folder)
 
+    def has_test_cases(self, problem_id: int) -> bool:
+        """题目是否已上传测试用例（目录存在且非空）。"""
+
+        folder = self._folder(problem_id)
+        return folder.is_dir() and any(folder.iterdir())
+
     def build_archive(self, problem_id: int) -> bytes:
         """将测试用例目录打包为 ZIP 字节流。"""
 

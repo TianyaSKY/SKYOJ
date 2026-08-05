@@ -47,6 +47,56 @@ class FakeProblemRepository:
         self.items.remove(problem)
 
 
+class FakeTestCaseStorage:
+    """内存假测试用例存储：仅 1、3 号题目已有测试用例。"""
+
+    def has_test_cases(self, problem_id: int) -> bool:
+        return problem_id in {1, 3}
+
+
+def _service_with_three_problems() -> ProblemService:
+    service = ProblemService(
+        FakeProblemRepository(), test_case_storage=FakeTestCaseStorage()
+    )
+    for title in ("A", "B", "C"):
+        service.create_problem(
+            "teacher",
+            CreateProblemParams(
+                title=title,
+                content="内容",
+                language="python",
+                problem_type="acm",
+            ),
+        )
+    return service
+
+
+def test_problem_service_student_list_filters_out_problems_without_test_cases() -> None:
+    service = _service_with_three_problems()
+
+    visible = service.list_problems("student")
+
+    assert {item.id for item in visible} == {1, 3}
+
+
+def test_problem_service_student_pagination_total_is_filtered_count() -> None:
+    service = _service_with_three_problems()
+
+    paginated = service.list_problems("student", page=1, page_size=1)
+
+    assert isinstance(paginated, PaginatedProblems)
+    assert paginated.total == 2
+    assert [item.id for item in paginated.problems] == [3]
+
+
+def test_problem_service_teacher_list_includes_all_problems() -> None:
+    service = _service_with_three_problems()
+
+    visible = service.list_problems("teacher")
+
+    assert {item.id for item in visible} == {1, 2, 3}
+
+
 def test_problem_service_create_update_and_paginate() -> None:
     service = ProblemService(FakeProblemRepository())
     created = service.create_problem(
@@ -73,7 +123,7 @@ def test_problem_service_create_update_and_paginate() -> None:
         created.id,
         UpdateProblemParams(title="更新后的题目", time_limit=2000),
     )
-    paginated = service.list_problems(page=1, page_size=1)
+    paginated = service.list_problems("teacher", page=1, page_size=1)
 
     assert updated.title == "更新后的题目"
     assert updated.time_limit == 2000

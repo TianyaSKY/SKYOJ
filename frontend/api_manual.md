@@ -37,6 +37,7 @@
 - **URL**: `/problems/` 或 `/problems/<id>`
 - **Methods**: `POST`, `GET`, `PUT`, `DELETE`
 - **Auth Required**: 管理类操作需 Teacher 权限。
+- **GET `/problems/`**：需登录；学生仅返回已上传测试点的题目，教师返回全部。
 
 ### 3.2 测试点管理 (Test Cases)
 
