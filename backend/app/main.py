@@ -20,6 +20,7 @@ from app.database import SessionLocal, create_tables
 from app.domain.errors import (
     AuthenticationError,
     BusinessError,
+    ExternalServiceError,
     InvalidStateError,
     PermissionDeniedError,
     ResourceNotFoundError,
@@ -100,6 +101,12 @@ def create_app() -> FastAPI:
         request: Request, exc: InvalidStateError
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+
+    @application.exception_handler(ExternalServiceError)
+    async def external_service_error_handler(
+        request: Request, exc: ExternalServiceError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=502, content={"error": str(exc)})
 
     @application.exception_handler(BusinessError)
     async def business_error_handler(

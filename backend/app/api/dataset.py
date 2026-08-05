@@ -85,14 +85,14 @@ def download_dataset(
 
     if not auth_token:
         raise HTTPException(
-            status_code=401, detail={"message": "Authentication required"}
+            status_code=401, detail={"error": "Authentication required"}
         )
 
     try:
         decode_auth_token(auth_token)
     except Exception:
         raise HTTPException(
-            status_code=401, detail={"message": "Invalid or expired token"}
+            status_code=401, detail={"error": "Invalid or expired token"}
         )
 
     dataset = service.download_dataset(id)

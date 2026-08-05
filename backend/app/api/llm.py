@@ -16,14 +16,6 @@ from app.domain.ai_draft import (
     SubmitTestDataExecutionParams,
     SubmitTestScriptGenerationParams,
 )
-from app.domain.errors import (
-    BusinessError,
-    ExternalServiceError,
-    InvalidStateError,
-    LlmConfigError,
-    PermissionDeniedError,
-    ResourceNotFoundError,
-)
 from app.domain.llm import AskLlmParams
 from app.services.ai_draft_service import AiDraftService
 from app.services.llm_facade_service import LlmFacadeService
@@ -35,19 +27,6 @@ router = APIRouter()
 def _require_teacher(auth: AuthContext) -> None:
     if auth.user.role != "teacher":
         raise HTTPException(status_code=403, detail={"error": "Permission denied"})
-
-
-def _map_business_error(exc: BusinessError) -> HTTPException:
-    """将业务异常映射为 HTTP 响应。"""
-    if isinstance(exc, ResourceNotFoundError):
-        return HTTPException(status_code=404, detail={"error": str(exc)})
-    if isinstance(exc, PermissionDeniedError):
-        return HTTPException(status_code=403, detail={"error": str(exc)})
-    if isinstance(exc, (InvalidStateError, LlmConfigError)):
-        return HTTPException(status_code=400, detail={"error": str(exc)})
-    if isinstance(exc, ExternalServiceError):
-        return HTTPException(status_code=502, detail={"error": str(exc)})
-    return HTTPException(status_code=400, detail={"error": str(exc)})
 
 
 def _dt_iso(value: Optional[datetime]) -> Optional[str]:
@@ -67,10 +46,7 @@ def call_llm(
     auth: AuthContext = Depends(get_current_auth),
     service: LlmFacadeService = Depends(get_llm_facade_service),
 ):
-    try:
-        return service.ask(AskLlmParams(body.system_setting, body.prompt, body.output_format))
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    return service.ask(AskLlmParams(body.system_setting, body.prompt, body.output_format))
 
 
 @router.post("/execute-test-generation", status_code=202)
@@ -81,18 +57,15 @@ def execute_test_generation(
 ):
     """兼容旧接口，但将执行请求投递到 Judge Worker。"""
     _require_teacher(auth)
-    try:
-        result = service.submit_test_data_execution(
-            SubmitTestDataExecutionParams(
-                user_id=auth.user.id,
-                problem_id=body.problem_id,
-                code=body.code,
-                problem_type=body.type or "acm",
-                language=body.language,
-            )
+    result = service.submit_test_data_execution(
+        SubmitTestDataExecutionParams(
+            user_id=auth.user.id,
+            problem_id=body.problem_id,
+            code=body.code,
+            problem_type=body.type or "acm",
+            language=body.language,
         )
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    )
     return {
         "message": "测试数据执行任务已提交，请到草稿箱查看进度",
         "draft_id": result.draft_id,
@@ -113,16 +86,13 @@ def submit_problem_generation(
 ):
     """异步 AI 出题：立即返回草稿 ID，结果写入草稿箱。"""
     _require_teacher(auth)
-    try:
-        result = service.submit_problem_generation(
-            SubmitProblemGenerationParams(
-                user_id=auth.user.id,
-                background=body.background,
-                difficulty=body.difficulty,
-            )
+    result = service.submit_problem_generation(
+        SubmitProblemGenerationParams(
+            user_id=auth.user.id,
+            background=body.background,
+            difficulty=body.difficulty,
         )
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    )
 
     return {
         "draft_id": result.draft_id,
@@ -141,16 +111,13 @@ def submit_test_script_generation(
 ):
     """异步生成测例/评估脚本。"""
     _require_teacher(auth)
-    try:
-        result = service.submit_test_script_generation(
-            SubmitTestScriptGenerationParams(
-                user_id=auth.user.id,
-                problem_id=body.problem_id,
-                direction=body.direction,
-            )
+    result = service.submit_test_script_generation(
+        SubmitTestScriptGenerationParams(
+            user_id=auth.user.id,
+            problem_id=body.problem_id,
+            direction=body.direction,
         )
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    )
 
     return {
         "draft_id": result.draft_id,
@@ -169,19 +136,16 @@ def submit_test_data_execution(
 ):
     """异步执行测例生成或保存非 ACM 脚本。"""
     _require_teacher(auth)
-    try:
-        result = service.submit_test_data_execution(
-            SubmitTestDataExecutionParams(
-                user_id=auth.user.id,
-                problem_id=body.problem_id,
-                code=body.code,
-                problem_type=body.type,
-                language=body.language,
-                source_draft_id=body.source_draft_id,
-            )
+    result = service.submit_test_data_execution(
+        SubmitTestDataExecutionParams(
+            user_id=auth.user.id,
+            problem_id=body.problem_id,
+            code=body.code,
+            problem_type=body.type,
+            language=body.language,
+            source_draft_id=body.source_draft_id,
         )
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    )
 
     return {
         "draft_id": result.draft_id,
@@ -202,15 +166,12 @@ def list_drafts(
 ):
     """列出当前教师的草稿箱任务。"""
     _require_teacher(auth)
-    try:
-        items = service.list_drafts(
-            auth.user.id,
-            status=status,
-            task_type=task_type,
-            limit=limit,
-        )
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    items = service.list_drafts(
+        auth.user.id,
+        status=status,
+        task_type=task_type,
+        limit=limit,
+    )
 
     return {
         "drafts": [
@@ -237,10 +198,7 @@ def draft_stats(
 ):
     """草稿箱统计（角标用）。"""
     _require_teacher(auth)
-    try:
-        stats = service.get_stats(auth.user.id)
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    stats = service.get_stats(auth.user.id)
 
     return {
         "total": stats.total,
@@ -261,10 +219,7 @@ def get_draft(
 ):
     """草稿详情。"""
     _require_teacher(auth)
-    try:
-        item = service.get_draft(auth.user.id, draft_id)
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    item = service.get_draft(auth.user.id, draft_id)
 
     return {
         "id": item.id,
@@ -289,10 +244,7 @@ def delete_draft(
 ):
     """删除草稿。"""
     _require_teacher(auth)
-    try:
-        service.delete_draft(auth.user.id, draft_id)
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    service.delete_draft(auth.user.id, draft_id)
     return {"message": "草稿已删除"}
 
 
@@ -304,10 +256,7 @@ def apply_problem_draft(
 ):
     """将成功的出题草稿创建为正式题目。"""
     _require_teacher(auth)
-    try:
-        result = service.apply_problem_draft(auth.user.id, draft_id)
-    except BusinessError as exc:
-        raise _map_business_error(exc) from exc
+    result = service.apply_problem_draft(auth.user.id, draft_id)
 
     return {
         "message": "题目创建成功",
