@@ -262,8 +262,11 @@ class AiDraftService:
             "具体要求：\n"
             f"1. 语言：使用 {script_language}。\n"
             f"2. 逻辑：{config['rule']}\n"
-            "3. 输出控制：你可以打印调试日志，但脚本执行的最后一行输出必须且只能是一个整数（0-100），代表得分。\n"
-            "4. 依赖：尽量使用基础库（如 csv, math, json），如果使用 pandas 或 sklearn，请确保逻辑简洁。"
+            f"3. 输出控制：{config['output']}\n"
+            "4. 依赖：尽量使用基础库（如 csv, math, json），如果使用 pandas 或 sklearn，请确保逻辑简洁。\n"
+            "5. 参考示例（只展示脚本结构与输入/输出方式，逻辑必须按当前题目重新实现；"
+            f"若目标语言不是 Python，请用 {script_language} 改写为同等结构）：\n"
+            f"```python\n{config['example']}\n```"
         )
         prompt = f"题目内容: {problem_snapshot}\n生成要求: {direction or '执行标准评估逻辑'}"
 
