@@ -6,6 +6,8 @@
 
 from typing import Any, Callable
 
+import time
+
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -33,6 +35,7 @@ def run_job(
             service.start_job(job_id, lease_seconds=service.lease_seconds(task_name))
             is None
         ):
+            logger.warning("异步任务重复投递已跳过 job_id={} task={}", job_id, task_name)
             return None  # 已被其他 worker 领取（重复投递）
 
         job = AsyncJobRepository(db).get_by_id(job_id)
@@ -40,9 +43,23 @@ def run_job(
             raise ValueError(f"异步任务不存在: {job_id}")
         payload = service.parse_payload(job.payload)
 
+        started_at = time.monotonic()
+        logger.info(
+            "异步任务开始执行 job_id={} task={} attempts={}",
+            job_id,
+            task_name,
+            job.attempts,
+        )
+
         try:
             result = handler(db, payload)
         except permanent_errors as exc:
+            logger.error(
+                "异步任务永久失败 job_id={} task={} error={}",
+                job_id,
+                task_name,
+                exc,
+            )
             service.fail_job(job_id, str(exc), retry=False)
             if on_failed:
                 on_failed(payload, str(exc))
@@ -55,9 +72,16 @@ def run_job(
             return None
 
         if getattr(result, "status", None) == "failed":
+            logger.warning("异步任务业务失败 job_id={} task={} status=failed", job_id, task_name)
             if on_failed:
                 on_failed(payload, result)
         service.complete_job(job_id)
+        logger.info(
+            "异步任务执行完成 job_id={} task={} 耗时={:.3f}s",
+            job_id,
+            task_name,
+            time.monotonic() - started_at,
+        )
         return result
     finally:
         db.close()

@@ -47,6 +47,19 @@ def use_test_session(engine, monkeypatch):
     monkeypatch.setattr(tasks_base, "SessionLocal", sessionmaker(bind=engine))
 
 
+def capture_logs():
+    """捕获 loguru 全局日志；返回 (records, restore)。
+
+    loguru 0.7.3 中 callable sink + format 收到 str 子类 Message，
+    直接 str() 取格式化文本（含尾随换行）。
+    """
+    from loguru import logger
+
+    records = []
+    sink_id = logger.add(records.append, format="{message}")
+    return records, lambda: logger.remove(sink_id)
+
+
 def test_run_job_success_path(monkeypatch):
     engine, db = make_session()
     try:
@@ -183,6 +196,113 @@ def test_run_job_duplicate_delivery_skips_handler(monkeypatch):
 
         assert result is None
         assert called == []
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_run_job_success_path_logs_start_and_completion(monkeypatch):
+    engine, db = make_session()
+    try:
+        service, job = seed_job(db)
+        use_test_session(engine, monkeypatch)
+
+        def handler(session, payload):
+            return {"ok": True}
+
+        records, restore = capture_logs()
+        try:
+            result = run_job(job.id, task_name=JUDGE_SUBMISSION_TASK, handler=handler)
+        finally:
+            restore()
+
+        assert result == {"ok": True}
+        messages = "\n".join(str(r) for r in records)
+        assert f"异步任务开始执行 job_id={job.id}" in messages
+        assert f"异步任务执行完成 job_id={job.id}" in messages
+        assert "耗时=" in messages
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_run_job_duplicate_delivery_logs_skip(monkeypatch):
+    engine, db = make_session()
+    try:
+        service, job = seed_job(db)
+        use_test_session(engine, monkeypatch)
+
+        # 已被另一个 worker 领取，租约仍有效
+        assert service.start_job(job.id, lease_seconds=600) is not None
+
+        called = []
+
+        def handler(session, payload):
+            called.append(payload)
+            return {"ok": True}
+
+        records, restore = capture_logs()
+        try:
+            result = run_job(job.id, task_name=JUDGE_SUBMISSION_TASK, handler=handler)
+        finally:
+            restore()
+
+        assert result is None
+        assert called == []
+        messages = "\n".join(str(r) for r in records)
+        assert f"异步任务重复投递已跳过 job_id={job.id}" in messages
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_run_job_permanent_error_logs_failure(monkeypatch):
+    engine, db = make_session()
+    try:
+        service, job = seed_job(db)
+        use_test_session(engine, monkeypatch)
+
+        def handler(session, payload):
+            raise _PermanentError("bad input")
+
+        records, restore = capture_logs()
+        try:
+            result = run_job(
+                job.id,
+                task_name=JUDGE_SUBMISSION_TASK,
+                handler=handler,
+                permanent_errors=(_PermanentError,),
+            )
+        finally:
+            restore()
+
+        assert result is None
+        messages = "\n".join(str(r) for r in records)
+        assert f"异步任务永久失败 job_id={job.id}" in messages
+        assert "bad input" in messages
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_run_job_business_failure_logs_warning(monkeypatch):
+    engine, db = make_session()
+    try:
+        service, job = seed_job(db)
+        use_test_session(engine, monkeypatch)
+
+        def handler(session, payload):
+            return _BusinessFailed()
+
+        records, restore = capture_logs()
+        try:
+            result = run_job(job.id, task_name=JUDGE_SUBMISSION_TASK, handler=handler)
+        finally:
+            restore()
+
+        assert result is not None
+        messages = "\n".join(str(r) for r in records)
+        assert f"异步任务业务失败 job_id={job.id}" in messages
     finally:
         db.close()
         engine.dispose()
