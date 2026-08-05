@@ -18,6 +18,7 @@ if str(BACKEND_ROOT) not in sys.path:
 # 必须在导入 app.database/app.main 前注入测试配置，避免测试连接真实数据库。
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["SECRET_KEY"] = "test-secret-key-for-milestone-one"
+os.environ["CELERY_BROKER_URL"] = "memory://"
 
 from app.database import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402

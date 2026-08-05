@@ -69,28 +69,6 @@ services:
     networks:
       - skyoj-net
 
-  outbox-dispatcher:
-    build:
-      context: .
-      dockerfile: docker/backend/Dockerfile
-    container_name: skyoj-outbox-dispatcher
-    command:
-      - python
-      - -m
-      - app.workers.outbox_dispatcher
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
-      PYTHONUNBUFFERED: "1"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - skyoj-net
-
   job-recovery:
     build:
       context: .

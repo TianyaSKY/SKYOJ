@@ -9,9 +9,6 @@ JOB_RUNNING = "running"
 JOB_SUCCEEDED = "succeeded"
 JOB_FAILED = "failed"
 
-OUTBOX_PENDING = "pending"
-OUTBOX_PUBLISHED = "published"
-
 DEFAULT_MAX_ATTEMPTS = 3
 # 键为消息任务名字符串，与 app.messaging.task_names 保持一致
 LEASE_SECONDS = {
@@ -59,6 +56,4 @@ __all__ = [
     "JOB_RUNNING",
     "JOB_SUCCEEDED",
     "LEASE_SECONDS",
-    "OUTBOX_PENDING",
-    "OUTBOX_PUBLISHED",
 ]

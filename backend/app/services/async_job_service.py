@@ -25,7 +25,7 @@ from app.utils.time import utcnow
 
 
 class AsyncJobService:
-    """编排数据库任务状态与 RabbitMQ Outbox 发布。"""
+    """编排数据库任务状态与 RabbitMQ 发布。"""
 
     def __init__(self, repository: AsyncJobRepository) -> None:
         self._repository = repository
@@ -36,7 +36,7 @@ class AsyncJobService:
         return cls(AsyncJobRepository(db))
 
     def enqueue(self, params: CreateAsyncJobParams) -> AsyncJobResult:
-        """创建任务和 Outbox；重复幂等键直接返回原任务。"""
+        """创建任务并直接投递给 RabbitMQ；重复幂等键直接返回原任务。"""
         if params.dedupe_key:
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is not None:
@@ -66,7 +66,26 @@ class AsyncJobService:
             job.task_name,
             job.queue,
         )
+        try:
+            self._publish(job)
+        except Exception as exc:
+            # 投递失败即撤销任务记录，客户端可重试（dedupe 键不复用僵尸任务）
+            self._repository.delete(job)
+            logger.exception("发布异步任务失败 job_id={} queue={}", job.id, job.queue)
+            raise
         return from_async_job_orm(job)
+
+    def _publish(self, job) -> None:
+        """向 Celery 投递任务消息；消息体只包含任务 ID。"""
+        from app.messaging.celery_app import celery_app
+
+        celery_app.send_task(
+            job.task_name,
+            args=[job.id],
+            queue=job.queue,
+            task_id=f"async-job-{job.id}-{job.attempts}",
+        )
+        logger.info("异步任务已发布 job_id={} queue={}", job.id, job.queue)
 
     def enqueue_judge_submission(self, submission_id: int) -> AsyncJobResult:
         """创建判题任务。"""
@@ -118,39 +137,6 @@ class AsyncJobService:
             )
         )
 
-    def publish_pending_jobs(self, *, limit: int = 20) -> int:
-        """发布一批 Outbox；消息体只包含任务 ID。"""
-        from app.messaging.celery_app import celery_app
-
-        now = utcnow()
-        outbox_items = self._repository.list_pending_outbox(now=now, limit=limit)
-        published = 0
-        for outbox in outbox_items:
-            job = outbox.job
-            try:
-                celery_app.send_task(
-                    job.task_name,
-                    args=[job.id],
-                    queue=job.queue,
-                    task_id=f"async-job-{job.id}-{job.attempts}",
-                )
-            except Exception as exc:
-                retry_at = utcnow() + timedelta(seconds=5)
-                self._repository.mark_outbox_pending(
-                    outbox.id,
-                    error_message=str(exc),
-                    available_at=retry_at,
-                )
-                logger.exception("发布异步任务失败 job_id={}", job.id)
-                continue
-            self._repository.mark_outbox_published(
-                outbox.id,
-                published_at=utcnow(),
-            )
-            published += 1
-            logger.info("异步任务已发布 job_id={} queue={}", job.id, job.queue)
-        return published
-
     def start_job(self, job_id: int, *, lease_seconds: int) -> AsyncJobResult | None:
         """领取任务并写入租约；重复消息返回 None。"""
         now = utcnow()
@@ -173,7 +159,7 @@ class AsyncJobService:
         *,
         retry: bool = True,
     ) -> AsyncJobResult | None:
-        """标记任务失败，并按剩余次数重新放回 Outbox。"""
+        """标记任务失败，并按剩余次数重新投递。"""
         now = utcnow()
         job = self._repository.get_by_id(job_id)
         if job is None:
@@ -195,14 +181,28 @@ class AsyncJobService:
                 failed.status,
                 error_message,
             )
+            if retry_at is not None:
+                try:
+                    self._publish(failed)
+                except Exception as exc:
+                    logger.exception(
+                        "重新投递失败任务 job_id={} queue={}",
+                        job_id,
+                        failed.queue,
+                    )
         return from_async_job_orm(failed) if failed is not None else None
 
     def recover_expired_jobs(self, *, limit: int = 100) -> int:
-        """恢复过期租约任务。"""
-        count = self._repository.recover_expired(now=utcnow(), limit=limit)
-        if count:
-            logger.warning("已恢复过期异步任务数量={}", count)
-        return count
+        """恢复过期租约任务并重新投递。"""
+        jobs = self._repository.recover_expired(now=utcnow(), limit=limit)
+        for job in jobs:
+            try:
+                self._publish(job)
+            except Exception as exc:
+                logger.exception("重新投递过期任务失败 job_id={}", job.id)
+        if jobs:
+            logger.warning("已恢复过期异步任务数量={}", len(jobs))
+        return len(jobs)
 
     @staticmethod
     def lease_seconds(task_name: str) -> int:
