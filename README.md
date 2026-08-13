@@ -35,6 +35,9 @@
 - **AI 助教 (Smart Tutor)**：
   - 集成 **DeepSeek/OpenAI** 接口。
   - 采用 **CoT (思维链)** 与 **角色扮演** 提示词工程，引导学生分析逻辑漏洞，而非直接提供答案。
+- **AI 辅助出题 (AI Problem Generation)**：
+  - 教师输入背景与难度，即可由 LLM 自动生成完整题目（ACM / OOP / Kaggle）与测例脚本。
+  - 任务异步执行并进入 **AI 草稿箱**（Draft Box），完成后可预览、执行测试数据并一键应用为正式题目，无需在提交页长时间等待。
 
 ### 3. 企业级系统架构
 - **云原生架构**：基于 Docker Compose 编排，实现 Web 服务、数据库、评测沙箱的完全解耦。
@@ -241,13 +244,26 @@ uv run python -m pytest -q backend/tests
 
 ## 系统截图
 
-![problem-detail-editor.png](images/problem-detail-editor.png)
 ![homepage-landing.png](images/homepage-landing.png)
-![public-datasets.png](images/public-datasets.png)
+*首页：开源在线评测平台落地页，突出多评测模式与 AI 辅助能力*
+
 ![problem-list.png](images/problem-list.png)
-![teacher-dashboard.png](images/teacher-dashboard.png)
-![submission-result.png](images/submission-result.png)
+*题目列表：支持按题型筛选与名称搜索，展示允许语言、时间与内存限制*
+
+![problem-detail-editor.png](images/problem-detail-editor.png)
+*题目详情与在线编程：Monaco Editor 提供 IDE 级编码体验*
+
+![problem-draft.png](images/problem-draft.png)
+*AI 草稿箱：异步出题与测例生成任务统一管理，完成后可预览并应用为正式题目*
+
 ![admin-problem-management.png](images/admin-problem-management.png)
+*题目管理后台：教师可新增、编辑、删除题目，并调用 AI 生成题目与测试用例*
+
+![teacher-dashboard.png](images/teacher-dashboard.png)
+*查重日志管理：查看提交相似度比对结果与告警*
+
+![submission-result.png](images/submission-result.png)
+*提交结果：逐用例展示判题反馈（Judge Feedback）*
 
 ---
 

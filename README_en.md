@@ -35,6 +35,9 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 - **Smart Tutor**:
   - Integrated **DeepSeek/OpenAI** interfaces.
   - Employs **CoT (Chain of Thought)** and **Role-Playing** prompt engineering to guide students in analyzing logical flaws rather than providing direct answers.
+- **AI Problem Generation**:
+  - Teachers provide a background and difficulty, and the LLM auto-generates complete problems (ACM / OOP / Kaggle) and test scripts.
+  - Tasks run asynchronously and land in the **AI Draft Box**, where results can be previewed, test data executed, and drafts applied as real problems — no long waits on the submission page.
 
 ### 3. Enterprise-Grade Architecture
 - **Cloud-Native Architecture**: Orchestrated based on Docker Compose, achieving complete decoupling of Web services, databases, and evaluation sandboxes.
@@ -44,8 +47,6 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
   - **Resource Quotas**: Strictly limits CPU, memory, and PID counts based on Linux Cgroups to prevent Fork bombs and resource exhaustion attacks.
 
 ---
-![project-timeline-1.gif](images/project-timeline-1.gif)
-![project-timeline-2.gif](images/project-timeline-2.gif)
 ## Tech Stack
 
 | Module | Technology Selection | Description |
@@ -257,13 +258,26 @@ uv run python -m pytest -q backend/tests
 
 ## System Screenshots
 
-![problem-detail-editor.png](images/problem-detail-editor.png)
 ![homepage-landing.png](images/homepage-landing.png)
-![public-datasets.png](images/public-datasets.png)
+*Homepage: open-source OJ landing page highlighting multi-mode judging and AI assistance*
+
 ![problem-list.png](images/problem-list.png)
-![teacher-dashboard.png](images/teacher-dashboard.png)
-![submission-result.png](images/submission-result.png)
+*Problem list: filter by problem type and search by name, with allowed languages and time/memory limits*
+
+![problem-detail-editor.png](images/problem-detail-editor.png)
+*Problem detail with online coding: Monaco Editor delivers an IDE-level experience*
+
+![problem-draft.png](images/problem-draft.png)
+*AI Draft Box: async problem generation and test-script generation tasks, preview and apply results as real problems*
+
 ![admin-problem-management.png](images/admin-problem-management.png)
+*Problem administration: teachers can add, edit, and delete problems, and generate problems/test data with AI*
+
+![teacher-dashboard.png](images/teacher-dashboard.png)
+*Plagiarism log management: review similarity check results and alerts*
+
+![submission-result.png](images/submission-result.png)
+*Submission result: per-case judge feedback (Judge Feedback)*
 
 ---
 
