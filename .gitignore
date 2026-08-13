@@ -21,6 +21,7 @@ mysql_data/
 
 # Local / tool temp artifacts
 mcps/
+skyoj.egg-info/
 .pytest_cache/
 backend/test_*.db
 backend/*.db

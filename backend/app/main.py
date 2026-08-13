@@ -118,6 +118,10 @@ def create_app() -> FastAPI:
     def hello():
         return {"status": "SKYOJ Backend is ready!"}
 
+    @application.get("/healthz")
+    def healthz():
+        return {"status": "ok"}
+
     application.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     application.include_router(problem.router, prefix="/api/problems", tags=["problems"])
     application.include_router(
