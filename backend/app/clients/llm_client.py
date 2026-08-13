@@ -8,7 +8,7 @@ from loguru import logger
 
 
 class LlmClient:
-    """封装 OpenAI 兼容接口的调用。"""
+    """封装 OpenAI 兼容接口（Responses API）的调用。"""
 
     def __init__(
         self,
@@ -56,22 +56,23 @@ class LlmClient:
         client = OpenAI(api_key=self._api_key, base_url=self._api_url)
         kwargs: dict[str, Any] = {
             "model": self._model_name,
-            "messages": [
-                {"role": "system", "content": full_system_prompt},
-                {"role": "user", "content": prompt},
-            ],
+            "input": [{"role": "user", "content": prompt}],
+            "instructions": full_system_prompt,
             "stream": False,
         }
 
-        if "deepseek" in self._model_name.lower():
-            kwargs["extra_body"] = {"enable_thinking": False}
-
         if output_format:
-            kwargs["response_format"] = {"type": "json_object"}
+            kwargs["text"] = {"format": {"type": "json_object"}}
 
         try:
-            response = client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content
+            response = client.responses.create(**kwargs)
+            if not getattr(response, "output", None):
+                snippet = response if isinstance(response, str) else str(response)
+                raise RuntimeError(
+                    f"上游未返回 OpenAI 兼容的 responses output（请检查 LLM_API_URL 与供应商是否支持 "
+                    f"Responses API，当前: {self._api_url}），响应片段: {snippet[:200]}"
+                )
+            content = response.output_text
             parsed = json.loads(content)
         except Exception as exc:
             logger.error("LLM 请求失败: {}", str(exc))

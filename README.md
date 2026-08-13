@@ -102,7 +102,7 @@ cp .env.example .env
 
 请至少配置以下 LLM 变量（用于 AI 助教与测试数据生成）：
 
-- `LLM_API_URL`
+- `LLM_API_URL`：OpenAI 兼容 API 的基础地址，需包含版本路径，例如 `https://api.example.com/v1`（缺少 `/v1` 等版本段时请求会打到错误路径）。项目使用 OpenAI SDK 的 Responses API（`/responses` 端点），供应商需支持该端点
 - `LLM_MODEL_NAME`
 - `LLM_API_KEY`
 
