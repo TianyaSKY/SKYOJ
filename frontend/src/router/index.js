@@ -66,6 +66,18 @@ const router = createRouter({
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
+            path: '/admin/problems/:id/preview',
+            name: 'problem-admin-preview',
+            component: () => import('../views/admin/ProblemPreviewView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
+            path: '/admin/datasets',
+            name: 'dataset-admin',
+            component: () => import('../views/DatasetListView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
             path: '/admin/drafts',
             name: 'ai-draft-box',
             component: () => import('../views/admin/DraftBoxView.vue'),
@@ -90,9 +102,15 @@ const router = createRouter({
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
+            path: '/admin/settings',
+            name: 'teacher-settings',
+            component: () => import('../views/admin/TeacherSettingsView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
             path: '/rank',
             name: 'rank',
-            component: () => import('../views/HomeView.vue') // Temporary
+            redirect: {name: 'exam'}
         },
         {
             path: '/login',
