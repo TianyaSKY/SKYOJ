@@ -9,6 +9,16 @@
 - **认证方式**: 使用 JWT (JSON Web Token)。除登录/注册外，大部分接口需要在 Header 中携带：
   `Authorization: Bearer <your_token>`
 
+### 错误响应
+
+所有失败的 JSON 响应都使用以下格式，成功响应保持接口原有结构：
+
+```json
+{"code": "AUTH_INVALID_CREDENTIALS", "message": "Invalid username or password"}
+```
+
+常用错误码：`AUTH_INVALID_CREDENTIALS`、`AUTH_REQUIRED`、`AUTH_TOKEN_EXPIRED`、`AUTH_INVALID_TOKEN`、`VALIDATION_ERROR`、`FORBIDDEN`、`NOT_FOUND`、`CONFLICT`、`PAYLOAD_TOO_LARGE`、`FEATURE_DISABLED`、`INTERNAL_ERROR`。
+
 ---
 
 ## 2. 用户认证模块 (Auth)

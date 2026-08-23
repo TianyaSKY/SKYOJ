@@ -2,6 +2,11 @@ import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
 import router from '@/router'
 
+const tokenErrorCodes = new Set([
+    'AUTH_REQUIRED', 'AUTH_TOKEN_EXPIRED', 'AUTH_INVALID_TOKEN'
+])
+let isHandlingAuthError = false
+
 const service = axios.create({
     baseURL: '/api',
     timeout: 5000
@@ -27,7 +32,9 @@ service.interceptors.response.use(
         return response.data
     },
     error => {
-        if (error.response && error.response.status === 401) {
+        const code = error.response?.data?.code
+        if (tokenErrorCodes.has(code) && !isHandlingAuthError) {
+            isHandlingAuthError = true
             ElMessageBox.confirm(
                 '登录状态已失效，您可以继续留在该页面，或者重新登录',
                 '系统提示',
@@ -39,7 +46,11 @@ service.interceptors.response.use(
             ).then(() => {
                 localStorage.removeItem('token')
                 localStorage.removeItem('user')
-                router.push('/login')
+                if (router.currentRoute.value.name !== 'login') {
+                    router.push('/login')
+                }
+            }).finally(() => {
+                isHandlingAuthError = false
             })
         }
         return Promise.reject(error)
