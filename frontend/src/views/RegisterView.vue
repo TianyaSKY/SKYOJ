@@ -119,8 +119,11 @@ const handleRegister = async () => {
         ElMessage.success('Registration successful! Please log in.')
         router.push('/login')
       } catch (error) {
-        // Error message is likely handled by the request interceptor
-        console.error('Registration failed:', error)
+        ElMessage.error(
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Registration failed'
+        )
       } finally {
         loading.value = false
       }

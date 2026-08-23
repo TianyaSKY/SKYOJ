@@ -27,7 +27,11 @@ service.interceptors.response.use(
         return response.data
     },
     error => {
-        if (error.response && error.response.status === 401) {
+        if (
+            error.response &&
+            error.response.status === 401 &&
+            !error.config?.skipAuthErrorHandler
+        ) {
             ElMessageBox.confirm(
                 '登录状态已失效，您可以继续留在该页面，或者重新登录',
                 '系统提示',

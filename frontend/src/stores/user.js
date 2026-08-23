@@ -9,7 +9,9 @@ export const useUserStore = defineStore('user', () => {
 
     const login = async (loginForm) => {
         try {
-            const res = await request.post('/auth/login', loginForm)
+            const res = await request.post('/auth/login', loginForm, {
+                skipAuthErrorHandler: true
+            })
             if (res.token && res.user) {
                 token.value = res.token
                 user.value = res.user
@@ -19,7 +21,11 @@ export const useUserStore = defineStore('user', () => {
             }
             return false
         } catch (error) {
-            ElMessage.error(error.response?.data?.message || 'Login failed')
+            ElMessage.error(
+                error.response?.data?.message ||
+                error.response?.data?.error ||
+                'Login failed'
+            )
             throw error
         }
     }
