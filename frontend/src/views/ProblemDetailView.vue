@@ -84,7 +84,7 @@
     <el-row v-else :gutter="0" class="full-height split-layout">
       <!-- Left Column: Problem Description -->
       <el-col :span="12" class="left-column">
-        <div class="column-content">
+        <div class="problem-panel-header">
           <div class="problem-header">
             <h2 class="problem-title">#{{ problem.id }} {{ problem.title }}</h2>
             <div class="problem-meta">
@@ -115,9 +115,9 @@
             </div>
           </div>
           <el-divider/>
-          <div class="problem-content">
-            <div class="markdown-body" v-html="renderedContent"></div>
-          </div>
+        </div>
+        <div class="problem-content problem-content-scroll">
+          <div class="markdown-body" v-html="renderedContent"></div>
         </div>
       </el-col>
 
@@ -187,7 +187,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {getProblemDetail, submitSolution} from '@/api/problem'
 import {ElMessage} from 'element-plus'
@@ -203,6 +203,7 @@ import 'katex/dist/katex.min.css'
 
 const route = useRoute()
 const router = useRouter()
+const setAnswerWorkspaceActive = inject('setAnswerWorkspaceActive', null)
 const problemId = route.params.id
 const examId = computed(() => route.query.exam_id)
 
@@ -238,6 +239,10 @@ const selectedFile = ref(null)
 const isKaggle = computed(() => {
   return problem.value.type && problem.value.type.toLowerCase() === 'kaggle'
 })
+
+watch(isKaggle, (isKaggleProblem) => {
+  setAnswerWorkspaceActive?.(!isKaggleProblem)
+}, {immediate: true})
 
 const getTypeTag = (type) => {
   const map = {
@@ -417,13 +422,19 @@ const handleSubmitKaggle = async () => {
 onMounted(() => {
   fetchProblem()
 })
+
+onBeforeUnmount(() => {
+  setAnswerWorkspaceActive?.(false)
+})
 </script>
 
 <style scoped>
 .problem-detail-container {
-  height: calc(100vh - 60px);
+  height: 100%;
   background-color: #fff;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .scrollable-container {
@@ -432,6 +443,7 @@ onMounted(() => {
   overflow-y: auto;
   padding: 20px;
   background-color: #f5f7fa;
+  display: block;
 }
 
 .exam-status-bar {
@@ -452,22 +464,35 @@ onMounted(() => {
 }
 
 .full-height {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .split-layout {
   border-top: 1px solid #e8e8e8;
+  overflow: hidden;
 }
 
 .left-column {
   height: 100%;
   border-right: 1px solid #e8e8e8;
-  overflow-y: auto;
   background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.column-content {
-  padding: 32px;
+.problem-panel-header {
+  flex-shrink: 0;
+  padding: 32px 32px 0;
+}
+
+.problem-content-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 32px 32px;
 }
 
 .problem-header {
@@ -497,6 +522,8 @@ onMounted(() => {
 .right-column {
   height: 100%;
   background-color: #1e1e1e;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .editor-container {
@@ -555,6 +582,7 @@ onMounted(() => {
 .editor-wrapper {
   flex: 1;
   min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .monaco-editor {
@@ -646,5 +674,47 @@ onMounted(() => {
   background-color: transparent;
   padding: 0;
   color: inherit;
+}
+
+@media (max-width: 768px) {
+  .split-layout {
+    flex-wrap: nowrap;
+    flex-direction: column;
+  }
+
+  .left-column,
+  .right-column {
+    flex: 1 1 50%;
+    width: 100%;
+    max-width: 100%;
+    height: 50%;
+  }
+
+  .left-column {
+    border-right: 0;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .problem-panel-header {
+    padding: 16px 16px 0;
+  }
+
+  .problem-content-scroll {
+    padding: 0 16px 16px;
+  }
+
+  .problem-title {
+    font-size: 1.35rem;
+    margin-bottom: 10px;
+  }
+
+  .problem-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .editor-toolbar {
+    padding: 0 12px;
+  }
 }
 </style>
