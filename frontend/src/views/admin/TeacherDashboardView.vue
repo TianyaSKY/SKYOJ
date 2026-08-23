@@ -2,8 +2,12 @@
   <div class="teacher-dashboard-container">
     <div class="dashboard-header">
       <div class="header-left">
-        <h1 class="page-title">教师工作台</h1>
-        <p class="page-desc">欢迎回来，这里是您的教学管理中心。</p>
+        <h1 class="page-title">教师后台</h1>
+        <p class="page-desc">集中管理题目、考试、提交记录与平台设置。</p>
+      <div class="header-actions">
+        <el-button type="primary" @click="router.push({name: 'problem-admin'})">管理题目</el-button>
+        <el-button @click="router.push({name: 'exam-admin'})">管理考试</el-button>
+      </div>
       </div>
     </div>
 
@@ -47,7 +51,7 @@
 
       <!-- 系统设置卡片 -->
       <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
-        <div class="nav-card" @click="openSysSettings">
+        <div class="nav-card" @click="router.push({ name: 'teacher-settings' })">
           <div class="nav-icon" style="color: #909399; background-color: #f4f4f5">
             <el-icon :size="32">
               <Setting/>
@@ -56,7 +60,7 @@
           <h3>系统设置</h3>
           <p>配置网站标题、公告、运行模式及 AI 智能体状态。</p>
           <div class="nav-footer">
-            <span>打开设置 <el-icon><ArrowRight/></el-icon></span>
+            <span>进入设置 <el-icon><ArrowRight/></el-icon></span>
           </div>
         </div>
       </el-col>
@@ -316,6 +320,8 @@ onMounted(() => {
   align-items: flex-start;
   margin-bottom: 40px;
 }
+
+.header-actions { display: flex; gap: 12px; }
 
 .page-title {
   font-size: 2.2rem;

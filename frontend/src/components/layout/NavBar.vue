@@ -11,11 +11,11 @@
     </el-menu-item>
     <div class="flex-grow"/>
     <el-menu-item index="/">首页</el-menu-item>
-    <template v-if="isPracticeMode || isTeacher">
+    <template v-if="isPracticeMode && !isTeacher">
       <el-menu-item index="/problems">题库</el-menu-item>
       <el-menu-item index="/datasets">公开数据集</el-menu-item>
     </template>
-    <el-menu-item v-if="!isPracticeMode" index="/exam" class="exam-menu-item">
+    <el-menu-item v-if="!isPracticeMode && !isTeacher" index="/exam" class="exam-menu-item">
       <el-icon><Timer /></el-icon>
       考试中心
     </el-menu-item>
@@ -32,7 +32,7 @@
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-            <el-dropdown-item v-if="isTeacher" command="teacher-dashboard">教师工作台</el-dropdown-item>
+            <el-dropdown-item v-if="isTeacher" command="teacher-dashboard">教师后台</el-dropdown-item>
             <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>

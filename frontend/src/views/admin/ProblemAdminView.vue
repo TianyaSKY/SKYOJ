@@ -32,6 +32,7 @@
         </el-table-column>
         <el-table-column align="center" fixed="right" label="操作" width="280">
           <template #default="scope">
+            <el-button size="small" @click="goToProblem(scope.row.id)">预览</el-button>
             <el-button :icon="Edit" size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button :icon="Cpu" size="small" type="warning" @click="handleAiTestData(scope.row)"
             >AICase
@@ -561,7 +562,7 @@ const handleDeleteAllTestCases = async () => {
 }
 
 const goToProblem = (id) => {
-  router.push({name: 'problem-detail', params: {id}})
+  router.push({name: 'problem-admin-preview', params: {id}})
 }
 
 onMounted(() => {

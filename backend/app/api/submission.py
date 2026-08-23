@@ -20,6 +20,9 @@ async def submit_code(
     exam_id: Optional[str] = Form(default=None),
     file: Optional[UploadFile] = File(default=None),
 ):
+    if auth.user.role != "student":
+        raise HTTPException(status_code=403, detail={"error": "Only student accounts can submit solutions."})
+
     content_type = request.headers.get("content-type", "")
     user_code = None
     exam_id_val = -1

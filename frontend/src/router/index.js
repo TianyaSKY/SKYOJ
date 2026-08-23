@@ -155,6 +155,16 @@ router.beforeEach(async (to, from, next) => {
     const isTeacher = user.role === 'teacher'
     const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
 
+    if (isTeacher && to.name === 'problem-detail') {
+        next({name: 'problem-admin-preview', params: {id: to.params.id}})
+        return
+    }
+
+    if (isTeacher && ['problems', 'datasets', 'exam', 'exam-detail', 'exam-rank'].includes(to.name)) {
+        next({name: to.name === 'datasets' ? 'dataset-admin' : 'teacher-dashboard'})
+        return
+    }
+
     // Exam Mode Logic
     if (!isPracticeMode) {
         // If practice mode is OFF (i.e., Exam Mode is ON)
