@@ -210,6 +210,30 @@
           @close="debugDrawerVisible = false"
       />
     </el-drawer>
+
+    <!-- Realtime Judge Result Toast -->
+    <transition name="el-fade-in">
+      <div v-if="realtimeStatus === 'received' && realtimeResult" class="realtime-toast">
+        <div class="toast-content">
+          <el-icon class="toast-icon"><CircleCheckFilled/></el-icon>
+          <div class="toast-text">
+            <strong>判题完成：{{ realtimeResult.status }}</strong>
+            <span>得分 {{ Number(realtimeResult.score ?? 0).toFixed(1) }}</span>
+          </div>
+          <el-button size="small" type="primary" @click="goToSubmissionDetail">查看详情</el-button>
+          <el-button size="small" @click="realtimeStatus = 'closed'">关闭</el-button>
+        </div>
+      </div>
+      <div v-else-if="realtimeStatus === 'pending'" class="realtime-toast pending">
+        <div class="toast-content">
+          <el-icon class="toast-icon is-loading"><Loading/></el-icon>
+          <div class="toast-text">
+            <strong>判题中...</strong>
+            <span>实时等待结果</span>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -220,7 +244,8 @@ import {getProblemDetail, submitSolution} from '@/api/problem'
 import {debugSolution} from '@/api/debug'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
-import {ArrowLeft, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
+import {ArrowLeft, CircleCheckFilled, Loading, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
+import {createSubmissionWS} from '@/utils/websocket'
 import DebugResultPanel from '@/components/DebugResultPanel.vue'
 
 // 题面 Markdown 渲染（含 LaTeX / 代码高亮），统一从 utils/markdown 入口复用，避免各处独立初始化导致配置漂移
@@ -248,6 +273,39 @@ const submitting = ref(false)
 const debugging = ref(false)
 const debugDrawerVisible = ref(false)
 const debugRunId = ref(null)
+
+// WebSocket: 提交后等待实时判题结果
+const realtimeResult = ref(null)
+const realtimeStatus = ref('idle') // 'idle' | 'pending' | 'received' | 'closed'
+let activeWS = null
+
+function clearRealtimeWS() {
+  if (activeWS) {
+    activeWS.close()
+    activeWS = null
+  }
+}
+
+function startRealtimeWait(submissionId) {
+  clearRealtimeWS()
+  realtimeResult.value = null
+  realtimeStatus.value = 'pending'
+  const token = localStorage.getItem('token') || ''
+  activeWS = createSubmissionWS(submissionId, token, {
+    onMessage: (data) => {
+      realtimeResult.value = data
+      realtimeStatus.value = 'received'
+      ElMessage.success(`判题完成：${data.status || ''} (${(data.score ?? 0).toFixed(1)} 分)`)
+    },
+    onError: () => {
+      realtimeStatus.value = 'closed'
+    },
+    onClose: () => {
+      realtimeStatus.value = 'closed'
+    },
+  })
+  activeWS.connect()
+}
 
 // Editor Settings
 const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
@@ -377,12 +435,19 @@ const handleSubmit = async () => {
       exam_id: examId.value || -1
     })
     ElMessage.success('Submission received!')
-    router.push(`/submission/${res.submission_id}`)
+    startRealtimeWait(res.submission_id)
   } catch (error) {
     ElMessage.error('Submission failed')
   } finally {
     submitting.value = false
   }
+}
+
+// 收到实时结果后，用户点击跳转查看详情
+const goToSubmissionDetail = () => {
+  if (!realtimeResult.value) return
+  clearRealtimeWS()
+  router.push(`/submission/${realtimeResult.value.submission_id || ''}`)
 }
 
 // Debug Run（仅 ACM 题目，不计入成绩，仅跑第一个测试点）
@@ -450,7 +515,7 @@ const handleSubmitKaggle = async () => {
 
     const res = await submitSolution(formData)
     ElMessage.success('File uploaded successfully!')
-    await router.push(`/submission/${res.submission_id}`)
+    startRealtimeWait(res.submission_id)
   } catch (error) {
     ElMessage.error('Upload failed')
   } finally {
@@ -464,6 +529,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   setAnswerWorkspaceActive?.(false)
+  clearRealtimeWS()
 })
 </script>
 
@@ -759,6 +825,61 @@ onBeforeUnmount(() => {
 
   .editor-toolbar {
     padding: 0 12px;
+  }
+}
+
+.realtime-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2000;
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 14px 18px;
+  min-width: 320px;
+}
+
+.realtime-toast.pending {
+  background: #f0f9ff;
+  border-color: #91caff;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast-icon {
+  font-size: 24px;
+  color: #67c23a;
+}
+
+.toast-icon.is-loading {
+  color: #409eff;
+  animation: spin 1s linear infinite;
+}
+
+.toast-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.toast-text strong {
+  color: #1a1a1a;
+}
+
+.toast-text span {
+  color: #888;
+  font-size: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
