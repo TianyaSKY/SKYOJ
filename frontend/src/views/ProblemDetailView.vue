@@ -165,6 +165,18 @@
               </el-popover>
             </div>
             <div class="toolbar-right">
+              <el-button
+                  v-if="isAcm"
+                  :icon="MagicStick"
+                  :loading="debugging"
+                  class="debug-btn"
+                  round
+                  size="default"
+                  type="warning"
+                  @click="handleDebug"
+              >
+                调试
+              </el-button>
               <el-button :loading="submitting" class="submit-btn" round size="default" type="primary"
                          @click="handleSubmit">
                 提交代码
@@ -183,6 +195,21 @@
         </div>
       </el-col>
     </el-row>
+
+    <!-- Debug Result Drawer -->
+    <el-drawer
+        v-model="debugDrawerVisible"
+        :close-on-press-escape="true"
+        direction="rtl"
+        size="60%"
+        title="ACM 调试运行结果（仅第一个测试点，不计入成绩）"
+    >
+      <DebugResultPanel
+          v-if="debugDrawerVisible"
+          :debug-run-id="debugRunId"
+          @close="debugDrawerVisible = false"
+      />
+    </el-drawer>
   </div>
 </template>
 
@@ -190,9 +217,11 @@
 import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {getProblemDetail, submitSolution} from '@/api/problem'
+import {debugSolution} from '@/api/debug'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
-import {ArrowLeft, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
+import {ArrowLeft, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
+import DebugResultPanel from '@/components/DebugResultPanel.vue'
 
 // 题面 Markdown 渲染（含 LaTeX / 代码高亮），统一从 utils/markdown 入口复用，避免各处独立初始化导致配置漂移
 import {renderMarkdown} from '@/utils/markdown'
@@ -216,6 +245,9 @@ const problem = ref({
 const language = ref('python')
 const code = ref('')
 const submitting = ref(false)
+const debugging = ref(false)
+const debugDrawerVisible = ref(false)
+const debugRunId = ref(null)
 
 // Editor Settings
 const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
@@ -234,6 +266,10 @@ const selectedFile = ref(null)
 
 const isKaggle = computed(() => {
   return problem.value.type && problem.value.type.toLowerCase() === 'kaggle'
+})
+
+const isAcm = computed(() => {
+  return problem.value.type && problem.value.type.toLowerCase() === 'acm'
 })
 
 watch(isKaggle, (isKaggleProblem) => {
@@ -346,6 +382,34 @@ const handleSubmit = async () => {
     ElMessage.error('Submission failed')
   } finally {
     submitting.value = false
+  }
+}
+
+// Debug Run（仅 ACM 题目，不计入成绩，仅跑第一个测试点）
+const handleDebug = async () => {
+  if (!isAcm.value) {
+    ElMessage.warning('仅 ACM 类型题目支持调试运行')
+    return
+  }
+  if (!code.value.trim()) {
+    ElMessage.warning('Code cannot be empty')
+    return
+  }
+
+  debugging.value = true
+  try {
+    const res = await debugSolution({
+      problem_id: parseInt(problemId),
+      code: code.value,
+      language: language.value,
+      exam_id: examId.value || -1
+    })
+    debugRunId.value = res.debug_run_id
+    debugDrawerVisible.value = true
+  } catch (error) {
+    ElMessage.error('调试运行失败')
+  } finally {
+    debugging.value = false
   }
 }
 
@@ -551,6 +615,11 @@ onBeforeUnmount(() => {
 
 .submit-btn {
   padding: 8px 24px;
+  font-weight: 600;
+}
+
+.debug-btn {
+  margin-right: 8px;
   font-weight: 600;
 }
 
