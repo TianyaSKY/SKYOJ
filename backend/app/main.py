@@ -8,6 +8,7 @@ from sqlalchemy.exc import OperationalError
 from app.api import (
     auth,
     dataset,
+    debug,
     exam,
     llm,
     problem,
@@ -127,6 +128,7 @@ def create_app() -> FastAPI:
     application.include_router(
         submission.router, prefix="/api/submissions", tags=["submissions"]
     )
+    application.include_router(debug.router, prefix="/api/debug", tags=["debug"])
     application.include_router(user.router, prefix="/api/user", tags=["user"])
     application.include_router(
         dataset.router, prefix="/api/datasets", tags=["datasets"]

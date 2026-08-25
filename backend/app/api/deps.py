@@ -20,6 +20,7 @@ from app.repositories.search_repository import SearchRepository
 from app.repositories.exam_repository import ExamRepository
 from app.services.ai_draft_service import AiDraftService
 from app.services.auth_service import AuthService
+from app.services.debug_service import DebugService
 from app.services.problem_service import ProblemService
 from app.services.dataset_service import DatasetService
 from app.services.submission_service import SubmissionService
@@ -28,6 +29,7 @@ from app.services.search_facade_service import SearchFacadeService
 from app.services.user_service import UserService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService
+from app.repositories.debug_run_repository import DebugRunRepository
 
 
 def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
@@ -82,6 +84,13 @@ def get_submission_service(db: Session = Depends(get_db)) -> SubmissionService:
     """构造提交领域服务。"""
     return SubmissionService(
         SubmissionRepository(db), AsyncJobService.from_session(db), SubmissionStorageClient()
+    )
+
+
+def get_debug_service(db: Session = Depends(get_db)) -> DebugService:
+    """构造调试运行领域服务。"""
+    return DebugService(
+        DebugRunRepository(db), AsyncJobService.from_session(db)
     )
 
 

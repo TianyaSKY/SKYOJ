@@ -7,6 +7,7 @@
 from app.domain.ai_draft import AiDraftDetail, AiDraftSummary
 from app.domain.async_job import AsyncJobResult
 from app.domain.dataset import DatasetDetail, DatasetListItem
+from app.domain.debug_run import DebugRunDetail
 from app.domain.exam import ExamDetail, ExamListItem, ExamProblemItem
 from app.domain.problem import ProblemDetail, ProblemListItem
 from app.domain.submission import SubmissionDetail, SubmissionListItem
@@ -196,4 +197,25 @@ def from_async_job_orm(job) -> AsyncJobResult:
         lease_until=job.lease_until,
         created_at=job.created_at,
         updated_at=job.updated_at,
+    )
+
+
+def from_debug_run_orm(row) -> DebugRunDetail:
+    """调试运行 ORM → 详情。"""
+    return DebugRunDetail(
+        id=row.id,
+        status=row.status,
+        language=row.language,
+        case_name=row.case_name,
+        input=row.input,
+        expected_output=row.expected_output,
+        actual_output=row.actual_output,
+        error_output=row.error_output,
+        time_used_ms=row.time_used_ms,
+        memory_used_kb=row.memory_used_kb,
+        created_at=row.created_at,
+        finished_at=row.finished_at,
+        problem_id=row.problem_id,
+        user_id=row.user_id,
+        exam_id=row.exam_id,
     )
