@@ -17,6 +17,7 @@ dependencies = [
     "pytest>=9.1.1",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.32",
+    "redis>=5.0.0",
     "requests>=2.34.2",
     "sqlalchemy>=2.0.51",
     "urllib3>=2.7.0",

@@ -54,8 +54,19 @@ def judge_submission(submission_id: int, db) -> None:
     )
     db.commit()
 
+    _publish_realtime_result(submission_id, final_status, final_score, final_log)
+
     if final_status == "Accepted":
         _enqueue_plagiarism_scan(db, problem_id)
+
+
+def _publish_realtime_result(submission_id: int, status: str, score: float, output_log: str) -> None:
+    """判题完成后发布实时通知。失败静默，不影响主流程。"""
+    try:
+        from app.utils.realtime import publish_submission_result
+        publish_submission_result(submission_id, status, score, output_log)
+    except Exception as exc:
+        logger.warning("实时推送失败 submission_id={} error={}", submission_id, exc)
 
 
 def _enqueue_plagiarism_scan(db, problem_id: int) -> None:

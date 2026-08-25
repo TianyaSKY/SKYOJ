@@ -1,14 +1,77 @@
+import json
+import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+import jwt
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 
 from app.api.deps import get_submission_service
 from app.api.schemas.submission import SubmitCodeBody
+from app.config import SECRET_KEY
 from app.domain.submission import SubmissionQuery, SubmitParams
 from app.services.submission_service import SubmissionService
 from app.utils.auth_tools import AuthContext, get_current_auth
+import redis as redis_lib
 
 router = APIRouter()
+
+_REDIS_URL = os.getenv("REDIS_URL") or ""
+_PUBSUB_CHANNEL_PREFIX = "skyoj:submission:"
+
+
+def _redis_client():
+    if _REDIS_URL:
+        return redis_lib.from_url(_REDIS_URL, decode_responses=True)
+    return None
+
+
+@router.websocket("/ws/{submission_id}")
+async def submission_websocket(
+    ws: WebSocket,
+    submission_id: int,
+    token: str = Query(...),
+):
+    """实时推送提交判题结果。
+
+    鉴权：token 放在 query 参数中。
+    推送消息：{"status": "...", "score": 100.0, "output_log": "..."}
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        await ws.close(code=4001, reason="Invalid token")
+        return
+
+    client = _redis_client()
+    pubsub = None
+    if client:
+        channel = f"{_PUBSUB_CHANNEL_PREFIX}{submission_id}"
+        pubsub = client.pubsub()
+        pubsub.subscribe(channel)
+
+    try:
+        await ws.accept()
+        if pubsub is None:
+            await ws.close(code=1011, reason="Redis not available")
+            return
+
+        import time
+        start = time.monotonic()
+        timeout = 300.0
+        while (time.monotonic() - start) < timeout:
+            msg = pubsub.get_message(timeout=1.0)
+            if msg and msg["type"] == "message":
+                await ws.send_text(msg["data"])
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if pubsub:
+            try:
+                pubsub.unsubscribe()
+                pubsub.close()
+            except Exception:
+                pass
 @router.post("/submit", status_code=202)
 async def submit_code(
     request: Request,
