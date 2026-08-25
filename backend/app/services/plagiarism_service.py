@@ -1,0 +1,179 @@
+"""查重业务服务。"""
+
+from typing import Any
+
+from loguru import logger
+from sqlalchemy.orm import Session, selectinload
+
+from app.clients.jplag_client import JPlagAPIError, JPlagClient
+from app.domain.async_job import CreateAsyncJobParams
+from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
+from app.domain.plagiarism import PlagiarismResult, SimilarityPair
+from app.messaging.queues import JUDGE_QUEUE
+from app.messaging.task_names import SCAN_PLAGIARISM_TASK
+from app.models.submission import Submission
+from app.repositories.plagiarism_repository import PlagiarismRepository
+from app.repositories.submission_repository import SubmissionRepository
+from app.services.async_job_service import AsyncJobService
+
+
+class PlagiarismService:
+    def __init__(
+        self,
+        plagiarism_repo: PlagiarismRepository,
+        submission_repo: SubmissionRepository,
+        jplag_client: JPlagClient | None = None,
+    ) -> None:
+        self._plagiarism_repo = plagiarism_repo
+        self._submission_repo = submission_repo
+        self._jplag_client = jplag_client or JPlagClient()
+
+    def trigger_scan(self, db: Session, problem_id: int) -> int:
+        """创建 AsyncJob 并返回 job_id。"""
+        job_service = AsyncJobService.from_session(db)
+        job = job_service.enqueue(
+            CreateAsyncJobParams(
+                task_name=SCAN_PLAGIARISM_TASK,
+                queue=JUDGE_QUEUE,
+                payload={"problem_id": problem_id, "min_similarity": 0.3},
+                dedupe_key=f"plagiarism-scan:{problem_id}",
+                max_attempts=1,
+            )
+        )
+        return job.id
+
+    def trigger_manual_scan(self, db: Session, problem_id: int) -> int:
+        """教师手动触发查重，返回 job_id。"""
+        return self.trigger_scan(db, problem_id)
+
+    def run_scan(
+        self,
+        db: Session,
+        problem_id: int,
+        min_similarity: float = 0.3,
+    ) -> PlagiarismResult:
+        """在 Celery worker 中执行：取提交 → 调用 JPlag → 写入报告。"""
+
+        submissions = (
+            db.query(Submission)
+            .filter(
+                Submission.problem_id == problem_id,
+                Submission.status == "Accepted",
+                Submission.code_content.isnot(None),
+            )
+            .options(selectinload(Submission.user))
+            .all()
+        )
+
+        if len(submissions) < 2:
+            logger.info("题目 #{} 有效提交不足，跳过查重", problem_id)
+            return PlagiarismResult(
+                problem_id=problem_id,
+                total_pairs=0,
+                high_risk_pairs=[],
+            )
+
+        sub_list = [
+            {
+                "id": s.id,
+                "code": s.code_content or "",
+                "language": s.language or "python",
+                "filename": self._filename_for_language(s.language),
+                "user_id": s.user_id,
+            }
+            for s in submissions
+        ]
+        language = submissions[0].language or "python"
+
+        try:
+            similarity_pairs = self._jplag_client.compare(sub_list, language=language)
+        except JPlagAPIError as exc:
+            logger.error("JPlag API 调用失败 problem_id={} error={}", problem_id, exc)
+            raise
+
+        high_risk: list[SimilarityPair] = []
+        for pair in similarity_pairs:
+            if pair.score < min_similarity:
+                continue
+            self._plagiarism_repo.upsert_report(
+                problem_id=problem_id,
+                sub_a=pair.submission_a_id,
+                sub_b=pair.submission_b_id,
+                score=pair.score,
+                blocks=[vars(b) for b in pair.matched_blocks],
+                status="completed",
+            )
+            high_risk.append(pair)
+
+        logger.info(
+            "题目 #{} 查重完成，共 {} 对提交，发现 {} 对高相似度",
+            problem_id,
+            len(submissions),
+            len(high_risk),
+        )
+        return PlagiarismResult(
+            problem_id=problem_id,
+            total_pairs=len(submissions),
+            high_risk_pairs=high_risk,
+        )
+
+    def get_problem_reports(
+        self,
+        problem_id: int,
+        min_score: float,
+        page: int,
+        page_size: int,
+        requester_id: int,
+        requester_role: str,
+    ) -> dict[str, Any]:
+        reports, total = self._plagiarism_repo.get_reports_for_problem(
+            problem_id, min_score, page, page_size
+        )
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "reports": [self._report_to_dict(r) for r in reports],
+        }
+
+    def get_submission_reports(
+        self, submission_id: int, requester_id: int, requester_role: str
+    ) -> list[dict[str, Any]]:
+        submission = self._submission_repo.get_by_id(submission_id)
+        if submission is None:
+            raise ResourceNotFoundError("提交记录不存在")
+        if requester_role == "student" and submission.user_id != requester_id:
+            raise PermissionDeniedError("无权查看该提交记录")
+
+        reports = self._plagiarism_repo.get_by_submission_id(submission_id)
+        return [self._report_to_dict(r) for r in reports]
+
+    def _report_to_dict(self, report) -> dict[str, Any]:
+        sub_a = report.submission_a
+        sub_b = report.submission_b
+        return {
+            "id": report.id,
+            "submission_a_id": report.submission_a_id,
+            "submission_b_id": report.submission_b_id,
+            "username_a": sub_a.user.username if sub_a and sub_a.user else "",
+            "username_b": sub_b.user.username if sub_b and sub_b.user else "",
+            "similarity_score": report.similarity_score,
+            "matched_blocks": report.matched_blocks or [],
+            "status": report.status,
+            "created_at": report.created_at.isoformat() if report.created_at else None,
+        }
+
+    @staticmethod
+    def _filename_for_language(language: str | None) -> str:
+        lang = (language or "python").lower()
+        ext_map = {
+            "python": "py", "py": "py",
+            "java": "java",
+            "c": "c",
+            "cpp": "cpp", "c++": "cpp",
+            "go": "go",
+            "rust": "rs",
+            "javascript": "js", "js": "js",
+            "typescript": "ts", "ts": "ts",
+        }
+        return f"main.{ext_map.get(lang, 'py')}"

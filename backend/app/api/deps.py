@@ -104,3 +104,16 @@ def get_search_service(db: Session = Depends(get_db)) -> SearchFacadeService:
     return SearchFacadeService(
         SearchRepository(db), test_case_storage=ProblemTestCaseStorageClient()
     )
+
+
+def get_plagiarism_service(db: Session = Depends(get_db)) -> PlagiarismService:
+    """构造查重服务。"""
+    from app.repositories.plagiarism_repository import PlagiarismRepository
+    from app.services.plagiarism_service import PlagiarismService
+    from app.clients.jplag_client import JPlagClient
+
+    return PlagiarismService(
+        plagiarism_repo=PlagiarismRepository(db),
+        submission_repo=SubmissionRepository(db),
+        jplag_client=JPlagClient(),
+    )

@@ -18,6 +18,7 @@ LEASE_SECONDS = {
     "skyoj.tasks.generate_problem": 10 * 60,
     "skyoj.tasks.generate_test_script": 10 * 60,
     "skyoj.tasks.finalize_dataset": 30 * 60,
+    "skyoj.tasks.scan_plagiarism": 30 * 60,
 }
 
 

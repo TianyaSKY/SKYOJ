@@ -11,6 +11,7 @@ from app.api import (
     debug,
     exam,
     llm,
+    plagiarism,
     problem,
     search,
     submission,
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
     application.include_router(exam.router, prefix="/api/exams", tags=["exams"])
     application.include_router(llm.router, prefix="/api/llm", tags=["llm"])
     application.include_router(search.router, prefix="/api/search", tags=["search"])
+    application.include_router(plagiarism.router, prefix="/api/plagiarism", tags=["plagiarism"])
 
     @application.on_event("startup")
     def on_startup():
