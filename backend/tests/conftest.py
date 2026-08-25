@@ -1,7 +1,6 @@
-"""API 测试共享夹具。"""
+"""pytest 全局 fixtures：测试数据库、客户端、认证 token。"""
 
 import os
-from pathlib import Path
 import sys
 
 import pytest
@@ -10,52 +9,127 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing-only")
 
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-if str(BACKEND_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_ROOT))
-
-# 必须在导入 app.database/app.main 前注入测试配置，避免测试连接真实数据库。
-os.environ["DATABASE_URL"] = "sqlite://"
-os.environ["SECRET_KEY"] = "test-secret-key-for-milestone-one"
-os.environ["CELERY_BROKER_URL"] = "memory://"
-
-from app.database import Base, get_db  # noqa: E402
-from app.main import create_app  # noqa: E402
-import app.models  # noqa: F401, E402
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-@pytest.fixture()
-def client():
-    """创建使用内存 SQLite 的 FastAPI 测试客户端。"""
+@pytest.fixture(scope="session")
+def engine():
+    """SQLite 内存引擎，所有测试共享同一 schema。"""
+    from app.database import Base
 
-    engine = create_engine(
-        "sqlite://",
+    eng = create_engine(
+        "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    testing_session = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=engine,
+    Base.metadata.create_all(eng)
+    return eng
+
+
+@pytest.fixture
+def db_session(engine):
+    """每个测试独立事务，测试结束自动回滚。"""
+    from sqlalchemy.orm import Session
+
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+    yield session
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest.fixture
+def client(db_session, monkeypatch):
+    """带内存数据库的 TestClient，mock Docker 调用。"""
+    import app.database
+
+    monkeypatch.setattr(app.database, "SessionLocal", lambda: db_session)
+
+    from unittest.mock import MagicMock, patch
+
+    with patch("app.services.sandbox_runner.client") as mock_client:
+        mock_container = MagicMock()
+        mock_container.id = "test-container-123"
+        mock_container.attrs = {}
+        mock_client.containers.run.return_value = mock_container
+        mock_container.exec_run.return_value = (0, "output")
+        mock_container.logs.return_value = b""
+        mock_container.wait.return_value = None
+
+        from app.main import app
+
+        yield TestClient(app)
+
+
+@pytest.fixture
+def teacher_user(db_session):
+    """创建一个教师用户并返回其 ORM 对象。"""
+    import bcrypt
+    from app.models.user import User
+
+    user = User(
+        username="test_teacher",
+        password_hash=bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode(),
+        role="teacher",
     )
-    Base.metadata.create_all(bind=engine)
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
 
-    application = create_app()
-    application.router.on_startup.clear()
 
-    def override_get_db():
-        db = testing_session()
-        try:
-            yield db
-        finally:
-            db.close()
+@pytest.fixture
+def student_user(db_session):
+    """创建一个学生用户并返回其 ORM 对象。"""
+    import bcrypt
+    from app.models.user import User
 
-    application.dependency_overrides[get_db] = override_get_db
+    user = User(
+        username="test_student",
+        password_hash=bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode(),
+        role="student",
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
 
-    with TestClient(application) as test_client:
-        yield test_client
 
-    application.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
+@pytest.fixture
+def teacher_token(client, teacher_user):
+    """返回教师 JWT token。"""
+    resp = client.post("/api/auth/login", json={"username": "test_teacher", "password": "password123"})
+    assert resp.status_code == 200
+    return resp.json()["token"]
+
+
+@pytest.fixture
+def student_token(client, student_user):
+    """返回学生 JWT token。"""
+    resp = client.post("/api/auth/login", json={"username": "test_student", "password": "password123"})
+    assert resp.status_code == 200
+    return resp.json()["token"]
+
+
+@pytest.fixture
+def sample_problem(db_session):
+    """创建一个 ACM 题目用于测试。"""
+    from app.models.problem import Problem
+
+    problem = Problem(
+        title="两数之和",
+        content="给定一个整数数组 nums 和目标值 target，返回两个数的下标。",
+        type="acm",
+        language="python,cpp",
+        time_limit=1000,
+        memory_limit=128,
+    )
+    db_session.add(problem)
+    db_session.commit()
+    db_session.refresh(problem)
+    return problem
