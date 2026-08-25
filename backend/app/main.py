@@ -27,6 +27,8 @@ from app.domain.errors import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.middleware.audit import AuditMiddleware
+from app.middleware.rate_limit import RateLimitExceeded
 from app.models.sysdict import SysDict
 from app.utils.sys_dict import sys_dict_kv
 
@@ -115,6 +117,18 @@ def create_app() -> FastAPI:
         request: Request, exc: BusinessError
     ) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+
+    @application.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(
+        request: Request, exc: RateLimitExceeded
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={"error": "请求过于频繁，请稍后再试", "retry_after": exc.retry_after},
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
+    application.add_middleware(AuditMiddleware)
 
     @application.get("/")
     def hello():

@@ -9,6 +9,7 @@ from app.api.deps import get_submission_service
 from app.api.schemas.submission import SubmitCodeBody
 from app.config import SECRET_KEY
 from app.domain.submission import SubmissionQuery, SubmitParams
+from app.middleware.rate_limit import enforce
 from app.services.submission_service import SubmissionService
 from app.utils.auth_tools import AuthContext, get_current_auth
 import redis as redis_lib
@@ -83,6 +84,7 @@ async def submit_code(
     exam_id: Optional[str] = Form(default=None),
     file: Optional[UploadFile] = File(default=None),
 ):
+    enforce(f"submit:{auth.user.id}", limit=10, window_seconds=60)
     if auth.user.role != "student":
         raise HTTPException(status_code=403, detail={"error": "Only student accounts can submit solutions."})
 
