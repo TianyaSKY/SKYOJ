@@ -124,6 +124,12 @@ class ExamService:
         return MonitorResult(exam.title, [MonitorProblemInfo(item.problem_id, item.display_id, item.score) for item in problems], users)
 
     def rank(self, exam_id: int) -> RankResult:
+        from app.utils.exam_cache import get_rank_cache, set_rank_cache
+
+        cached = get_rank_cache(exam_id)
+        if cached is not None:
+            return RankResult.from_dict(cached)
+
         exam = self._require_exam(exam_id)
         problems = self._repository.list_problems(exam_id)
         problem_ids = [item.problem_id for item in problems]
@@ -141,7 +147,9 @@ class ExamService:
                 ranks[submission.user_id] = RankEntry(entry.user_id, entry.username, entry.solved + 1, entry.penalty + elapsed + stats.failed_attempts * 1200, entry.problems)
             elif submission.status not in {"Pending", "Compile Error"}:
                 entry.problems[submission.problem_id] = RankProblemStats(False, stats.failed_attempts + 1, 0)
-        return RankResult(exam.title, [RankProblemInfo(item.problem_id, item.display_id) for item in problems], sorted(ranks.values(), key=lambda item: (-item.solved, item.penalty)))
+        result = RankResult(exam.title, [RankProblemInfo(item.problem_id, item.display_id) for item in problems], sorted(ranks.values(), key=lambda item: (-item.solved, item.penalty)))
+        set_rank_cache(exam_id, result.to_dict())
+        return result
 
     def score_rows(self, requester_role: str, exam_id: int) -> tuple[ExamDetail, list[ExamScoreRow]]:
         self._require_teacher(requester_role)

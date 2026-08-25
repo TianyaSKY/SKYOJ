@@ -56,6 +56,9 @@ def judge_submission(submission_id: int, db) -> None:
 
     _publish_realtime_result(submission_id, final_status, final_score, final_log)
 
+    if submission is not None and submission.exam_id:
+        _invalidate_exam_cache(submission.exam_id)
+
     if final_status == "Accepted":
         _enqueue_plagiarism_scan(db, problem_id)
 
@@ -67,6 +70,15 @@ def _publish_realtime_result(submission_id: int, status: str, score: float, outp
         publish_submission_result(submission_id, status, score, output_log)
     except Exception as exc:
         logger.warning("实时推送失败 submission_id={} error={}", submission_id, exc)
+
+
+def _invalidate_exam_cache(exam_id: int) -> None:
+    """考试中提交判题后，失效排行榜缓存以保证下一位用户看到最新结果。"""
+    try:
+        from app.utils.exam_cache import invalidate_rank_cache
+        invalidate_rank_cache(exam_id)
+    except Exception as exc:
+        logger.warning("失效考试缓存失败 exam_id={} error={}", exam_id, exc)
 
 
 def _enqueue_plagiarism_scan(db, problem_id: int) -> None:

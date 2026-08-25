@@ -175,6 +175,56 @@ class RankResult:
     problems: list[RankProblemInfo]
     rank: list[RankEntry]
 
+    def to_dict(self) -> dict:
+        return {
+            "exam_title": self.exam_title,
+            "problems": [
+                {"problem_id": p.problem_id, "display_id": p.display_id}
+                for p in self.problems
+            ],
+            "rank": [
+                {
+                    "user_id": e.user_id,
+                    "username": e.username,
+                    "solved": e.solved,
+                    "penalty": e.penalty,
+                    "problems": {
+                        str(pid): {
+                            "solved": stats.solved,
+                            "failed_attempts": stats.failed_attempts,
+                            "time": stats.time,
+                        }
+                        for pid, stats in e.problems.items()
+                    },
+                }
+                for e in self.rank
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RankResult":
+        return cls(
+            exam_title=data["exam_title"],
+            problems=[RankProblemInfo(p["problem_id"], p.get("display_id")) for p in data.get("problems", [])],
+            rank=[
+                RankEntry(
+                    user_id=e["user_id"],
+                    username=e["username"],
+                    solved=e["solved"],
+                    penalty=e["penalty"],
+                    problems={
+                        int(pid): RankProblemStats(
+                            solved=stats["solved"],
+                            failed_attempts=stats["failed_attempts"],
+                            time=stats["time"],
+                        )
+                        for pid, stats in e.get("problems", {}).items()
+                    },
+                )
+                for e in data.get("rank", [])
+            ],
+        )
+
 
 @dataclass(frozen=True)
 class ExamScoreRow:
