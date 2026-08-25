@@ -194,12 +194,8 @@ import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 import {ArrowLeft, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
 
-// Markdown and Highlighting
-import MarkdownIt from 'markdown-it'
-import mk from 'markdown-it-katex'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
-import 'katex/dist/katex.min.css'
+// 题面 Markdown 渲染（含 LaTeX / 代码高亮），统一从 utils/markdown 入口复用，避免各处独立初始化导致配置漂移
+import {renderMarkdown} from '@/utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
@@ -306,30 +302,9 @@ watch(language, (newLang) => {
   code.value = templates[newLang] || ''
 })
 
-// Configure MarkdownIt
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-  highlight: function (str, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return '<pre class="hljs"><code>' +
-            hljs.highlight(str, {language: lang, ignoreIllegals: true}).value +
-            '</code></pre>';
-      } catch (__) {
-      }
-    }
+// Configure MarkdownIt — 题面渲染复用 utils/markdown 的统一实例，确保 LaTeX / 换行 / XSS 防护与编辑器预览一致
 
-    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
-  }
-})
-
-md.use(mk)
-
-const renderedContent = computed(() => {
-  return problem.value.content ? md.render(problem.value.content) : ''
-})
+const renderedContent = computed(() => renderMarkdown(problem.value.content))
 
 const fetchProblem = async () => {
   try {

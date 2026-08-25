@@ -19,19 +19,13 @@ import {computed, onMounted, ref} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {getProblemDetail} from '@/api/problem'
 import {ElMessage} from 'element-plus'
-import MarkdownIt from 'markdown-it'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
+import {renderMarkdown} from '@/utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const problem = ref({})
-const md = new MarkdownIt({html: true, linkify: true, highlight: (str, lang) => {
-  if (lang && hljs.getLanguage(lang)) return `<pre class="hljs"><code>${hljs.highlight(str, {language: lang, ignoreIllegals: true}).value}</code></pre>`
-  return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`
-}})
-const renderedContent = computed(() => md.render(problem.value.content || ''))
+const renderedContent = computed(() => renderMarkdown(problem.value.content || ''))
 
 onMounted(async () => {
   loading.value = true
