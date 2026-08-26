@@ -16,6 +16,7 @@ from app.api.schemas.problem_community import (
     SolutionListItemResponse,
     SolutionListResponse,
     TagResponse,
+    ToggleFavoriteResponse,
     ToggleLikeResponse,
     UpdateSolutionRequest,
 )
@@ -140,6 +141,21 @@ def toggle_like(
         solution_id=result.solution_id,
         liked=result.liked,
         vote_count=result.vote_count,
+    )
+
+
+@router.post(
+    "/solutions/{solution_id}/favorite", response_model=ToggleFavoriteResponse
+)
+def toggle_favorite(
+    solution_id: int,
+    auth: AuthContext = Depends(get_current_auth),
+    service: SolutionService = Depends(get_solution_service),
+):
+    result = service.toggle_favorite(solution_id, auth.user.id)
+    return ToggleFavoriteResponse(
+        solution_id=result.solution_id,
+        favorited=result.favorited,
     )
 
 
@@ -308,6 +324,8 @@ def _detail_to_dict(detail) -> dict:
         "comment_count": detail.comment_count,
         "view_count": detail.view_count,
         "liked_by_me": detail.liked_by_me,
+        "favorited_by_me": detail.favorited_by_me,
+        "favorite_count": detail.favorite_count,
         "created_at": detail.created_at,
         "updated_at": detail.updated_at,
     }

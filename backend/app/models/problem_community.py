@@ -114,6 +114,7 @@ class ProblemSolution(Base):
     vote_count = Column(Integer, default=0, nullable=False)
     comment_count = Column(Integer, default=0, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)
+    favorite_count = Column(Integer, default=0, nullable=False)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(
@@ -130,6 +131,11 @@ class ProblemSolution(Base):
     )
     comments = relationship(
         "ProblemSolutionComment",
+        back_populates="solution",
+        cascade="all, delete-orphan",
+    )
+    favorites = relationship(
+        "ProblemSolutionFavorite",
         back_populates="solution",
         cascade="all, delete-orphan",
     )
@@ -162,6 +168,32 @@ class ProblemSolutionLike(Base):
 
     def __repr__(self) -> str:
         return f"<ProblemSolutionLike solution={self.solution_id} user={self.user_id}>"
+
+
+class ProblemSolutionFavorite(Base):
+    """题解收藏关系表。每用户每题解一条记录（与点赞不同，收藏不计入 vote_count）。"""
+
+    __tablename__ = "problem_solution_favorites"
+    __table_args__ = (
+        UniqueConstraint(
+            "solution_id", "user_id", name="uq_problem_solution_favorites_pair"
+        ),
+        Index("ix_problem_solution_favorites_user", "user_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    solution_id = Column(
+        Integer,
+        ForeignKey("problem_solutions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    solution = relationship("ProblemSolution", back_populates="favorites")
+
+    def __repr__(self) -> str:
+        return f"<ProblemSolutionFavorite solution={self.solution_id} user={self.user_id}>"
 
 
 class ProblemSolutionComment(Base):

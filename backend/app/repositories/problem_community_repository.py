@@ -16,6 +16,7 @@ from app.models.problem import Problem
 from app.models.problem_community import (
     ProblemSolution,
     ProblemSolutionComment,
+    ProblemSolutionFavorite,
     ProblemSolutionLike,
     ProblemTag,
     ProblemTagMap,
@@ -114,6 +115,35 @@ class ProblemCommunityRepository:
             .all()
         )
         return [row[0] for row in rows]
+
+    # -- 收藏 --
+
+    def get_favorite(self, solution_id: int, user_id: int) -> Optional[ProblemSolutionFavorite]:
+        return (
+            self._db.query(ProblemSolutionFavorite)
+            .filter(
+                ProblemSolutionFavorite.solution_id == solution_id,
+                ProblemSolutionFavorite.user_id == user_id,
+            )
+            .first()
+        )
+
+    def add_favorite(self, solution_id: int, user_id: int) -> ProblemSolutionFavorite:
+        fav = ProblemSolutionFavorite(solution_id=solution_id, user_id=user_id)
+        self._db.add(fav)
+        self._db.flush()
+        return fav
+
+    def remove_favorite(self, fav: ProblemSolutionFavorite) -> None:
+        self._db.delete(fav)
+        self._db.flush()
+
+    def list_favorites_for_user(self, user_id: int) -> list[ProblemSolutionFavorite]:
+        return (
+            self._db.query(ProblemSolutionFavorite)
+            .filter(ProblemSolutionFavorite.user_id == user_id)
+            .all()
+        )
 
     # -- 评论 --
 

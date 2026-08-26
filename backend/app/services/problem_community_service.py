@@ -22,6 +22,7 @@ from app.domain.problem_community import (
     SolutionDetail,
     SolutionListItem,
     TagDetail,
+    ToggleFavoriteResult,
     ToggleLikeResult,
     UpdateSolutionParams,
 )
@@ -116,6 +117,21 @@ class SolutionService:
         solution.vote_count = max(0, (solution.vote_count or 0) - 1)
         self._db.commit()
         return ToggleLikeResult(solution_id=solution_id, liked=False, vote_count=solution.vote_count)
+
+    def toggle_favorite(self, solution_id: int, user_id: int) -> ToggleFavoriteResult:
+        solution = self._repo.get_solution_by_id(solution_id)
+        if solution is None or solution.status == "hidden":
+            raise ResourceNotFoundError("题解不存在")
+        existing = self._repo.get_favorite(solution_id, user_id)
+        if existing is None:
+            self._repo.add_favorite(solution_id, user_id)
+            solution.favorite_count = (solution.favorite_count or 0) + 1
+            self._db.commit()
+            return ToggleFavoriteResult(solution_id=solution_id, favorited=True)
+        self._repo.remove_favorite(existing)
+        solution.favorite_count = max(0, (solution.favorite_count or 0) - 1)
+        self._db.commit()
+        return ToggleFavoriteResult(solution_id=solution_id, favorited=False)
 
     # -- 评论 --
 

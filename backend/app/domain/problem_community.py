@@ -53,7 +53,9 @@ class SolutionDetail:
     view_count: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
-    liked_by_me: bool = False  # 调用方预取
+    liked_by_me: bool = False
+    favorited_by_me: bool = False
+    favorite_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,14 @@ class ToggleLikeResult:
     solution_id: int
     liked: bool
     vote_count: int
+
+
+@dataclass(frozen=True)
+class ToggleFavoriteResult:
+    """收藏/取消收藏返回。"""
+
+    solution_id: int
+    favorited: bool
 
 
 # --- 标签 ---

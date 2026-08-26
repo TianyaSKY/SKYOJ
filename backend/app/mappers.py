@@ -250,10 +250,13 @@ def from_debug_run_orm(row) -> DebugRunDetail:
 
 
 def from_solution_orm(solution, *, viewer_id: int | None = None) -> SolutionDetail:
-    """题解 ORM → 详情；liked_by_me 视调用方预取的 viewer_id 是否点赞决定。"""
+    """题解 ORM → 详情；liked_by_me / favorited_by_me 视调用方预取的 viewer_id 是否点赞/收藏决定。"""
     liked_by_me = False
+    favorited_by_me = False
     if viewer_id is not None and solution.likes is not None:
         liked_by_me = any(like.user_id == viewer_id for like in solution.likes)
+    if viewer_id is not None and solution.favorites is not None:
+        favorited_by_me = any(fav.user_id == viewer_id for fav in solution.favorites)
     return SolutionDetail(
         id=solution.id,
         problem_id=solution.problem_id,
@@ -270,6 +273,8 @@ def from_solution_orm(solution, *, viewer_id: int | None = None) -> SolutionDeta
         created_at=solution.created_at,
         updated_at=solution.updated_at,
         liked_by_me=liked_by_me,
+        favorited_by_me=favorited_by_me,
+        favorite_count=solution.favorite_count or 0,
     )
 
 

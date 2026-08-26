@@ -13,6 +13,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import MarkdownIt from 'markdown-it'
 
@@ -114,6 +115,18 @@ async function toggleLike (item) {
     item.liked_by_me = resp.liked
   } catch (e) {
     ElMessage.error(e.message || '点赞失败')
+  }
+}
+
+async function toggleFavorite (item) {
+  try {
+    const resp = await request({
+      url: `/api/problems/solutions/${item.id}/favorite`,
+      method: 'post'
+    })
+    item.favorited_by_me = resp.favorited
+  } catch (e) {
+    ElMessage.error(e.message || '收藏失败')
   }
 }
 
@@ -221,6 +234,9 @@ async function deleteComment (commentId) {
           <el-button :type="item.liked_by_me ? 'primary' : 'default'" size="small" @click="toggleLike(item)">
             <el-icon><Star /></el-icon>
             <span style="margin-left: 4px">{{ item.vote_count }}</span>
+          </el-button>
+          <el-button :type="item.favorited_by_me ? 'warning' : 'default'" size="small" @click="toggleFavorite(item)">
+            <el-icon><StarFilled /></el-icon>
           </el-button>
           <el-button size="small" @click="openComments(item)">
             <el-icon><ChatDotRound /></el-icon>

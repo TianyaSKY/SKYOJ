@@ -48,6 +48,8 @@ class SolutionDetailResponse(BaseModel):
     comment_count: int
     view_count: int
     liked_by_me: bool
+    favorited_by_me: bool
+    favorite_count: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
@@ -63,6 +65,11 @@ class ToggleLikeResponse(BaseModel):
     solution_id: int
     liked: bool
     vote_count: int
+
+
+class ToggleFavoriteResponse(BaseModel):
+    solution_id: int
+    favorited: bool
 
 
 class CommentResponse(BaseModel):
