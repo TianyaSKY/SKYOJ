@@ -27,8 +27,9 @@ def judge_submission(submission_id: int, db) -> None:
         user_code = submission.code_content or ""
         problem_id = submission.problem_id
         language = submission.language or "python"
+        case_results: list[dict] = []
         if problem_type == "acm":
-            status, score, log = run_acm_judge(
+            status, score, log, case_results = run_acm_judge(
                 submission_id, user_code, problem_id, language, db=db
             )
         elif problem_type == "oop":
@@ -50,7 +51,11 @@ def judge_submission(submission_id: int, db) -> None:
         logger.exception("判题业务执行异常 submission_id={}", submission_id)
 
     repository.update_result(
-        submission_id, status=final_status, score=final_score, output_log=final_log
+        submission_id,
+        status=final_status,
+        score=final_score,
+        output_log=final_log,
+        case_results=case_results,
     )
     db.commit()
 

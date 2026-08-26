@@ -352,11 +352,15 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
 
     并发上限为 8 个并行容器，超过 8 个测试点时多余排队。
     编译结果不跨容器复用，每次都重新编译（代码每次都不同，缓存收益低）。
+
+    返回 ``(status, score, log, case_results)``，其中 ``case_results`` 是
+    ``[{"case_name", "status", "error_output"}]`` 形式的列表；与
+    ``Submission.case_results`` JSON 列对应，前端据此逐点折叠展示。
     """
     del submission_id
     lang_config = _ACM_LANG_CONFIGS.get((language or "").lower())
     if not lang_config:
-        return "System Error", 0, f"Unsupported language: {language}"
+        return "System Error", 0, f"Unsupported language: {language}", []
 
     if db is None:
         from app.database import SessionLocal
@@ -365,7 +369,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         try:
             problem = ProblemRepository(temporary_db).get_by_id(problem_id)
             if not problem:
-                return "System Error", 0, "Problem not found"
+                return "System Error", 0, "Problem not found", []
             memory_limit = problem.memory_limit
             time_limit = problem.time_limit
         finally:
@@ -373,13 +377,13 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
     else:
         problem = ProblemRepository(db).get_by_id(problem_id)
         if not problem:
-            return "System Error", 0, "Problem not found"
+            return "System Error", 0, "Problem not found", []
         memory_limit = problem.memory_limit
         time_limit = problem.time_limit
 
     test_case_dir = f"uploads/problems/{problem_id}"
     if not os.path.exists(test_case_dir):
-        return "Runtime Error", 0, "System Error: Test cases missing"
+        return "Runtime Error", 0, "System Error: Test cases missing", []
 
     in_files = sorted(
         [name for name in os.listdir(test_case_dir) if name.endswith(".in")],
@@ -387,14 +391,14 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
     )
     total_cases = len(in_files)
     if total_cases == 0:
-        return "Runtime Error", 0, "System Error: No .in files found"
+        return "Runtime Error", 0, "System Error: No .in files found", []
 
     case_payloads = []
     for in_file in in_files:
         case_name = in_file[: -len(".in")]
         out_file = os.path.join(test_case_dir, f"{case_name}.out")
         if not os.path.exists(out_file):
-            return "System Error", 0, f"Missing output file for test case: {case_name}.out"
+            return "System Error", 0, f"Missing output file for test case: {case_name}.out", []
         with open(os.path.join(test_case_dir, in_file), "r", encoding="utf-8") as source:
             input_data = source.read()
         with open(out_file, "r", encoding="utf-8") as source:
@@ -430,25 +434,36 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             for future in as_completed(futures):
                 ordered_results.append(future.result())
     except Exception as exc:
-        return "Runtime Error", 0, str(exc)
+        return "Runtime Error", 0, str(exc), []
 
     passed_count = 0
     has_tle = False
     logs = []
+    case_results: list[dict] = []
     for case_name, result_type, detail in ordered_results:
         if result_type == "passed":
             passed_count += 1
             logs.append(f"Test Case {case_name}: Passed")
+            case_results.append({"case_name": case_name, "status": "passed"})
         elif result_type == "tle":
             has_tle = True
             logs.append(f"Test Case {case_name}: Time Limit Exceeded")
+            case_results.append({"case_name": case_name, "status": "tle"})
         elif result_type == "runtime_error":
             logs.append(
                 f"Test Case {case_name}: Runtime Error"
                 + (f"\n{detail}" if detail else "")
             )
+            case_results.append(
+                {
+                    "case_name": case_name,
+                    "status": "runtime_error",
+                    "error_output": str(detail) if detail else None,
+                }
+            )
         else:
             logs.append(f"Test Case {case_name}: Wrong Answer")
+            case_results.append({"case_name": case_name, "status": "wrong_answer"})
 
     final_score = (passed_count / total_cases) * 100
     if has_tle:
@@ -457,4 +472,4 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         final_status = "Accepted"
     else:
         final_status = "Wrong Answer"
-    return final_status, final_score, "\n".join(logs)
+    return final_status, final_score, "\n".join(logs), case_results
