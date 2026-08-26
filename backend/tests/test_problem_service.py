@@ -26,6 +26,8 @@ class FakeProblemRepository:
     def __init__(self) -> None:
         self.items = []
         self.next_id = 1
+        # master 的标签过滤会无条件构造 ProblemCommunityRepository(_db)
+        self._db = None
 
     def create(self, **kwargs):
         problem_type = kwargs.pop("problem_type")
