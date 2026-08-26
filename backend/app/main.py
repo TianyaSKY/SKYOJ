@@ -53,6 +53,7 @@ def init_db():
     while retries > 0:
         try:
             create_tables()
+            _ensure_new_columns()
             logger.success("数据库连接成功，数据表已创建")
 
             db = SessionLocal()
@@ -82,6 +83,35 @@ def init_db():
             )
             time.sleep(3)
     logger.error("数据库多次连接失败，应用将以降级状态继续启动")
+
+
+def _ensure_new_columns():
+    """对已存在的表补充新列（ALTER TABLE IF NOT EXISTS 语义）。"""
+    from sqlalchemy import text
+    from app.database import engine
+
+    # case_results: ACM 逐点判题结果 JSON
+    _alter_if_missing("submissions", "case_results", "JSON")
+
+    # exam.contest_type / freeze_minutes
+    _alter_if_missing("exams", "contest_type", "VARCHAR(10) DEFAULT 'icpc'")
+    _alter_if_missing("exams", "freeze_minutes", "INT")
+
+    logger.info("新列同步检查完成")
+
+
+def _alter_if_missing(table: str, column: str, definition: str):
+    from sqlalchemy import text
+    from app.database import engine
+
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
+            conn.commit()
+            logger.success("ALTER TABLE {} ADD COLUMN {} ({})", table, column, definition)
+        except Exception:
+            conn.commit()  # 列已存在或其他非致命错误，静默略过
+            pass
 
 
 @asynccontextmanager
