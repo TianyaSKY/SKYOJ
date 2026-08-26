@@ -2,12 +2,22 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.domain.errors import ResourceNotFoundError
-from app.domain.problem import CreateProblemParams, PaginatedProblems, UpdateProblemParams
-from app.services.problem_service import ProblemService
-from app.services.auth_service import AuthService
+from app.domain.errors import (
+    AuthenticationError,
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
+from app.domain.problem import (
+    CreateProblemParams,
+    PaginatedProblems,
+    TestCaseSummary as ProblemTestCaseSummary,
+    UpdateProblemParams,
+)
 from app.domain.auth import LoginParams, RegisterParams
-from app.domain.errors import AuthenticationError, InvalidStateError
+from app.services.auth_service import AuthService
+from app.services.problem_service import ProblemService
+
 
 
 class FakeProblemRepository:
@@ -53,6 +63,29 @@ class FakeTestCaseStorage:
     def has_test_cases(self, problem_id: int) -> bool:
         return problem_id in {1, 3}
 
+    def summarize(self, problem_id: int) -> ProblemTestCaseSummary:
+        if problem_id in {1, 3}:
+            return ProblemTestCaseSummary(
+                status="ready",
+                total_count=2,
+                valid_count=2,
+                invalid_count=0,
+                file_count=4,
+                total_size=20,
+                ignored_files=[],
+                cases=[],
+            )
+        return ProblemTestCaseSummary(
+            status="empty",
+            total_count=0,
+            valid_count=0,
+            invalid_count=0,
+            file_count=0,
+            total_size=0,
+            ignored_files=[],
+            cases=[],
+        )
+
 
 def _service_with_three_problems() -> ProblemService:
     service = ProblemService(
@@ -95,6 +128,23 @@ def test_problem_service_teacher_list_includes_all_problems() -> None:
     visible = service.list_problems("teacher")
 
     assert {item.id for item in visible} == {1, 2, 3}
+    status_by_id = {item.id: item for item in visible}
+    assert status_by_id[1].test_case_status == "ready"
+    assert status_by_id[1].test_case_count == 2
+    assert status_by_id[2].test_case_status == "empty"
+
+
+def test_problem_service_test_case_summary_requires_teacher_and_problem() -> None:
+    service = _service_with_three_problems()
+
+    with pytest.raises(PermissionDeniedError):
+        service.get_test_case_summary("student", 1)
+    with pytest.raises(ResourceNotFoundError):
+        service.get_test_case_summary("teacher", 999)
+
+    summary = service.get_test_case_summary("teacher", 1)
+    assert summary.status == "ready"
+    assert summary.valid_count == 2
 
 
 def test_problem_service_create_update_and_paginate() -> None:

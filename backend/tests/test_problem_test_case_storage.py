@@ -135,3 +135,43 @@ def test_has_test_cases_tracks_upload_and_delete(tmp_path: Path):
 
     client.delete_all(1)
     assert client.has_test_cases(1) is False
+
+
+def test_summarize_reports_pair_status_and_ignored_files(tmp_path: Path):
+    client = ProblemTestCaseStorageClient(str(tmp_path / "problems"))
+    client.save_zip(
+        1,
+        "cases.zip",
+        make_zip(
+            ("1.in", b"input"),
+            ("1.out", b"output"),
+            ("2.in", b"missing output"),
+            ("nested/3.in", b"ignored input"),
+            ("nested/3.out", b"ignored output"),
+            ("README.txt", b"ignored"),
+        ),
+    )
+
+    summary = client.summarize(1)
+
+    assert summary.status == "incomplete"
+    assert summary.total_count == 2
+    assert summary.valid_count == 1
+    assert summary.invalid_count == 1
+    assert summary.file_count == 6
+    assert summary.ignored_files == ["nested/3.in", "nested/3.out", "README.txt"]
+    assert [case.name for case in summary.cases] == ["1", "2"]
+    assert summary.cases[0].status == "ready"
+    assert summary.cases[0].input_size == 5
+    assert summary.cases[0].output_size == 6
+    assert summary.cases[1].status == "missing_output"
+
+
+def test_summarize_empty_problem_has_empty_status(tmp_path: Path):
+    client = ProblemTestCaseStorageClient(str(tmp_path / "problems"))
+
+    summary = client.summarize(1)
+
+    assert summary.status == "empty"
+    assert summary.total_count == 0
+    assert summary.file_count == 0
