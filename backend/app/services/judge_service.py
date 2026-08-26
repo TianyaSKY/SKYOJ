@@ -59,6 +59,20 @@ def judge_submission(submission_id: int, db) -> None:
     )
     db.commit()
 
+    # === 错题本更新 ===
+    if submission is not None:
+        try:
+            from app.services.wrong_book_service import WrongBookService
+            wb = WrongBookService(db)
+            wb.on_judge_complete(
+                user_id=submission.user_id,
+                problem_id=problem_id,
+                submission_id=submission_id,
+                status=final_status,
+            )
+        except Exception as exc:
+            logger.warning("错题本更新失败 submission_id={} error={}", submission_id, exc)
+
     _publish_realtime_result(submission_id, final_status, final_score, final_log)
 
     if submission is not None and submission.exam_id:

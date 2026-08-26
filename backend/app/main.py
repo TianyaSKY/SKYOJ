@@ -19,6 +19,7 @@ from app.api import (
     submission,
     sys_dict,
     user,
+    wrong_book,
 )
 from app.database import SessionLocal, create_tables
 from app.domain.errors import (
@@ -214,6 +215,7 @@ def create_app() -> FastAPI:
     application.include_router(plagiarism.router, prefix="/api/plagiarism", tags=["plagiarism"])
     application.include_router(problem_community.router, prefix="/api", tags=["community"])
     application.include_router(problem_community.tags_router, prefix="/api", tags=["community"])
+    application.include_router(wrong_book.router, prefix="/api", tags=["wrong_book"])
 
     return application
 

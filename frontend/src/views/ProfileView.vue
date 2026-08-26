@@ -33,6 +33,68 @@
     </el-card>
 
     <template v-if="isPracticeMode || isTeacher">
+      <!-- Wrong Book Card -->
+      <el-card class="wrongbook-card mb-4" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <h3 class="header-title">
+              <el-icon><Warning /></el-icon>
+              错题本
+            </h3>
+            <div class="wrongbook-stats">
+              <el-tag type="danger" effect="plain" size="small">未解决 {{ wbStats.unresolved }}</el-tag>
+              <el-tag type="success" effect="plain" size="small">已掌握 {{ wbStats.accepted }}</el-tag>
+              <el-tag type="warning" effect="plain" size="small">已复习 {{ wbStats.reviewed }}</el-tag>
+            </div>
+          </div>
+        </template>
+        <el-table v-loading="wbLoading" :data="wbItems" stripe style="width: 100%" :max-height="300">
+          <el-table-column align="center" label="#" prop="problem_id" width="80"/>
+          <el-table-column label="题目" min-width="200" prop="problem_title"/>
+          <el-table-column align="center" label="首次出错" min-width="160">
+            <template #default="scope">
+              <span class="text-secondary">{{ formatTime(scope.row.first_wrong_at) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column align="center" label="最近出错" min-width="160">
+            <template #default="scope">
+              <span class="text-secondary">{{ formatTime(scope.row.latest_wrong_at) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column align="center" label="状态" width="120">
+            <template #default="scope">
+              <el-tag v-if="scope.row.accepted" type="success" size="small">已掌握</el-tag>
+              <el-tag v-else type="danger" size="small">未解决</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column align="center" label="复习" width="100">
+            <template #default="scope">
+              <el-button
+                :type="scope.row.reviewed ? 'warning' : 'default'"
+                size="small"
+                :disabled="scope.row.accepted"
+                @click="toggleReview(scope.row)"
+              >
+                {{ scope.row.reviewed ? '已复习' : '标记复习' }}
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column align="center" fixed="right" label="操作" width="90">
+            <template #default="scope">
+              <el-button plain size="small" type="primary" @click="$router.push(`/problem/${scope.row.problem_id}`)">
+                去练
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div v-if="wbStats.total > wbItems.length" class="wrongbook-more">
+          <el-link type="primary" :underline="false" @click="$router.push('/profile')">
+            查看全部 {{ wbStats.total }} 条错题 →
+          </el-link>
+        </div>
+        <el-empty v-if="wbStats.total === 0 && !wbLoading" description="暂无错题记录，继续加油！" />
+      </el-card>
+
       <!-- Heatmap Card -->
       <el-card class="heatmap-card mb-4" shadow="hover">
         <template #header>
@@ -130,8 +192,9 @@ import {useUserStore} from '@/stores/user'
 import {useSysStore} from '@/stores/sys'
 import {getUserProfile, getUserSubmissions, uploadAvatar} from '@/api/user'
 import {ElMessage} from 'element-plus'
-import {Calendar, List, Camera} from '@element-plus/icons-vue'
+import {Calendar, List, Camera, Warning} from '@element-plus/icons-vue'
 import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
+import request from '@/utils/request'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -140,6 +203,9 @@ const sysStore = useSysStore()
 const targetUser = ref({})
 const submissions = ref([])
 const loading = ref(false)
+const wbItems = ref([])
+const wbStats = ref({ total: 0, unresolved: 0, reviewed: 0, accepted: 0 })
+const wbLoading = ref(false)
 
 const userId = computed(() => route.params.id)
 const userAvatar = computed(() => {
@@ -173,6 +239,35 @@ const formatTime = (isoString) => {
 const formatDate = (isoString) => {
   if (!isoString) return ''
   return new Date(isoString).toLocaleDateString()
+}
+
+const fetchWrongBook = async () => {
+  wbLoading.value = true
+  try {
+    const [statsRes, listRes] = await Promise.all([
+      request({ url: '/api/wrong-book/stats', method: 'get' }),
+      request({ url: '/api/wrong-book/', method: 'get', params: { page: 1, page_size: 10 } }),
+    ])
+    wbStats.value = statsRes
+    wbItems.value = listRes.items || []
+  } catch {
+    // 非登录用户无权限
+  } finally {
+    wbLoading.value = false
+  }
+}
+
+const toggleReview = async (item) => {
+  try {
+    const res = await request({
+      url: `/api/wrong-book/${item.id}/toggle-review`,
+      method: 'post',
+    })
+    item.reviewed = res.reviewed
+    wbStats.value.reviewed += item.reviewed ? 1 : -1
+  } catch {
+    ElMessage.error('操作失败')
+  }
 }
 
 const beforeAvatarUpload = (file) => {
@@ -238,6 +333,7 @@ watch(() => route.params.id, () => {
 
 onMounted(() => {
   fetchData()
+  fetchWrongBook()
 })
 </script>
 
@@ -356,5 +452,20 @@ onMounted(() => {
 
 .problem-link {
   font-weight: 500;
+}
+
+.wrongbook-stats {
+  display: flex;
+  gap: 8px;
+}
+
+.wrongbook-more {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.text-secondary {
+  color: #909399;
+  font-size: 0.9rem;
 }
 </style>

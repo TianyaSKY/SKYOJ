@@ -9,6 +9,7 @@ from app.models.problem import Problem
 from app.models.problem_community import (
     ProblemSolution,
     ProblemSolutionComment,
+    ProblemSolutionFavorite,
     ProblemSolutionLike,
     ProblemTag,
     ProblemTagMap,
@@ -17,6 +18,7 @@ from app.models.search_history import SearchHistory
 from app.models.submission import Submission
 from app.models.sysdict import SysDict
 from app.models.user import User
+from app.models.wrong_book import WrongBook
 
 __all__ = [
     "AiDraft",
@@ -37,4 +39,5 @@ __all__ = [
     "Submission",
     "SysDict",
     "User",
+    "WrongBook",
 ]
