@@ -13,6 +13,8 @@ class CreateExamParams:
     description: str
     start_time: datetime
     end_time: datetime
+    contest_type: str = "icpc"
+    freeze_minutes: Optional[int] = None
     password: Optional[str] = None
     is_visible: bool = False
     created_by: int = 0
@@ -26,6 +28,8 @@ class UpdateExamParams:
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    contest_type: Optional[str] = None
+    freeze_minutes: Optional[int] = None
     password: Optional[str] = None
     is_visible: Optional[bool] = None
 
@@ -66,6 +70,8 @@ class ExamListItem:
     description: str
     start_time: datetime
     end_time: datetime
+    contest_type: str
+    freeze_minutes: Optional[int]
     is_visible: bool
     created_by: int
     problem_count: int
@@ -82,6 +88,8 @@ class ExamDetail:
     description: str
     start_time: datetime
     end_time: datetime
+    contest_type: str
+    freeze_minutes: Optional[int]
     is_visible: bool
     created_by: int
     has_password: bool
