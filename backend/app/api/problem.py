@@ -58,6 +58,9 @@ def get_problems(
                     "language": p.language,
                     "time_limit": p.time_limit,
                     "memory_limit": p.memory_limit,
+                    "test_case_status": p.test_case_status,
+                    "test_case_count": p.test_case_count,
+                    "test_case_valid_count": p.test_case_valid_count,
                 }
                 for p in result.problems
             ],
@@ -71,6 +74,9 @@ def get_problems(
             "language": p.language,
             "time_limit": p.time_limit,
             "memory_limit": p.memory_limit,
+            "test_case_status": p.test_case_status,
+            "test_case_count": p.test_case_count,
+            "test_case_valid_count": p.test_case_valid_count,
         }
         for p in result
     ]
@@ -149,6 +155,34 @@ def delete_test_cases(
 ):
     service.delete_test_cases(auth.user.role, problem_id)
     return {"message": f"All test cases for problem {problem_id} deleted."}
+
+@router.get("/{problem_id}/test_cases/summary")
+def get_test_case_summary(
+    problem_id: int,
+    auth: AuthContext = Depends(get_current_auth),
+    service: ProblemService = Depends(get_problem_service),
+):
+    summary = service.get_test_case_summary(auth.user.role, problem_id)
+    return {
+        "status": summary.status,
+        "total_count": summary.total_count,
+        "valid_count": summary.valid_count,
+        "invalid_count": summary.invalid_count,
+        "file_count": summary.file_count,
+        "total_size": summary.total_size,
+        "ignored_files": summary.ignored_files,
+        "cases": [
+            {
+                "name": case.name,
+                "input_file": case.input_file,
+                "output_file": case.output_file,
+                "input_size": case.input_size,
+                "output_size": case.output_size,
+                "status": case.status,
+            }
+            for case in summary.cases
+        ],
+    }
 
 
 @router.get("/{problem_id}/test_cases")

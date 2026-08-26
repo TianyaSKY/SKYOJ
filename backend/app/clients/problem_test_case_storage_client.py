@@ -1,13 +1,16 @@
 """题目测试用例文件存储客户端。"""
 
 import io
-from pathlib import Path, PurePosixPath, PureWindowsPath
+import re
 import shutil
 import stat
 import uuid
 import zipfile
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from app.domain.errors import InvalidStateError, ResourceNotFoundError
+from app.domain.problem import TestCaseItem, TestCaseSummary
+
 
 
 MAX_ARCHIVE_SIZE = 100 * 1024 * 1024
@@ -94,6 +97,105 @@ class ProblemTestCaseStorageClient:
 
         folder = self._folder(problem_id)
         return folder.is_dir() and any(folder.iterdir())
+
+    def summarize(self, problem_id: int) -> TestCaseSummary:
+        """读取题目测试点的配对状态和文件明细。"""
+
+        folder = self._folder(problem_id)
+        if not folder.is_dir():
+            return self._empty_summary()
+
+        input_files: dict[str, Path] = {}
+        output_files: dict[str, Path] = {}
+        ignored_files: list[str] = []
+        total_size = 0
+        file_count = 0
+
+        for path in folder.rglob("*"):
+            if path.is_symlink() or not path.is_file():
+                continue
+
+            relative_name = path.relative_to(folder).as_posix()
+            size = path.stat().st_size
+            total_size += size
+            file_count += 1
+
+            if path.parent != folder:
+                ignored_files.append(relative_name)
+            elif path.name.endswith(".in"):
+                input_files[path.name[: -len(".in")]] = path
+            elif path.name.endswith(".out"):
+                output_files[path.name[: -len(".out")]] = path
+            else:
+                ignored_files.append(relative_name)
+
+        case_names = sorted(
+            set(input_files) | set(output_files),
+            key=self._natural_sort_key,
+        )
+        cases = []
+        for name in case_names:
+            input_path = input_files.get(name)
+            output_path = output_files.get(name)
+            if input_path and output_path:
+                status = "ready"
+            elif input_path:
+                status = "missing_output"
+            else:
+                status = "missing_input"
+
+            cases.append(
+                TestCaseItem(
+                    name=name,
+                    input_file=input_path.name if input_path else None,
+                    output_file=output_path.name if output_path else None,
+                    input_size=input_path.stat().st_size if input_path else None,
+                    output_size=output_path.stat().st_size if output_path else None,
+                    status=status,
+                )
+            )
+
+        valid_count = sum(case.status == "ready" for case in cases)
+        invalid_count = len(cases) - valid_count
+        if not file_count:
+            status = "empty"
+        elif not cases:
+            status = "invalid"
+        elif invalid_count:
+            status = "incomplete"
+        else:
+            status = "ready"
+
+        return TestCaseSummary(
+            status=status,
+            total_count=len(cases),
+            valid_count=valid_count,
+            invalid_count=invalid_count,
+            file_count=file_count,
+            total_size=total_size,
+            ignored_files=sorted(ignored_files, key=self._natural_sort_key),
+            cases=cases,
+        )
+
+    @staticmethod
+    def _empty_summary() -> TestCaseSummary:
+        return TestCaseSummary(
+            status="empty",
+            total_count=0,
+            valid_count=0,
+            invalid_count=0,
+            file_count=0,
+            total_size=0,
+            ignored_files=[],
+            cases=[],
+        )
+
+    @staticmethod
+    def _natural_sort_key(value: str) -> tuple[tuple[int, int | str], ...]:
+        return tuple(
+            (0, int(part)) if part.isdigit() else (1, part.casefold())
+            for part in re.split(r"(\d+)", value)
+        )
 
     def build_archive(self, problem_id: int) -> bytes:
         """将测试用例目录打包为 ZIP 字节流。"""

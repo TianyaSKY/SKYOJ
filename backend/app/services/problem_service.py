@@ -1,16 +1,18 @@
 """题目领域的业务服务。"""
 
-from app.domain.errors import ResourceNotFoundError
+from dataclasses import replace
+
+from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
+from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.domain.problem import (
     CreateProblemParams,
     PaginatedProblems,
     ProblemDetail,
     ProblemListItem,
+    TestCaseSummary,
     UpdateProblemParams,
     UploadTestCasesParams,
 )
-from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
-from app.domain.errors import PermissionDeniedError
 from app.mappers import from_problem_orm
 from app.repositories.problem_repository import ProblemRepository
 
@@ -56,7 +58,10 @@ class ProblemService:
             problems, total = self._problem_repository.list_all(
                 page=page, page_size=page_size
             )
-            items = [from_problem_orm(problem) for problem in problems]
+            items = [
+                self._with_test_case_status(from_problem_orm(problem))
+                for problem in problems
+            ]
             if page is None or page_size is None:
                 return items
 
@@ -137,6 +142,23 @@ class ProblemService:
         self._require_teacher(requester_role)
         self._require_problem(problem_id)
         return self._test_case_storage.build_archive(problem_id)
+
+    def get_test_case_summary(
+        self, requester_role: str, problem_id: int
+    ) -> TestCaseSummary:
+        """读取题目的测试点状态，仅供教师管理页面使用。"""
+        self._require_teacher(requester_role)
+        self._require_problem(problem_id)
+        return self._test_case_storage.summarize(problem_id)
+
+    def _with_test_case_status(self, item: ProblemListItem) -> ProblemListItem:
+        summary = self._test_case_storage.summarize(item.id)
+        return replace(
+            item,
+            test_case_status=summary.status,
+            test_case_count=summary.total_count,
+            test_case_valid_count=summary.valid_count,
+        )
 
     def _require_problem(self, problem_id: int):
         problem = self._problem_repository.get_by_id(problem_id)

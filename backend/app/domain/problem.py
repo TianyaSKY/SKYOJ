@@ -39,6 +39,30 @@ class UploadTestCasesParams:
     filename: str
     content: bytes
 
+@dataclass(frozen=True)
+class TestCaseItem:
+    """单个测试点的输入输出文件状态。"""
+
+    name: str
+    input_file: Optional[str]
+    output_file: Optional[str]
+    input_size: Optional[int]
+    output_size: Optional[int]
+    status: str
+
+
+@dataclass(frozen=True)
+class TestCaseSummary:
+    """题目测试点的整体状态摘要。"""
+
+    status: str
+    total_count: int
+    valid_count: int
+    invalid_count: int
+    file_count: int
+    total_size: int
+    ignored_files: list[str]
+    cases: list[TestCaseItem]
 
 @dataclass(frozen=True)
 class ProblemListItem:
@@ -50,6 +74,9 @@ class ProblemListItem:
     language: str
     time_limit: int
     memory_limit: int
+    test_case_status: str = "unknown"
+    test_case_count: int = 0
+    test_case_valid_count: int = 0
 
 
 @dataclass(frozen=True)
