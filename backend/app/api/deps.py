@@ -29,7 +29,10 @@ from app.services.search_facade_service import SearchFacadeService
 from app.services.user_service import UserService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService
+from app.services.plagiarism_service import PlagiarismService
 from app.repositories.debug_run_repository import DebugRunRepository
+from app.repositories.plagiarism_repository import PlagiarismRepository
+from app.clients.jplag_client import JPlagClient
 
 
 def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
@@ -108,10 +111,6 @@ def get_search_service(db: Session = Depends(get_db)) -> SearchFacadeService:
 
 def get_plagiarism_service(db: Session = Depends(get_db)) -> PlagiarismService:
     """构造查重服务。"""
-    from app.repositories.plagiarism_repository import PlagiarismRepository
-    from app.services.plagiarism_service import PlagiarismService
-    from app.clients.jplag_client import JPlagClient
-
     return PlagiarismService(
         plagiarism_repo=PlagiarismRepository(db),
         submission_repo=SubmissionRepository(db),

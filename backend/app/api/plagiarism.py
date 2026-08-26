@@ -3,14 +3,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_auth, get_plagiarism_service
+from app.api.deps import get_plagiarism_service
 from app.api.schemas.plagiarism import (
     PlagiarismListResponse,
     PlagiarismReportResponse,
     PlagiarismScanResponse,
 )
 from app.services.plagiarism_service import PlagiarismService
-from app.utils.auth_tools import AuthContext
+from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 
