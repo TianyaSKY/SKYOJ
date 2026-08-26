@@ -35,6 +35,17 @@ class AskLlmBody(BaseModel):
     system_setting: str = Field(min_length=1, max_length=10000)
     prompt: str = Field(min_length=1, max_length=50000)
     output_format: Optional[dict[str, Any]] = None
+    # 若提供此字段，AI 答疑时自动带入该提交的代码与判题结果作为上下文。
+    context_submission_id: Optional[int] = Field(default=None, ge=1)
+
+
+class AskLlmSSEBody(BaseModel):
+    """SSE 流式 LLM 对话请求（用于 AI 答疑实时打字机效果）。"""
+
+    system_setting: str = Field(min_length=1, max_length=10000)
+    prompt: str = Field(min_length=1, max_length=50000)
+    output_format: Optional[dict[str, Any]] = None
+    context_submission_id: Optional[int] = Field(default=None, ge=1)
 
 
 class ExecuteTestGenerationBody(BaseModel):

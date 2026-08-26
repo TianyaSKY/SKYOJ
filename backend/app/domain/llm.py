@@ -11,3 +11,5 @@ class AskLlmParams:
     system_setting: str
     prompt: str
     output_format: Optional[dict[str, Any]] = None
+    # 若提供，AI 答疑时自动带入该提交代码与判题结果作为上下文。
+    context_submission_id: Optional[int] = None

@@ -1,15 +1,19 @@
+"""LLM HTTP 接口：同步/流式问答、AI 草稿箱（异步任务）。"""
+
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_ai_draft_service, get_llm_facade_service
 from app.api.schemas.ai_draft import (
+    AskLlmBody,
+    AskLlmSSEBody,
     ExecuteTestDataDraftBody,
     ExecuteTestGenerationBody,
     GenerateProblemDraftBody,
     GenerateTestScriptDraftBody,
-    AskLlmBody,
 )
 from app.domain.ai_draft import (
     SubmitProblemGenerationParams,
@@ -36,7 +40,7 @@ def _dt_iso(value: Optional[datetime]) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# 兼容：同步问答接口与异步测试数据接口
+# 同步/流式 AI 问答
 # ---------------------------------------------------------------------------
 
 
@@ -46,35 +50,48 @@ def call_llm(
     auth: AuthContext = Depends(get_current_auth),
     service: LlmFacadeService = Depends(get_llm_facade_service),
 ):
-    return service.ask(AskLlmParams(body.system_setting, body.prompt, body.output_format))
-
-
-@router.post("/execute-test-generation", status_code=202)
-def execute_test_generation(
-    body: ExecuteTestGenerationBody,
-    auth: AuthContext = Depends(get_current_auth),
-    service: AiDraftService = Depends(get_ai_draft_service),
-):
-    """兼容旧接口，但将执行请求投递到 Judge Worker。"""
-    _require_teacher(auth)
-    result = service.submit_test_data_execution(
-        SubmitTestDataExecutionParams(
-            user_id=auth.user.id,
-            problem_id=body.problem_id,
-            code=body.code,
-            problem_type=body.type or "acm",
-            language=body.language,
+    return service.ask(
+        AskLlmParams(
+            system_setting=body.system_setting,
+            prompt=body.prompt,
+            output_format=body.output_format,
+            context_submission_id=body.context_submission_id,
         )
     )
-    return {
-        "message": "测试数据执行任务已提交，请到草稿箱查看进度",
-        "draft_id": result.draft_id,
-        "status": result.status,
-    }
+
+
+@router.post("/ask/stream")
+def call_llm_stream(
+    body: AskLlmSSEBody,
+    auth: AuthContext = Depends(get_current_auth),
+    service: LlmFacadeService = Depends(get_llm_facade_service),
+):
+    """
+    SSE 流式 AI 答疑端点。
+
+    SSE 事件格式：
+      event: text   data: <token>     （每个 token）
+      event: done   data:             （结束时）
+      event: error  data: <错误信息>  （出错时）
+    """
+    params = AskLlmParams(
+        system_setting=body.system_setting,
+        prompt=body.prompt,
+        output_format=body.output_format,
+        context_submission_id=body.context_submission_id,
+    )
+    return StreamingResponse(
+        service.ask_stream(params),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
-# 异步草稿箱接口（按分层规范新增）
+# 异步 AI 草稿箱（按分层规范新增）
 # ---------------------------------------------------------------------------
 
 
@@ -154,6 +171,40 @@ def submit_test_data_execution(
         "title": result.title,
         "message": "任务已提交，请到草稿箱查看进度",
     }
+
+
+# ---------------------------------------------------------------------------
+# 兼容：旧接口（将请求投递到 Judge Worker）
+# ---------------------------------------------------------------------------
+
+
+@router.post("/execute-test-generation", status_code=202)
+def execute_test_generation(
+    body: ExecuteTestGenerationBody,
+    auth: AuthContext = Depends(get_current_auth),
+    service: AiDraftService = Depends(get_ai_draft_service),
+):
+    """兼容旧接口。"""
+    _require_teacher(auth)
+    result = service.submit_test_data_execution(
+        SubmitTestDataExecutionParams(
+            user_id=auth.user.id,
+            problem_id=body.problem_id,
+            code=body.code,
+            problem_type=body.type or "acm",
+            language=body.language,
+        )
+    )
+    return {
+        "message": "测试数据执行任务已提交，请到草稿箱查看进度",
+        "draft_id": result.draft_id,
+        "status": result.status,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 草稿箱查询与操作
+# ---------------------------------------------------------------------------
 
 
 @router.get("/drafts")

@@ -85,3 +85,40 @@ class LlmClient:
                     raise RuntimeError(f"LLM 返回格式不匹配: 缺失键 {key}")
 
         return parsed
+
+    def chat_stream(
+        self,
+        *,
+        system_setting: str,
+        prompt: str,
+    ):
+        """
+        SSE 流式调用 LLM，yield 每一个 SSE 事件行。
+
+        用于 AI 答疑页面的实时打字机效果。
+        失败时 yield 一条 error 事件后结束。
+        """
+        if not self.is_configured():
+            yield "event: error\ndata: LLM 环境变量未配置\n\n"
+            return
+
+        from openai import OpenAI
+
+        client = OpenAI(api_key=self._api_key, base_url=self._api_url)
+        try:
+            stream = client.responses.create(
+                model=self._model_name,
+                instructions=system_setting,
+                input=[{"role": "user", "content": prompt}],
+                stream=True,
+            )
+            for event in stream:
+                if event.type == "response.output_text.delta":
+                    delta = event.delta
+                    if delta:
+                        yield f"event: text\ndata: {delta}\n\n"
+                elif event.type == "response.completed":
+                    break
+        except Exception as exc:
+            logger.error("LLM 流式请求失败: {}", str(exc))
+            yield f"event: error\ndata: LLM 请求失败: {exc}\n\n"
