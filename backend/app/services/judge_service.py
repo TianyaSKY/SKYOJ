@@ -1,6 +1,7 @@
 """判题编排：按题目类型分发到各模式判题实现。"""
 
 import os
+import time as time_module
 
 from loguru import logger
 
@@ -21,9 +22,11 @@ def judge_submission(submission_id: int, db) -> None:
     final_status = "System Error"
     final_score = 0.0
     final_log = ""
+    problem_type = str(submission.problem.type or "acm").lower()
+
+    judge_start = time_module.perf_counter()
 
     try:
-        problem_type = str(submission.problem.type or "acm").lower()
         user_code = submission.code_content or ""
         problem_id = submission.problem_id
         language = submission.language or "python"
@@ -49,6 +52,14 @@ def judge_submission(submission_id: int, db) -> None:
     except Exception as exc:
         final_log = f"Judge Error: {str(exc)}"
         logger.exception("判题业务执行异常 submission_id={}", submission_id)
+    finally:
+        duration = time_module.perf_counter() - judge_start
+        try:
+            from app.utils.metrics import judge_duration, submissions_total
+            judge_duration.labels(problem_type=problem_type).observe(duration)
+            submissions_total.labels(problem_type=problem_type, status=final_status).inc()
+        except Exception:
+            pass
 
     repository.update_result(
         submission_id,

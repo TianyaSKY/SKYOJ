@@ -2,7 +2,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from loguru import logger
 from sqlalchemy.exc import OperationalError
 
@@ -88,10 +88,24 @@ def init_db():
 async def lifespan(_: FastAPI):
     """FastAPI 推荐的 lifespan 处理器，替换弃用的 on_event。
 
-    仅负责启动期的数据库初始化与字典种子；无关闭钩子。
+    启动时：数据库初始化 + 启动后台任务定期刷新 Celery 队列深度。
     """
     init_db()
+
+    import asyncio
+    from app.utils.metrics import refresh_celery_queue_depth
+
+    async def _refresh_loop():
+        while True:
+            try:
+                refresh_celery_queue_depth()
+            except Exception:
+                pass
+            await asyncio.sleep(30)
+
+    task = asyncio.create_task(_refresh_loop())
     yield
+    task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -101,6 +115,35 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+
+    # Prometheus HTTP 指标中间件。
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request as StarletteRequest
+    import time as time_module
+
+    class PrometheusMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: StarletteRequest, call_next):
+            from app.utils.metrics import http_request_duration, http_requests_total
+
+            path = request.url.path
+            method = request.method
+            start = time_module.perf_counter()
+            response = await call_next(request)
+            duration = time_module.perf_counter() - start
+            http_requests_total.labels(
+                method=method, path=path, status=response.status_code
+            ).inc()
+            http_request_duration.labels(method=method, path=path).observe(duration)
+            return response
+
+    application.add_middleware(PrometheusMiddleware)
+
+    @application.get("/metrics")
+    def metrics_endpoint():
+        """Prometheus 抓取端点。"""
+        from app.utils.metrics import get_metrics, get_metrics_content_type
+
+        return Response(content=get_metrics(), media_type=get_metrics_content_type())
 
     def _envelope(status_code: int, code: str, **fields) -> dict:
         """构造统一的错误响应体：``{"code": ..., "error": ..., ...}``。"""
