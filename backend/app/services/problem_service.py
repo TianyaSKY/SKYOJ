@@ -55,25 +55,36 @@ class ProblemService:
         requester_role: str,
         page: int | None = None,
         page_size: int | None = None,
+        tag_id: int | None = None,
     ) -> list[ProblemListItem] | PaginatedProblems:
         """查询题目列表，并在指定页码时返回分页结果。
 
         教师可见全部题目；其他角色仅可见已上传测试用例的题目。
+        支持按 tag_id 过滤（仅返回关联该标签且 approved=True 的题目）。
         """
+        from app.repositories.problem_community_repository import ProblemCommunityRepository
+
+        repo = ProblemCommunityRepository(self._problem_repository._db)
+        allowed_ids: set[int] | None = None
+        if tag_id is not None:
+            ids = repo.list_problem_ids_by_tag(tag_id)
+            if not ids:
+                if page is not None and page_size is not None:
+                    return PaginatedProblems(total=0, page=page, page_size=page_size, problems=[])
+                return []
+            allowed_ids = set(ids)
+
         if requester_role == "teacher":
             problems, total = self._problem_repository.list_all(
                 page=page, page_size=page_size
             )
             items = [from_problem_orm(problem) for problem in problems]
+            if allowed_ids is not None:
+                items = [p for p in items if p.id in allowed_ids]
+                total = len(items)
             if page is None or page_size is None:
                 return items
-
-            return PaginatedProblems(
-                total=total or 0,
-                page=page,
-                page_size=page_size,
-                problems=items,
-            )
+            return PaginatedProblems(total=total or 0, page=page, page_size=page_size, problems=items)
 
         problems, _ = self._problem_repository.list_all()
         visible = [
@@ -81,6 +92,8 @@ class ProblemService:
             for problem in problems
             if self._test_case_storage.has_test_cases(problem.id)
         ]
+        if allowed_ids is not None:
+            visible = [p for p in visible if p.id in allowed_ids]
         if page is None or page_size is None:
             return [from_problem_orm(problem) for problem in visible]
 

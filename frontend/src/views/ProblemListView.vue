@@ -21,6 +21,21 @@
             <el-option label="Kaggle" value="kaggle"/>
             <el-option label="OOP" value="oop"/>
           </el-select>
+          <el-select
+              v-model="tagFilter"
+              clearable
+              filterable
+              placeholder="知识点"
+              style="width: 160px"
+              @change="handleTagChange"
+          >
+            <el-option
+                v-for="tag in allTags"
+                :key="tag.id"
+                :label="tag.name + (tag.category ? ' (' + tag.category + ')' : '')"
+                :value="tag.id"
+            />
+          </el-select>
         </div>
       </div>
 
@@ -123,6 +138,7 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
 import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
+import request from '@/utils/request'
 
 const loading = ref(false)
 const problems = ref([])
@@ -132,6 +148,8 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
 const typeFilter = ref('')
+const tagFilter = ref('')
+const allTags = ref([])
 
 const capitalize = (str) => {
   if (!str) return ''
@@ -205,10 +223,14 @@ watch(searchQuery, (newVal) => {
 const fetchProblems = async () => {
   loading.value = true
   try {
-    const res = await getProblemList({
+    const params = {
       page: currentPage.value,
       page_size: pageSize.value
-    })
+    }
+    if (tagFilter.value) {
+      params.tag_id = tagFilter.value
+    }
+    const res = await getProblemList(params)
     if (res.problems) {
       problems.value = res.problems
       total.value = res.total
@@ -224,6 +246,20 @@ const fetchProblems = async () => {
   }
 }
 
+const fetchTags = async () => {
+  try {
+    const res = await request({ url: '/api/tags', method: 'get' })
+    allTags.value = res || []
+  } catch {
+    // 标签加载失败不影响题目列表
+  }
+}
+
+const handleTagChange = () => {
+  currentPage.value = 1
+  fetchProblems()
+}
+
 const handleSizeChange = (val) => {
   pageSize.value = val
   currentPage.value = 1
@@ -236,6 +272,7 @@ const handleCurrentChange = (val) => {
 }
 
 onMounted(() => {
+  fetchTags()
   fetchProblems()
 })
 </script>

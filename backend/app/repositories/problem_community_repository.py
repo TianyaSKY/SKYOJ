@@ -243,3 +243,14 @@ class ProblemCommunityRepository:
             .all()
         )
         return rows
+
+    def list_problem_ids_by_tag(self, tag_id: int) -> list[int]:
+        rows = (
+            self._db.query(ProblemTagMap.problem_id)
+            .filter(
+                ProblemTagMap.tag_id == tag_id,
+                ProblemTagMap.approved == True,  # noqa: E712
+            )
+            .all()
+        )
+        return [r[0] for r in rows]

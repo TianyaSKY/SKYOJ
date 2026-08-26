@@ -41,10 +41,13 @@ def create_problem(
 def get_problems(
     page: Optional[int] = Query(default=None, ge=1),
     page_size: Optional[int] = Query(default=None, ge=1, le=100),
+    tag_id: Optional[int] = Query(default=None),
     auth: AuthContext = Depends(get_current_auth),
     service: ProblemService = Depends(get_problem_service),
 ):
-    result = service.list_problems(auth.user.role, page=page, page_size=page_size)
+    result = service.list_problems(
+        auth.user.role, page=page, page_size=page_size, tag_id=tag_id
+    )
     if isinstance(result, PaginatedProblems):
         return {
             "total": result.total,
