@@ -7,6 +7,7 @@ from loguru import logger
 from sqlalchemy.exc import OperationalError
 
 from app.api import (
+    admin_analytics,
     auth,
     dataset,
     debug,
@@ -216,6 +217,7 @@ def create_app() -> FastAPI:
     application.include_router(problem_community.router, prefix="/api", tags=["community"])
     application.include_router(problem_community.tags_router, prefix="/api", tags=["community"])
     application.include_router(wrong_book.router, prefix="/api", tags=["wrong_book"])
+    application.include_router(admin_analytics.router, prefix="/api", tags=["admin"])
 
     return application
 

@@ -1,6 +1,6 @@
 """提交与判题业务服务。"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.domain.submission import (
@@ -77,3 +77,75 @@ class SubmissionService:
         if requester_role == "student" and submission.user_id != requester_id:
             raise PermissionDeniedError("无权查看该提交记录")
         return from_submission_detail_orm(submission)
+
+    def get_platform_analytics(self) -> dict:
+        """平台全局学情分析（教师用）。"""
+        import math
+        from collections import defaultdict
+
+        from app.models.submission import Submission
+        from app.models.problem import Problem
+
+        db = self._submission_repository._db
+        submissions = db.query(Submission).all()
+        problems = db.query(Problem).all()
+        total_submissions = len(submissions)
+        total_accepted = sum(1 for s in submissions if s.status == "Accepted")
+        global_pass_rate = total_accepted / total_submissions if total_submissions > 0 else 0.0
+
+        # 每题通过率
+        problem_submissions: dict[int, list[Submission]] = defaultdict(list)
+        for s in submissions:
+            problem_submissions[s.problem_id].append(s)
+
+        problem_pass_rates = []
+        for problem in problems:
+            subs = problem_submissions.get(problem.id, [])
+            if not subs:
+                continue
+            ac = sum(1 for s in subs if s.status == "Accepted")
+            problem_pass_rates.append({
+                "problem_id": problem.id,
+                "title": problem.title,
+                "pass_rate": ac / len(subs),
+                "total": len(subs),
+            })
+
+        # 题目难度：log(提交数+1) × 错误率 × 100，值越大越难
+        problem_difficulty = []
+        for problem in problems:
+            subs = problem_submissions.get(problem.id, [])
+            if not subs:
+                continue
+            ac = sum(1 for s in subs if s.status == "Accepted")
+            err_rate = 1 - ac / len(subs)
+            difficulty = math.log(len(subs) + 1) * err_rate * 100
+            problem_difficulty.append({
+                "problem_id": problem.id,
+                "title": problem.title,
+                "difficulty": min(difficulty, 100.0),
+                "total": len(subs),
+            })
+        problem_difficulty.sort(key=lambda x: x["difficulty"], reverse=True)
+
+        # 每日提交（近 30 天）
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        recent_subs = [s for s in submissions if s.created_at and s.created_at >= thirty_days_ago]
+        daily_map: dict[str, int] = defaultdict(int)
+        for s in recent_subs:
+            date_str = s.created_at.strftime("%Y-%m-%d")
+            daily_map[date_str] += 1
+        daily_submissions = [
+            {"date": date_str, "count": count}
+            for date_str, count in sorted(daily_map.items())
+        ]
+
+        return {
+            "total_submissions": total_submissions,
+            "total_accepted": total_accepted,
+            "global_pass_rate": global_pass_rate,
+            "total_problems": len(problems),
+            "problem_pass_rates": problem_pass_rates,
+            "problem_difficulty": problem_difficulty[:20],
+            "daily_submissions": daily_submissions,
+        }

@@ -80,6 +80,22 @@
           </div>
         </div>
       </el-col>
+
+      <!-- 学情分析卡片 -->
+      <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
+        <div class="nav-card" @click="$router.push({ name: 'teacher-analytics' })">
+          <div class="nav-icon" style="color: #e6a23c; background-color: #fdf6ec">
+            <el-icon :size="32">
+              <DataAnalysis/>
+            </el-icon>
+          </div>
+          <h3>学情分析</h3>
+          <p>全局通过率分布、题目难度热力图、提交趋势等教师决策数据。</p>
+          <div class="nav-footer">
+            <span>进入分析 <el-icon><ArrowRight/></el-icon></span>
+          </div>
+        </div>
+      </el-col>
     </el-row>
 
     <!-- User List Dialog -->
@@ -182,7 +198,7 @@
 <script setup>
 import {onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
-import {ArrowRight, Document, InfoFilled, Setting, Reading} from '@element-plus/icons-vue'
+import {ArrowRight, DataAnalysis, Document, InfoFilled, Setting, Reading} from '@element-plus/icons-vue'
 import {getSysInfo, getSysStatistics, updateSysInfo} from '@/api/sys'
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
