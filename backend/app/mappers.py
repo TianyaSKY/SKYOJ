@@ -56,7 +56,25 @@ def from_submission_orm(submission) -> SubmissionListItem:
 
 
 def from_submission_detail_orm(submission) -> SubmissionDetail:
-    """提交 ORM → 详情（code=code_content，log=output_log）。"""
+    """提交 ORM → 详情（code=code_content，log=output_log，case_results=JSON 列）。"""
+    from app.domain.submission import CaseResult
+
+    raw_cases = submission.case_results or []
+    case_results = [
+        CaseResult(
+            case_name=str(item.get("case_name", "")),
+            status=str(item.get("status", "unknown")),
+            time_used_ms=item.get("time_used_ms"),
+            memory_used_kb=item.get("memory_used_kb"),
+            input_data=item.get("input_data"),
+            expected_output=item.get("expected_output"),
+            actual_output=item.get("actual_output"),
+            error_output=item.get("error_output"),
+        )
+        for item in raw_cases
+        if isinstance(item, dict)
+    ]
+
     return SubmissionDetail(
         id=submission.id,
         status=submission.status,
@@ -66,6 +84,7 @@ def from_submission_detail_orm(submission) -> SubmissionDetail:
         language=submission.language,
         exam_id=submission.exam_id,
         created_at=submission.created_at,
+        case_results=case_results,
     )
 
 

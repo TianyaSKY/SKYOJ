@@ -47,13 +47,25 @@ class SubmissionRepository:
         return self._db.get(Submission, submission_id)
 
     def update_result(
-        self, submission_id: int, *, status: str, score: float, output_log: str
+        self,
+        submission_id: int,
+        *,
+        status: str,
+        score: float,
+        output_log: str,
+        case_results: list[dict] | None = None,
     ) -> None:
-        """更新判题结果；不提交事务，由调用方 commit。"""
+        """更新判题结果；不提交事务，由调用方 commit。
+
+        case_results 仅 ACM 模式写入，结构与 ``Submission.case_results`` JSON 列一致。
+        """
+        values: dict = {"status": status, "score": score, "output_log": output_log}
+        if case_results is not None:
+            values["case_results"] = case_results
         self._db.execute(
             update(Submission)
             .where(Submission.id == submission_id)
-            .values(status=status, score=score, output_log=output_log)
+            .values(**values)
         )
 
     def list_all(

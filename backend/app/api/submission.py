@@ -197,5 +197,18 @@ def get_submission(
         "code": submission.code,
         "language": submission.language,
         "exam_id": submission.exam_id,
-        "created_at": submission.created_at.isoformat(),
+        "created_at": submission.created_at.isoformat() if submission.created_at else None,
+        "case_results": [
+            {
+                "case_name": item.case_name,
+                "status": item.status,
+                "time_used_ms": item.time_used_ms,
+                "memory_used_kb": item.memory_used_kb,
+                "input_data": item.input_data,
+                "expected_output": item.expected_output,
+                "actual_output": item.actual_output,
+                "error_output": item.error_output,
+            }
+            for item in (submission.case_results or [])
+        ],
     }
