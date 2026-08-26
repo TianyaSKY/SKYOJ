@@ -14,6 +14,7 @@ from app.api import (
     llm,
     plagiarism,
     problem,
+    problem_community,
     search,
     submission,
     sys_dict,
@@ -211,6 +212,8 @@ def create_app() -> FastAPI:
     application.include_router(llm.router, prefix="/api/llm", tags=["llm"])
     application.include_router(search.router, prefix="/api/search", tags=["search"])
     application.include_router(plagiarism.router, prefix="/api/plagiarism", tags=["plagiarism"])
+    application.include_router(problem_community.router, prefix="/api", tags=["community"])
+    application.include_router(problem_community.tags_router, prefix="/api", tags=["community"])
 
     return application
 

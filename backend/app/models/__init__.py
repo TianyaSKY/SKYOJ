@@ -6,6 +6,13 @@ from app.models.debug_run import DebugRun
 from app.models.exam import Exam, ExamProblem
 from app.models.plagiarism import PlagiarismReport
 from app.models.problem import Problem
+from app.models.problem_community import (
+    ProblemSolution,
+    ProblemSolutionComment,
+    ProblemSolutionLike,
+    ProblemTag,
+    ProblemTagMap,
+)
 from app.models.search_history import SearchHistory
 from app.models.submission import Submission
 from app.models.sysdict import SysDict
@@ -21,6 +28,11 @@ __all__ = [
     "ExamProblem",
     "PlagiarismReport",
     "Problem",
+    "ProblemSolution",
+    "ProblemSolutionComment",
+    "ProblemSolutionLike",
+    "ProblemTag",
+    "ProblemTagMap",
     "SearchHistory",
     "Submission",
     "SysDict",

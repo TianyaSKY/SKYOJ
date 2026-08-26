@@ -36,6 +36,12 @@ class Problem(Base):
         cascade="all, delete-orphan",
         lazy=True,
     )
+    solutions = relationship(
+        "ProblemSolution",
+        back_populates="problem",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
 
     def __repr__(self):
         return f"<Problem {self.title}>"

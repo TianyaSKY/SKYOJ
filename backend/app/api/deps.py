@@ -30,6 +30,7 @@ from app.services.user_service import UserService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService
 from app.services.plagiarism_service import PlagiarismService
+from app.services.problem_community_service import SolutionService, TagService
 from app.repositories.debug_run_repository import DebugRunRepository
 from app.repositories.plagiarism_repository import PlagiarismRepository
 from app.clients.jplag_client import JPlagClient
@@ -116,3 +117,13 @@ def get_plagiarism_service(db: Session = Depends(get_db)) -> PlagiarismService:
         submission_repo=SubmissionRepository(db),
         jplag_client=JPlagClient(),
     )
+
+
+def get_solution_service(db: Session = Depends(get_db)) -> SolutionService:
+    """构造题解业务服务。"""
+    return SolutionService(db)
+
+
+def get_tag_service(db: Session = Depends(get_db)) -> TagService:
+    """构造题目标签业务服务。"""
+    return TagService(db)
