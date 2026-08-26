@@ -14,6 +14,7 @@ from app.domain.async_job import (
 from app.mappers import from_async_job_orm
 from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
 from app.messaging.task_names import (
+    DEBUG_SUBMISSION_TASK,
     EXECUTE_TEST_DATA_TASK,
     FINALIZE_DATASET_TASK,
     GENERATE_PROBLEM_TASK,
@@ -99,6 +100,18 @@ class AsyncJobService:
                 payload={"submission_id": submission_id},
                 dedupe_key=f"judge-submission:{submission_id}",
                 max_attempts=3,
+            )
+        )
+
+    def enqueue_debug_submission(self, debug_run_id: int) -> AsyncJobResult:
+        """创建 ACM 调试运行任务。"""
+        return self.enqueue(
+            CreateAsyncJobParams(
+                task_name=DEBUG_SUBMISSION_TASK,
+                queue=JUDGE_QUEUE,
+                payload={"debug_run_id": debug_run_id},
+                dedupe_key=f"debug-submission:{debug_run_id}",
+                max_attempts=2,
             )
         )
 

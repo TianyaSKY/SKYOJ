@@ -7,9 +7,16 @@
 from app.domain.ai_draft import AiDraftDetail, AiDraftSummary
 from app.domain.async_job import AsyncJobResult
 from app.domain.dataset import DatasetDetail, DatasetListItem
+from app.domain.debug_run import DebugRunDetail
 from app.domain.exam import ExamDetail, ExamListItem, ExamProblemItem
 from app.domain.problem import ProblemDetail, ProblemListItem
-from app.domain.submission import SubmissionDetail, SubmissionListItem
+from app.domain.problem_community import (
+    CommentDetail,
+    SolutionDetail,
+    SolutionListItem,
+    TagDetail,
+)
+from app.domain.submission import CaseResult, SubmissionDetail, SubmissionListItem
 from app.domain.user import UserProfile, UserSubmissionItem
 from app.repositories.ai_draft_repository import AiDraftRepository
 
@@ -55,7 +62,25 @@ def from_submission_orm(submission) -> SubmissionListItem:
 
 
 def from_submission_detail_orm(submission) -> SubmissionDetail:
-    """提交 ORM → 详情（code=code_content，log=output_log）。"""
+    """提交 ORM → 详情（code=code_content，log=output_log，case_results=JSON 列）。"""
+    from app.domain.submission import CaseResult
+
+    raw_cases = submission.case_results or []
+    case_results = [
+        CaseResult(
+            case_name=str(item.get("case_name", "")),
+            status=str(item.get("status", "unknown")),
+            time_used_ms=item.get("time_used_ms"),
+            memory_used_kb=item.get("memory_used_kb"),
+            input_data=item.get("input_data"),
+            expected_output=item.get("expected_output"),
+            actual_output=item.get("actual_output"),
+            error_output=item.get("error_output"),
+        )
+        for item in raw_cases
+        if isinstance(item, dict)
+    ]
+
     return SubmissionDetail(
         id=submission.id,
         status=submission.status,
@@ -65,6 +90,7 @@ def from_submission_detail_orm(submission) -> SubmissionDetail:
         language=submission.language,
         exam_id=submission.exam_id,
         created_at=submission.created_at,
+        case_results=case_results,
     )
 
 
@@ -129,6 +155,8 @@ def from_exam_orm(exam, *, problem_count: int, submission_count: int) -> ExamLis
         description=exam.description or "",
         start_time=exam.start_time,
         end_time=exam.end_time,
+        contest_type=exam.contest_type or "icpc",
+        freeze_minutes=exam.freeze_minutes,
         is_visible=exam.is_visible,
         created_by=exam.created_by,
         problem_count=problem_count,
@@ -145,6 +173,8 @@ def from_exam_detail_orm(exam, problems) -> ExamDetail:
         description=exam.description or "",
         start_time=exam.start_time,
         end_time=exam.end_time,
+        contest_type=exam.contest_type or "icpc",
+        freeze_minutes=exam.freeze_minutes,
         is_visible=exam.is_visible,
         created_by=exam.created_by,
         has_password=bool(exam.password),
@@ -196,4 +226,94 @@ def from_async_job_orm(job) -> AsyncJobResult:
         lease_until=job.lease_until,
         created_at=job.created_at,
         updated_at=job.updated_at,
+    )
+
+
+def from_debug_run_orm(row) -> DebugRunDetail:
+    """调试运行 ORM → 详情。"""
+    return DebugRunDetail(
+        id=row.id,
+        status=row.status,
+        language=row.language,
+        case_name=row.case_name,
+        input=row.input,
+        expected_output=row.expected_output,
+        actual_output=row.actual_output,
+        error_output=row.error_output,
+        time_used_ms=row.time_used_ms,
+        memory_used_kb=row.memory_used_kb,
+        created_at=row.created_at,
+        finished_at=row.finished_at,
+        problem_id=row.problem_id,
+        user_id=row.user_id,
+        exam_id=row.exam_id,
+    )
+
+
+# --- 题解 / 标签 / 评论 映射 ---
+
+
+def from_solution_orm(solution, *, viewer_id: int | None = None) -> SolutionDetail:
+    """题解 ORM → 详情；liked_by_me / favorited_by_me 视调用方预取的 viewer_id 是否点赞/收藏决定。"""
+    liked_by_me = False
+    favorited_by_me = False
+    if viewer_id is not None and solution.likes is not None:
+        liked_by_me = any(like.user_id == viewer_id for like in solution.likes)
+    if viewer_id is not None and solution.favorites is not None:
+        favorited_by_me = any(fav.user_id == viewer_id for fav in solution.favorites)
+    return SolutionDetail(
+        id=solution.id,
+        problem_id=solution.problem_id,
+        author_id=solution.author_id,
+        author_username=solution.author.username if solution.author else "Unknown",
+        title=solution.title,
+        content=solution.content,
+        language=solution.language,
+        is_official=bool(solution.is_official),
+        status=solution.status,
+        vote_count=solution.vote_count or 0,
+        comment_count=solution.comment_count or 0,
+        view_count=solution.view_count or 0,
+        created_at=solution.created_at,
+        updated_at=solution.updated_at,
+        liked_by_me=liked_by_me,
+        favorited_by_me=favorited_by_me,
+        favorite_count=solution.favorite_count or 0,
+    )
+
+
+def from_solution_list_orm(solution) -> SolutionListItem:
+    """题解 ORM → 列表项（不含正文）。"""
+    return SolutionListItem(
+        id=solution.id,
+        problem_id=solution.problem_id,
+        author_id=solution.author_id,
+        author_username=solution.author.username if solution.author else "Unknown",
+        title=solution.title,
+        language=solution.language,
+        is_official=bool(solution.is_official),
+        vote_count=solution.vote_count or 0,
+        comment_count=solution.comment_count or 0,
+        created_at=solution.created_at,
+    )
+
+
+def from_comment_orm(comment) -> CommentDetail:
+    return CommentDetail(
+        id=comment.id,
+        solution_id=comment.solution_id,
+        user_id=comment.user_id,
+        username=comment.user.username if comment.user else "Unknown",
+        content=comment.content,
+        created_at=comment.created_at,
+    )
+
+
+def from_tag_orm(tag) -> TagDetail:
+    return TagDetail(
+        id=tag.id,
+        slug=tag.slug,
+        name=tag.name,
+        category=tag.category,
+        description=tag.description,
     )

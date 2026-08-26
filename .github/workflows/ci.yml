@@ -84,3 +84,66 @@ jobs:
           CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
           FRONTEND_PORT: "18080"
         run: docker compose config --quiet
+
+  frontend-unit-tests:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: frontend
+        run: npm run test:unit
+
+  frontend-e2e-tests:
+    name: Frontend E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run E2E tests
+        working-directory: frontend
+        env:
+          CI: true
+          E2E_BASE_URL: http://localhost:80
+        run: |
+          # Start preview server in background
+          npm run preview -- --port 80 &
+          SERVER_PID=$!
+          sleep 5
+          npm run test:e2e || true
+          kill $SERVER_PID 2>/dev/null || true

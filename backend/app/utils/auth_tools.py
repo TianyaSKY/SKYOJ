@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import jwt
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -66,6 +66,7 @@ def _extract_bearer(authorization: Optional[str]) -> str:
 def get_current_auth(
     authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
+    request: Request = None,
 ) -> AuthContext:
     token = _extract_bearer(authorization)
     try:
@@ -76,7 +77,7 @@ def get_current_auth(
                 status_code=401,
                 detail={"message": "User not found, token is invalid."},
             )
-        return AuthContext(
+        ctx = AuthContext(
             user=AuthUserInfo(
                 id=current_user.id,
                 username=current_user.username,
@@ -84,6 +85,9 @@ def get_current_auth(
             ),
             exam_id=payload.get("exam_id", -1),
         )
+        if request is not None:
+            request.state.auth_context = ctx
+        return ctx
     except HTTPException:
         raise
     except jwt.ExpiredSignatureError:

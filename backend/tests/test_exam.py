@@ -1,0 +1,108 @@
+"""考试 API 测试：创建、列表、详情、排行榜。"""
+
+import datetime
+
+import pytest
+
+
+class TestExamCRUD:
+    def test_create_exam_requires_teacher(self, client, student_token):
+        resp = client.post(
+            "/api/exams/",
+            headers={"Authorization": f"Bearer {student_token}"},
+            json={
+                "title": "期末考试",
+                "description": "数据结构期末测试",
+                "start_time": "2026-01-01T09:00:00",
+                "end_time": "2026-01-01T12:00:00",
+                "is_visible": True,
+            },
+        )
+        assert resp.status_code == 403
+
+    def test_create_exam_success(self, client, teacher_token, teacher_user):
+        resp = client.post(
+            "/api/exams/",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+            json={
+                "title": "数据结构期末考试",
+                "description": "ACM 赛制期末测试",
+                "start_time": "2026-06-01T09:00:00",
+                "end_time": "2026-06-01T12:00:00",
+                "is_visible": True,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["title"] == "数据结构期末考试"
+        assert "id" in data
+
+    def test_list_exams_teacher(self, client, teacher_token):
+        resp = client.get("/api/exams/", headers={"Authorization": f"Bearer {teacher_token}"})
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_list_exams_student_visible(self, client, student_token):
+        resp = client.get("/api/exams/", headers={"Authorization": f"Bearer {student_token}"})
+        assert resp.status_code == 200
+
+    def test_delete_exam_requires_teacher(self, client, student_token):
+        resp = client.delete(
+            "/api/exams/1",
+            headers={"Authorization": f"Bearer {student_token}"},
+        )
+        assert resp.status_code == 403
+
+    def test_update_exam_teacher(self, client, teacher_token):
+        # 先创建
+        create = client.post(
+            "/api/exams/",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+            json={
+                "title": "旧标题",
+                "description": "旧描述",
+                "start_time": "2026-06-01T09:00:00",
+                "end_time": "2026-06-01T12:00:00",
+                "is_visible": False,
+            },
+        )
+        exam_id = create.json()["id"]
+        # 更新
+        resp = client.put(
+            f"/api/exams/{exam_id}",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+            json={"title": "新标题", "is_visible": True},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["title"] == "新标题"
+
+
+class TestExamRank:
+    def test_rank_empty_exam(self, client, teacher_token):
+        """空考试排行榜返回空排名列表。"""
+        create = client.post(
+            "/api/exams/",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+            json={
+                "title": "空考试",
+                "description": "无参赛者",
+                "start_time": "2026-06-01T09:00:00",
+                "end_time": "2026-06-01T12:00:00",
+                "is_visible": True,
+            },
+        )
+        exam_id = create.json()["id"]
+        resp = client.get(f"/api/exams/{exam_id}/rank")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["exam_title"] == "空考试"
+        assert data["rank"] == []
+
+
+class TestExamScoreExport:
+    def test_export_scores_requires_teacher(self, client, student_token):
+        resp = client.get(
+            "/api/exams/1/export_scores",
+            headers={"Authorization": f"Bearer {student_token}"},
+        )
+        assert resp.status_code == 403

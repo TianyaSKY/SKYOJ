@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -40,6 +40,9 @@ class Submission(Base):
 
     score = Column(Float, default=0.0)
     output_log = Column(Text)
+    # 逐点判题结果。结构：[{"case_name", "status", "time_used_ms", "memory_used_kb", "input_data", "expected_output", "actual_output", "error_output"}]
+    # 仅 ACM 模式写入；OOP / Kaggle 留空列表。
+    case_results = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

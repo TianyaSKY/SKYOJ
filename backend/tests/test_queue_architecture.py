@@ -5,11 +5,12 @@ from pathlib import Path
 from app.messaging.celery_app import celery_app
 
 
-def test_only_three_durable_queues_and_five_routed_tasks():
+def test_only_three_durable_queues_and_six_routed_tasks():
     queue_names = {queue.name for queue in celery_app.conf.task_queues}
     assert queue_names == {"judge", "ai", "file"}
     assert set(celery_app.conf.task_routes) == {
         "skyoj.tasks.judge_submission",
+        "skyoj.tasks.debug_submission",
         "skyoj.tasks.execute_test_data",
         "skyoj.tasks.generate_problem",
         "skyoj.tasks.generate_test_script",

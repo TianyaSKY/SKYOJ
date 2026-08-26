@@ -84,7 +84,7 @@
     <el-row v-else :gutter="0" class="full-height split-layout">
       <!-- Left Column: Problem Description -->
       <el-col :span="12" class="left-column">
-        <div class="column-content">
+        <div class="problem-panel-header">
           <div class="problem-header">
             <h2 class="problem-title">#{{ problem.id }} {{ problem.title }}</h2>
             <div class="problem-meta">
@@ -114,10 +114,16 @@
               </el-tooltip>
             </div>
           </div>
-          <el-divider/>
-          <div class="problem-content">
-            <div class="markdown-body" v-html="renderedContent"></div>
+          <div class="problem-tag-row">
+            <TagPanel :problem-id="Number(problem.id)" />
           </div>
+          <el-divider/>
+        </div>
+        <div class="problem-content problem-content-scroll">
+          <div class="markdown-body" v-html="renderedContent"></div>
+        </div>
+        <div class="solution-section">
+          <SolutionPanel :problem-id="Number(problem.id)" />
         </div>
       </el-col>
 
@@ -165,6 +171,18 @@
               </el-popover>
             </div>
             <div class="toolbar-right">
+              <el-button
+                  v-if="isAcm"
+                  :icon="MagicStick"
+                  :loading="debugging"
+                  class="debug-btn"
+                  round
+                  size="default"
+                  type="warning"
+                  @click="handleDebug"
+              >
+                调试
+              </el-button>
               <el-button :loading="submitting" class="submit-btn" round size="default" type="primary"
                          @click="handleSubmit">
                 提交代码
@@ -183,26 +201,67 @@
         </div>
       </el-col>
     </el-row>
+
+    <!-- Debug Result Drawer -->
+    <el-drawer
+        v-model="debugDrawerVisible"
+        :close-on-press-escape="true"
+        direction="rtl"
+        size="60%"
+        title="ACM 调试运行结果（仅第一个测试点，不计入成绩）"
+    >
+      <DebugResultPanel
+          v-if="debugDrawerVisible"
+          :debug-run-id="debugRunId"
+          @close="debugDrawerVisible = false"
+      />
+    </el-drawer>
+
+    <!-- Realtime Judge Result Toast -->
+    <transition name="el-fade-in">
+      <div v-if="realtimeStatus === 'received' && realtimeResult" class="realtime-toast">
+        <div class="toast-content">
+          <el-icon class="toast-icon"><CircleCheckFilled/></el-icon>
+          <div class="toast-text">
+            <strong>判题完成：{{ realtimeResult.status }}</strong>
+            <span>得分 {{ Number(realtimeResult.score ?? 0).toFixed(1) }}</span>
+          </div>
+          <el-button size="small" type="primary" @click="goToSubmissionDetail">查看详情</el-button>
+          <el-button size="small" @click="realtimeStatus = 'closed'">关闭</el-button>
+        </div>
+      </div>
+      <div v-else-if="realtimeStatus === 'pending'" class="realtime-toast pending">
+        <div class="toast-content">
+          <el-icon class="toast-icon is-loading"><Loading/></el-icon>
+          <div class="toast-text">
+            <strong>判题中...</strong>
+            <span>实时等待结果</span>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {getProblemDetail, submitSolution} from '@/api/problem'
+import {debugSolution} from '@/api/debug'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
-import {ArrowLeft, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
+import {ArrowLeft, CircleCheckFilled, Loading, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
+import {createSubmissionWS} from '@/utils/websocket'
+import DebugResultPanel from '@/components/DebugResultPanel.vue'
+import SolutionPanel from '@/components/SolutionPanel.vue'
+import TagPanel from '@/components/TagPanel.vue'
 
-// Markdown and Highlighting
-import MarkdownIt from 'markdown-it'
-import mk from 'markdown-it-katex'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
-import 'katex/dist/katex.min.css'
+// 题面 Markdown 渲染（含 LaTeX / 代码高亮），统一从 utils/markdown 入口复用，避免各处独立初始化导致配置漂移
+import {renderMarkdown} from '@/utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
+const setAnswerWorkspaceActive = inject('setAnswerWorkspaceActive', null)
 const problemId = route.params.id
 const examId = computed(() => route.query.exam_id)
 
@@ -219,6 +278,42 @@ const problem = ref({
 const language = ref('python')
 const code = ref('')
 const submitting = ref(false)
+const debugging = ref(false)
+const debugDrawerVisible = ref(false)
+const debugRunId = ref(null)
+
+// WebSocket: 提交后等待实时判题结果
+const realtimeResult = ref(null)
+const realtimeStatus = ref('idle') // 'idle' | 'pending' | 'received' | 'closed'
+let activeWS = null
+
+function clearRealtimeWS() {
+  if (activeWS) {
+    activeWS.close()
+    activeWS = null
+  }
+}
+
+function startRealtimeWait(submissionId) {
+  clearRealtimeWS()
+  realtimeResult.value = null
+  realtimeStatus.value = 'pending'
+  const token = localStorage.getItem('token') || ''
+  activeWS = createSubmissionWS(submissionId, token, {
+    onMessage: (data) => {
+      realtimeResult.value = data
+      realtimeStatus.value = 'received'
+      ElMessage.success(`判题完成：${data.status || ''} (${(data.score ?? 0).toFixed(1)} 分)`)
+    },
+    onError: () => {
+      realtimeStatus.value = 'closed'
+    },
+    onClose: () => {
+      realtimeStatus.value = 'closed'
+    },
+  })
+  activeWS.connect()
+}
 
 // Editor Settings
 const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
@@ -238,6 +333,14 @@ const selectedFile = ref(null)
 const isKaggle = computed(() => {
   return problem.value.type && problem.value.type.toLowerCase() === 'kaggle'
 })
+
+const isAcm = computed(() => {
+  return problem.value.type && problem.value.type.toLowerCase() === 'acm'
+})
+
+watch(isKaggle, (isKaggleProblem) => {
+  setAnswerWorkspaceActive?.(!isKaggleProblem)
+}, {immediate: true})
 
 const getTypeTag = (type) => {
   const map = {
@@ -301,30 +404,9 @@ watch(language, (newLang) => {
   code.value = templates[newLang] || ''
 })
 
-// Configure MarkdownIt
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-  highlight: function (str, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return '<pre class="hljs"><code>' +
-            hljs.highlight(str, {language: lang, ignoreIllegals: true}).value +
-            '</code></pre>';
-      } catch (__) {
-      }
-    }
+// Configure MarkdownIt — 题面渲染复用 utils/markdown 的统一实例，确保 LaTeX / 换行 / XSS 防护与编辑器预览一致
 
-    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
-  }
-})
-
-md.use(mk)
-
-const renderedContent = computed(() => {
-  return problem.value.content ? md.render(problem.value.content) : ''
-})
+const renderedContent = computed(() => renderMarkdown(problem.value.content))
 
 const fetchProblem = async () => {
   try {
@@ -361,11 +443,46 @@ const handleSubmit = async () => {
       exam_id: examId.value || -1
     })
     ElMessage.success('Submission received!')
-    router.push(`/submission/${res.submission_id}`)
+    startRealtimeWait(res.submission_id)
   } catch (error) {
     ElMessage.error('Submission failed')
   } finally {
     submitting.value = false
+  }
+}
+
+// 收到实时结果后，用户点击跳转查看详情
+const goToSubmissionDetail = () => {
+  if (!realtimeResult.value) return
+  clearRealtimeWS()
+  router.push(`/submission/${realtimeResult.value.submission_id || ''}`)
+}
+
+// Debug Run（仅 ACM 题目，不计入成绩，仅跑第一个测试点）
+const handleDebug = async () => {
+  if (!isAcm.value) {
+    ElMessage.warning('仅 ACM 类型题目支持调试运行')
+    return
+  }
+  if (!code.value.trim()) {
+    ElMessage.warning('Code cannot be empty')
+    return
+  }
+
+  debugging.value = true
+  try {
+    const res = await debugSolution({
+      problem_id: parseInt(problemId),
+      code: code.value,
+      language: language.value,
+      exam_id: examId.value || -1
+    })
+    debugRunId.value = res.debug_run_id
+    debugDrawerVisible.value = true
+  } catch (error) {
+    ElMessage.error('调试运行失败')
+  } finally {
+    debugging.value = false
   }
 }
 
@@ -406,7 +523,7 @@ const handleSubmitKaggle = async () => {
 
     const res = await submitSolution(formData)
     ElMessage.success('File uploaded successfully!')
-    await router.push(`/submission/${res.submission_id}`)
+    startRealtimeWait(res.submission_id)
   } catch (error) {
     ElMessage.error('Upload failed')
   } finally {
@@ -417,13 +534,20 @@ const handleSubmitKaggle = async () => {
 onMounted(() => {
   fetchProblem()
 })
+
+onBeforeUnmount(() => {
+  setAnswerWorkspaceActive?.(false)
+  clearRealtimeWS()
+})
 </script>
 
 <style scoped>
 .problem-detail-container {
-  height: calc(100vh - 60px);
+  height: 100%;
   background-color: #fff;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .scrollable-container {
@@ -432,6 +556,7 @@ onMounted(() => {
   overflow-y: auto;
   padding: 20px;
   background-color: #f5f7fa;
+  display: block;
 }
 
 .exam-status-bar {
@@ -452,22 +577,35 @@ onMounted(() => {
 }
 
 .full-height {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .split-layout {
   border-top: 1px solid #e8e8e8;
+  overflow: hidden;
 }
 
 .left-column {
   height: 100%;
   border-right: 1px solid #e8e8e8;
-  overflow-y: auto;
   background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.column-content {
-  padding: 32px;
+.problem-panel-header {
+  flex-shrink: 0;
+  padding: 32px 32px 0;
+}
+
+.problem-content-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 32px 32px;
 }
 
 .problem-header {
@@ -494,9 +632,20 @@ onMounted(() => {
   cursor: help;
 }
 
+.problem-tag-row {
+  margin: 8px 0;
+}
+
+.solution-section {
+  margin-top: 16px;
+  padding-bottom: 24px;
+}
+
 .right-column {
   height: 100%;
   background-color: #1e1e1e;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .editor-container {
@@ -552,9 +701,15 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.debug-btn {
+  margin-right: 8px;
+  font-weight: 600;
+}
+
 .editor-wrapper {
   flex: 1;
   min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .monaco-editor {
@@ -646,5 +801,102 @@ onMounted(() => {
   background-color: transparent;
   padding: 0;
   color: inherit;
+}
+
+@media (max-width: 768px) {
+  .split-layout {
+    flex-wrap: nowrap;
+    flex-direction: column;
+  }
+
+  .left-column,
+  .right-column {
+    flex: 1 1 50%;
+    width: 100%;
+    max-width: 100%;
+    height: 50%;
+  }
+
+  .left-column {
+    border-right: 0;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .problem-panel-header {
+    padding: 16px 16px 0;
+  }
+
+  .problem-content-scroll {
+    padding: 0 16px 16px;
+  }
+
+  .problem-title {
+    font-size: 1.35rem;
+    margin-bottom: 10px;
+  }
+
+  .problem-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .editor-toolbar {
+    padding: 0 12px;
+  }
+}
+
+.realtime-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2000;
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 14px 18px;
+  min-width: 320px;
+}
+
+.realtime-toast.pending {
+  background: #f0f9ff;
+  border-color: #91caff;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast-icon {
+  font-size: 24px;
+  color: #67c23a;
+}
+
+.toast-icon.is-loading {
+  color: #409eff;
+  animation: spin 1s linear infinite;
+}
+
+.toast-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.toast-text strong {
+  color: #1a1a1a;
+}
+
+.toast-text span {
+  color: #888;
+  font-size: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

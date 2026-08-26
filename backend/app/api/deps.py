@@ -20,6 +20,7 @@ from app.repositories.search_repository import SearchRepository
 from app.repositories.exam_repository import ExamRepository
 from app.services.ai_draft_service import AiDraftService
 from app.services.auth_service import AuthService
+from app.services.debug_service import DebugService
 from app.services.problem_service import ProblemService
 from app.services.dataset_service import DatasetService
 from app.services.submission_service import SubmissionService
@@ -28,6 +29,12 @@ from app.services.search_facade_service import SearchFacadeService
 from app.services.user_service import UserService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService
+from app.services.plagiarism_service import PlagiarismService
+from app.services.problem_community_service import SolutionService, TagService
+from app.services.wrong_book_service import WrongBookService
+from app.repositories.debug_run_repository import DebugRunRepository
+from app.repositories.plagiarism_repository import PlagiarismRepository
+from app.clients.jplag_client import JPlagClient
 
 
 def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
@@ -85,6 +92,13 @@ def get_submission_service(db: Session = Depends(get_db)) -> SubmissionService:
     )
 
 
+def get_debug_service(db: Session = Depends(get_db)) -> DebugService:
+    """构造调试运行领域服务。"""
+    return DebugService(
+        DebugRunRepository(db), AsyncJobService.from_session(db)
+    )
+
+
 def get_system_service(db: Session = Depends(get_db)) -> SystemService:
     """构造系统设置服务。"""
     return SystemService(SystemRepository(db))
@@ -95,3 +109,27 @@ def get_search_service(db: Session = Depends(get_db)) -> SearchFacadeService:
     return SearchFacadeService(
         SearchRepository(db), test_case_storage=ProblemTestCaseStorageClient()
     )
+
+
+def get_plagiarism_service(db: Session = Depends(get_db)) -> PlagiarismService:
+    """构造查重服务。"""
+    return PlagiarismService(
+        plagiarism_repo=PlagiarismRepository(db),
+        submission_repo=SubmissionRepository(db),
+        jplag_client=JPlagClient(),
+    )
+
+
+def get_solution_service(db: Session = Depends(get_db)) -> SolutionService:
+    """构造题解业务服务。"""
+    return SolutionService(db)
+
+
+def get_tag_service(db: Session = Depends(get_db)) -> TagService:
+    """构造题目标签业务服务。"""
+    return TagService(db)
+
+
+def get_wrong_book_service(db: Session = Depends(get_db)) -> WrongBookService:
+    """构造错题本服务。"""
+    return WrongBookService(db)

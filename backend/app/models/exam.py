@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -12,6 +12,12 @@ class Exam(Base):
     description = Column(Text)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
+    # 比赛类型：icpc（ICPC 罚时排行榜）/ ioi（IOI 纯分制）
+    contest_type = Column(String(10), default="icpc", nullable=False)
+    # 封榜时间（分钟）：比赛结束前多少分钟封榜（仅 ICPC 有效）。
+    # 封榜期间 scoreboard 显示 ?，结束后自动解封。
+    # None 表示不封榜（实时排行榜）。
+    freeze_minutes = Column(Integer, nullable=True)
     password = Column(String(2000))
     is_visible = Column(Boolean, default=False)
 

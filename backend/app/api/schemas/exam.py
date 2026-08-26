@@ -13,6 +13,8 @@ class CreateExamBody(BaseModel):
     description: str = ""
     start_time: datetime
     end_time: datetime
+    contest_type: str = "icpc"
+    freeze_minutes: Optional[int] = None
     password: Optional[str] = None
     is_visible: bool = False
 
@@ -24,6 +26,8 @@ class UpdateExamBody(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    contest_type: Optional[str] = None
+    freeze_minutes: Optional[int] = None
     password: Optional[str] = None
     is_visible: Optional[bool] = None
 

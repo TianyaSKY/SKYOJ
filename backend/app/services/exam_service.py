@@ -1,7 +1,7 @@
 """考试领域业务服务。"""
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.config import SECRET_KEY
 from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
@@ -24,7 +24,17 @@ class ExamService:
     def create_exam(self, requester_role: str, params: CreateExamParams) -> ExamDetail:
         self._require_teacher(requester_role)
         self._validate_times(params.start_time, params.end_time)
-        exam = self._repository.create(title=params.title, description=params.description, start_time=params.start_time, end_time=params.end_time, password=self._hash_password(params.password), is_visible=params.is_visible, created_by=params.created_by)
+        exam = self._repository.create(
+            title=params.title,
+            description=params.description,
+            start_time=params.start_time,
+            end_time=params.end_time,
+            contest_type=params.contest_type,
+            freeze_minutes=params.freeze_minutes,
+            password=self._hash_password(params.password),
+            is_visible=params.is_visible,
+            created_by=params.created_by,
+        )
         return from_exam_detail_orm(exam, [])
 
     def list_exams(self, requester_role: str) -> list[ExamListItem]:
@@ -77,7 +87,15 @@ class ExamService:
         start_time = params.start_time if params.start_time is not None else exam.start_time
         end_time = params.end_time if params.end_time is not None else exam.end_time
         self._validate_times(start_time, end_time)
-        for field, value in (("title", params.title), ("description", params.description), ("start_time", params.start_time), ("end_time", params.end_time), ("is_visible", params.is_visible)):
+        for field, value in (
+            ("title", params.title),
+            ("description", params.description),
+            ("start_time", params.start_time),
+            ("end_time", params.end_time),
+            ("is_visible", params.is_visible),
+            ("contest_type", params.contest_type),
+            ("freeze_minutes", params.freeze_minutes),
+        ):
             if value is not None:
                 setattr(exam, field, value)
         if params.password is not None:
@@ -123,25 +141,90 @@ class ExamService:
         users.sort(key=lambda item: item.total_score, reverse=True)
         return MonitorResult(exam.title, [MonitorProblemInfo(item.problem_id, item.display_id, item.score) for item in problems], users)
 
-    def rank(self, exam_id: int) -> RankResult:
+    def rank(self, exam_id: int, as_of: str | None = None) -> RankResult:
+        """
+        排行榜计算。
+
+        参数:
+        - as_of: 可选的时间戳字符串（ISO 格式），用于回溯查看历史排行榜。
+          例如 as_of=exam.end_time - freeze_minutes 即可看到封榜前的最后一刻。
+          不传时按当前时间计算（实况排行榜）。
+        - exam.freeze_minutes: ICPC 比赛结束前 N 分钟封榜。
+          封榜期间所有未 Accepted 提交在 scoreboard 上显示为 '?'。
+        """
+        from app.utils.exam_cache import get_rank_cache, set_rank_cache
+
+        # 若 as_of 不为 None，则不使用缓存（历史快照每次重新算）。
+        if as_of is None:
+            cached = get_rank_cache(exam_id)
+            if cached is not None:
+                return RankResult.from_dict(cached)
+
         exam = self._require_exam(exam_id)
         problems = self._repository.list_problems(exam_id)
         problem_ids = [item.problem_id for item in problems]
+
+        # as_of 决定截断时间：排行榜只统计 as_of 之前的提交。
+        now = datetime.utcnow()
+        view_time = now
+        if as_of is not None:
+            try:
+                from dateutil.parser import parse as parse_dt
+                view_time = parse_dt(as_of)
+            except Exception:
+                view_time = now
+        # freeze_minutes: 如果当前视口时间 > (end_time - freeze_minutes)，
+        # 则视为处于封榜期，failed_attempts 不计入 scoreboard。
+        freeze_end = None
+        if exam.freeze_minutes is not None:
+            freeze_end = exam.end_time - timedelta(minutes=exam.freeze_minutes)
+        in_freeze = freeze_end is not None and view_time >= freeze_end
+
         ranks: dict[int, RankEntry] = {}
-        for submission in self._repository.list_submissions(exam_id, problem_ids):
+        # 过滤只取 view_time 之前的提交。
+        all_submissions = self._repository.list_submissions(exam_id, problem_ids)
+        for submission in all_submissions:
+            if submission.created_at > view_time:
+                continue
             if submission.user_id not in ranks:
-                ranks[submission.user_id] = RankEntry(submission.user_id, submission.user.username, 0, 0, {pid: RankProblemStats(False, 0, 0) for pid in problem_ids})
+                ranks[submission.user_id] = RankEntry(
+                    submission.user_id,
+                    submission.user.username,
+                    0, 0,
+                    {pid: RankProblemStats(False, 0, 0) for pid in problem_ids},
+                )
             entry = ranks[submission.user_id]
             stats = entry.problems.get(submission.problem_id)
             if stats is None or stats.solved:
                 continue
             if submission.status == "Accepted":
                 elapsed = int((submission.created_at - exam.start_time).total_seconds())
-                entry.problems[submission.problem_id] = RankProblemStats(True, stats.failed_attempts, elapsed)
-                ranks[submission.user_id] = RankEntry(entry.user_id, entry.username, entry.solved + 1, entry.penalty + elapsed + stats.failed_attempts * 1200, entry.problems)
+                entry.problems[submission.problem_id] = RankProblemStats(
+                    True,
+                    stats.failed_attempts if not in_freeze else 0,
+                    elapsed,
+                )
+                ranks[submission.user_id] = RankEntry(
+                    entry.user_id, entry.username,
+                    entry.solved + 1,
+                    entry.penalty + elapsed + (stats.failed_attempts if not in_freeze else 0) * 1200,
+                    entry.problems,
+                )
             elif submission.status not in {"Pending", "Compile Error"}:
-                entry.problems[submission.problem_id] = RankProblemStats(False, stats.failed_attempts + 1, 0)
-        return RankResult(exam.title, [RankProblemInfo(item.problem_id, item.display_id) for item in problems], sorted(ranks.values(), key=lambda item: (-item.solved, item.penalty)))
+                entry.problems[submission.problem_id] = RankProblemStats(
+                    False,
+                    stats.failed_attempts + 1 if not in_freeze else stats.failed_attempts,
+                    0,
+                )
+
+        result = RankResult(
+            exam.title,
+            [RankProblemInfo(item.problem_id, item.display_id) for item in problems],
+            sorted(ranks.values(), key=lambda item: (-item.solved, item.penalty)),
+        )
+        if as_of is None:
+            set_rank_cache(exam_id, result.to_dict())
+        return result
 
     def score_rows(self, requester_role: str, exam_id: int) -> tuple[ExamDetail, list[ExamScoreRow]]:
         self._require_teacher(requester_role)

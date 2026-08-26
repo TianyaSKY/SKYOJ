@@ -3,6 +3,7 @@
 import csv
 import io
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -17,12 +18,32 @@ router = APIRouter()
 
 
 def _exam_response(exam) -> dict:
-    return {"id": exam.id, "title": exam.title, "description": exam.description, "start_time": exam.start_time.isoformat(), "end_time": exam.end_time.isoformat(), "is_visible": exam.is_visible, "created_by": exam.created_by}
+    return {
+        "id": exam.id,
+        "title": exam.title,
+        "description": exam.description,
+        "start_time": exam.start_time.isoformat(),
+        "end_time": exam.end_time.isoformat(),
+        "contest_type": exam.contest_type,
+        "freeze_minutes": exam.freeze_minutes,
+        "is_visible": exam.is_visible,
+        "created_by": exam.created_by,
+    }
 
 
 @router.post("/", status_code=201)
 def create_exam(body: CreateExamBody, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
-    exam = service.create_exam(auth.user.role, CreateExamParams(body.title, body.description, body.start_time, body.end_time, body.password, body.is_visible, auth.user.id))
+    exam = service.create_exam(auth.user.role, CreateExamParams(
+        title=body.title,
+        description=body.description,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        contest_type=body.contest_type,
+        freeze_minutes=body.freeze_minutes,
+        password=body.password,
+        is_visible=body.is_visible,
+        created_by=auth.user.id,
+    ))
     return _exam_response(exam)
 
 
@@ -60,14 +81,39 @@ def get_exam_monitor(exam_id: int, auth: AuthContext = Depends(get_current_auth)
 
 
 @router.get("/{exam_id}/rank")
-def get_exam_rank(exam_id: int, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
-    result = service.rank(exam_id)
-    return {"exam_title": result.exam_title, "problems": [{"problem_id": p.problem_id, "display_id": p.display_id} for p in result.problems], "rank": [{"user_id": user.user_id, "username": user.username, "solved": user.solved, "penalty": user.penalty, "problems": {problem_id: {"solved": item.solved, "failed_attempts": item.failed_attempts, "time": item.time} for problem_id, item in user.problems.items()}} for user in result.rank]}
+def get_exam_rank(exam_id: int, as_of: Optional[str] = None, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
+    result = service.rank(exam_id, as_of=as_of)
+    return {
+        "exam_title": result.exam_title,
+        "problems": [{"problem_id": p.problem_id, "display_id": p.display_id} for p in result.problems],
+        "rank": [
+            {
+                "user_id": user.user_id,
+                "username": user.username,
+                "solved": user.solved,
+                "penalty": user.penalty,
+                "problems": {
+                    problem_id: {"solved": item.solved, "failed_attempts": item.failed_attempts, "time": item.time}
+                    for problem_id, item in user.problems.items()
+                }
+            }
+            for user in result.rank
+        ],
+    }
 
 
 @router.put("/{exam_id}")
 def update_exam(exam_id: int, body: UpdateExamBody, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
-    exam = service.update_exam(auth.user.role, exam_id, UpdateExamParams(body.title, body.description, body.start_time, body.end_time, body.password, body.is_visible))
+    exam = service.update_exam(auth.user.role, exam_id, UpdateExamParams(
+        title=body.title,
+        description=body.description,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        contest_type=body.contest_type,
+        freeze_minutes=body.freeze_minutes,
+        password=body.password,
+        is_visible=body.is_visible,
+    ))
     return _exam_response(exam)
 
 

@@ -61,12 +61,13 @@
 
 <script setup>
 import {reactive, ref} from 'vue'
-import {useRouter} from 'vue-router'
+import {useRoute, useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
 import {Lock, User} from '@element-plus/icons-vue'
 import {useUserStore} from '@/stores/user'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const loginFormRef = ref(null)
 const loading = ref(false)
@@ -96,7 +97,11 @@ const handleLogin = async () => {
           password: loginForm.password
         })
         ElMessage.success('Login successful!')
-        router.push('/')
+        const redirect = route.query.redirect
+        const destination = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+          ? redirect
+          : '/'
+        router.replace(destination)
       } catch (error) {
         // Error handling is done in the store or interceptor, but we can add specific UI logic here if needed
         console.error(error)

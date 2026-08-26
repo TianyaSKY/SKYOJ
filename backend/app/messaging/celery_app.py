@@ -6,6 +6,7 @@ from kombu import Queue
 from app.config import CELERY_BROKER_URL
 from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
 from app.messaging.task_names import (
+    DEBUG_SUBMISSION_TASK,
     EXECUTE_TEST_DATA_TASK,
     FINALIZE_DATASET_TASK,
     GENERATE_PROBLEM_TASK,
@@ -41,6 +42,7 @@ celery_app.conf.update(
     ),
     task_routes={
         JUDGE_SUBMISSION_TASK: {"queue": JUDGE_QUEUE},
+        DEBUG_SUBMISSION_TASK: {"queue": JUDGE_QUEUE},
         EXECUTE_TEST_DATA_TASK: {"queue": JUDGE_QUEUE},
         GENERATE_PROBLEM_TASK: {"queue": AI_QUEUE},
         GENERATE_TEST_SCRIPT_TASK: {"queue": AI_QUEUE},
@@ -48,6 +50,7 @@ celery_app.conf.update(
     },
     include=(
         "app.tasks.judge_tasks",
+        "app.tasks.debug_tasks",
         "app.tasks.ai_tasks",
         "app.tasks.file_tasks",
     ),

@@ -60,9 +60,27 @@ const router = createRouter({
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
+            path: '/admin/analytics',
+            name: 'teacher-analytics',
+            component: () => import('../views/admin/TeacherAnalyticsView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
             path: '/admin/problems',
             name: 'problem-admin',
             component: () => import('../views/admin/ProblemAdminView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
+            path: '/admin/problems/:id/preview',
+            name: 'problem-admin-preview',
+            component: () => import('../views/admin/ProblemPreviewView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
+            path: '/admin/datasets',
+            name: 'dataset-admin',
+            component: () => import('../views/DatasetListView.vue'),
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
@@ -90,9 +108,15 @@ const router = createRouter({
             meta: {requiresAuth: true, role: 'teacher'}
         },
         {
+            path: '/admin/settings',
+            name: 'teacher-settings',
+            component: () => import('../views/admin/TeacherSettingsView.vue'),
+            meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
             path: '/rank',
             name: 'rank',
-            component: () => import('../views/HomeView.vue') // Temporary
+            redirect: {name: 'exam'}
         },
         {
             path: '/login',
@@ -154,6 +178,16 @@ router.beforeEach(async (to, from, next) => {
     const user = userStore.user || JSON.parse(localStorage.getItem('user') || '{}')
     const isTeacher = user.role === 'teacher'
     const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
+
+    if (isTeacher && to.name === 'problem-detail') {
+        next({name: 'problem-admin-preview', params: {id: to.params.id}})
+        return
+    }
+
+    if (isTeacher && ['problems', 'datasets', 'exam', 'exam-detail', 'exam-rank'].includes(to.name)) {
+        next({name: to.name === 'datasets' ? 'dataset-admin' : 'teacher-dashboard'})
+        return
+    }
 
     // Exam Mode Logic
     if (!isPracticeMode) {

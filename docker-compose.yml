@@ -47,6 +47,21 @@ services:
     networks:
       - skyoj-net
 
+  redis:
+    image: redis:7-alpine
+    container_name: skyoj-redis
+    expose:
+      - "6379"
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - skyoj-net
+
   backend:
     build:
       context: .
@@ -70,6 +85,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_MODEL_NAME: ${LLM_MODEL_NAME:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
@@ -81,6 +97,8 @@ services:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - skyoj-net
@@ -98,12 +116,15 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JOB_RECOVERY_INTERVAL_SECONDS: ${JOB_RECOVERY_INTERVAL_SECONDS:-30}
       PYTHONUNBUFFERED: "1"
     depends_on:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - skyoj-net
@@ -127,6 +148,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./backend:/app
@@ -136,6 +158,8 @@ services:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - skyoj-net
@@ -159,6 +183,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_MODEL_NAME: ${LLM_MODEL_NAME:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
@@ -169,6 +194,8 @@ services:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - skyoj-net
@@ -192,6 +219,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./backend:/app
@@ -200,6 +228,8 @@ services:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - skyoj-net
