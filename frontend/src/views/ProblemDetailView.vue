@@ -114,10 +114,16 @@
               </el-tooltip>
             </div>
           </div>
+          <div class="problem-tag-row">
+            <TagPanel :problem-id="Number(problem.id)" />
+          </div>
           <el-divider/>
         </div>
         <div class="problem-content problem-content-scroll">
           <div class="markdown-body" v-html="renderedContent"></div>
+        </div>
+        <div class="solution-section">
+          <SolutionPanel :problem-id="Number(problem.id)" />
         </div>
       </el-col>
 
@@ -247,6 +253,8 @@ import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 import {ArrowLeft, CircleCheckFilled, Loading, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
 import {createSubmissionWS} from '@/utils/websocket'
 import DebugResultPanel from '@/components/DebugResultPanel.vue'
+import SolutionPanel from '@/components/SolutionPanel.vue'
+import TagPanel from '@/components/TagPanel.vue'
 
 // 题面 Markdown 渲染（含 LaTeX / 代码高亮），统一从 utils/markdown 入口复用，避免各处独立初始化导致配置漂移
 import {renderMarkdown} from '@/utils/markdown'
@@ -622,6 +630,15 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   cursor: help;
+}
+
+.problem-tag-row {
+  margin: 8px 0;
+}
+
+.solution-section {
+  margin-top: 16px;
+  padding-bottom: 24px;
 }
 
 .right-column {
