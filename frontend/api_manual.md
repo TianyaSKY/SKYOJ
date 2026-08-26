@@ -38,6 +38,7 @@
 - **Methods**: `POST`, `GET`, `PUT`, `DELETE`
 - **Auth Required**: 管理类操作需 Teacher 权限。
 - **GET `/problems/`**：需登录；学生仅返回已上传测试点的题目，教师返回全部。
+- **教师列表的测试点字段**：每个题目额外返回 `test_case_status`、`test_case_count`、`test_case_valid_count`，用于快速筛选未配置或配对不完整的题目。
 
 ### 3.2 测试点管理 (Test Cases)
 
@@ -55,6 +56,12 @@
     - **Method**: `DELETE`
     - **Auth Required**: Teacher only
 
+
+- **查看测试点状态摘要**:
+    - **URL**: `/problems/<id>/test_cases/summary`
+    - **Method**: `GET`
+    - **Auth Required**: Teacher only
+    - **Response**: 返回 `status`（`empty`、`ready`、`incomplete` 或 `invalid`）、测试点总数与已配对数，以及每个测试点的输入/输出文件、文件大小和缺失状态。
 ---
 
 ## 4. 提交与判题模块 (Submissions)

@@ -74,6 +74,13 @@ export function uploadTestCases(id, formData) {
     })
 }
 
+export function getTestCaseSummary(id) {
+    return request({
+        url: `/problems/${id}/test_cases/summary`,
+        method: 'get'
+    })
+}
+
 export function downloadTestCases(id) {
     return request({
         url: `/problems/${id}/test_cases`,

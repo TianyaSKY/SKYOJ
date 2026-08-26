@@ -30,6 +30,18 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="测试点" min-width="150">
+          <template #default="scope">
+            <div class="test-case-cell">
+              <el-tag :type="testCaseStatusMeta(scope.row.test_case_status).type" size="small">
+                {{ testCaseStatusMeta(scope.row.test_case_status).label }}
+              </el-tag>
+              <span v-if="scope.row.test_case_count" class="test-case-count">
+                {{ scope.row.test_case_valid_count }}/{{ scope.row.test_case_count }} 个就绪
+              </span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column align="center" fixed="right" label="操作" width="280">
           <template #default="scope">
             <el-button :icon="Edit" size="small" @click="handleEdit(scope.row)">编辑</el-button>
@@ -111,6 +123,69 @@
         <!-- Test Cases Upload (Only in Edit Mode) -->
         <div v-if="isEdit" class="test-cases-section">
           <el-divider content-position="left">测试点管理</el-divider>
+          <div v-loading="testCaseSummaryLoading" class="test-case-summary">
+            <template v-if="testCaseSummary">
+              <div class="test-case-overview">
+                <el-tag :type="testCaseStatusMeta(testCaseSummary.status).type">
+                  {{ testCaseStatusMeta(testCaseSummary.status).label }}
+                </el-tag>
+                <span>测试点 {{ testCaseSummary.total_count }} 个</span>
+                <span>已配对 {{ testCaseSummary.valid_count }} 个</span>
+                <span>文件 {{ testCaseSummary.file_count }} 个</span>
+                <span>总大小 {{ formatFileSize(testCaseSummary.total_size) }}</span>
+              </div>
+              <el-alert
+                  v-if="testCaseSummary.status === 'incomplete' || testCaseSummary.status === 'invalid'"
+                  :closable="false"
+                  show-icon
+                  title="测试点文件未完全配对，提交判题前请补齐同名 .in/.out 文件。"
+                  type="warning"
+              />
+              <el-alert
+                  v-if="testCaseSummary.ignored_files.length"
+                  :closable="false"
+                  class="summary-alert"
+                  show-icon
+                  type="info"
+              >
+                已忽略 {{ testCaseSummary.ignored_files.length }} 个不会参与判题的文件：
+                {{ testCaseSummary.ignored_files.join('、') }}
+              </el-alert>
+              <el-table
+                  v-if="testCaseSummary.cases.length"
+                  :data="testCaseSummary.cases"
+                  border
+                  class="test-case-table"
+                  size="small"
+              >
+                <el-table-column label="测试点" min-width="100" prop="name"/>
+                <el-table-column label="输入文件" min-width="180">
+                  <template #default="scope">
+                    {{ scope.row.input_file || '缺失' }}
+                    <span v-if="scope.row.input_size !== null" class="file-size">
+                      （{{ formatFileSize(scope.row.input_size) }}）
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="输出文件" min-width="180">
+                  <template #default="scope">
+                    {{ scope.row.output_file || '缺失' }}
+                    <span v-if="scope.row.output_size !== null" class="file-size">
+                      （{{ formatFileSize(scope.row.output_size) }}）
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="状态" width="110">
+                  <template #default="scope">
+                    <el-tag :type="testCaseStatusMeta(scope.row.status).type" size="small">
+                      {{ testCaseStatusMeta(scope.row.status).label }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-else description="尚未配置可识别的测试点" :image-size="72"/>
+            </template>
+          </div>
           <el-form-item label="上传测试点 (ZIP)">
             <el-upload
                 :auto-upload="false"
@@ -258,9 +333,11 @@ import {
   downloadTestCases,
   getProblemDetail,
   getProblemList,
+  getTestCaseSummary,
   updateProblem,
   uploadTestCases,
 } from '@/api/problem'
+
 import {
   submitProblemGenerationDraft,
   submitTestScriptGenerationDraft,
@@ -316,6 +393,9 @@ const uploadingTestCases = ref(false)
 const downloadingTestCases = ref(false)
 const deletingTestCases = ref(false)
 
+const testCaseSummary = ref(null)
+const testCaseSummaryLoading = ref(false)
+
 const form = ref({
   title: '',
   content: '',
@@ -325,6 +405,27 @@ const form = ref({
   memory_limit: 128,
   template_code: '',
 })
+
+const TEST_CASE_STATUS_META = {
+  unknown: {label: '未检查', type: 'info'},
+  empty: {label: '未配置', type: 'info'},
+  ready: {label: '已就绪', type: 'success'},
+  incomplete: {label: '配对不完整', type: 'warning'},
+  invalid: {label: '文件无效', type: 'danger'},
+  missing_input: {label: '缺少输入', type: 'danger'},
+  missing_output: {label: '缺少输出', type: 'danger'},
+}
+
+const testCaseStatusMeta = (status) => {
+  return TEST_CASE_STATUS_META[status] || TEST_CASE_STATUS_META.unknown
+}
+
+const formatFileSize = (size) => {
+  if (size === null || size === undefined) return '缺失'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑题目' : '新增题目'))
 
@@ -336,6 +437,18 @@ const fetchProblems = async () => {
     ElMessage.error('获取题目列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+const fetchTestCaseSummary = async (problemId) => {
+  testCaseSummaryLoading.value = true
+  try {
+    testCaseSummary.value = await getTestCaseSummary(problemId)
+  } catch (error) {
+    testCaseSummary.value = null
+    ElMessage.error('获取测试点状态失败')
+  } finally {
+    testCaseSummaryLoading.value = false
   }
 }
 
@@ -354,6 +467,7 @@ const resetForm = () => {
   // Reset test case upload
   testCaseFileList.value = []
   selectedTestCaseFile.value = null
+  testCaseSummary.value = null
 }
 
 const handleCreate = () => {
@@ -399,6 +513,7 @@ const handleEdit = async (row) => {
   currentProblemId.value = row.id
   dialogVisible.value = true
   dialogLoading.value = true
+  testCaseSummary.value = null
 
   // Reset test case upload when opening edit dialog
   testCaseFileList.value = []
@@ -406,7 +521,7 @@ const handleEdit = async (row) => {
 
   try {
     const detail = await getProblemDetail(row.id)
-    // Ensure template_code is a string to avoid Monaco Editor \"Illegal argument\" error
+    // Ensure template_code is a string to avoid Monaco Editor "Illegal argument" error
     form.value = {
       ...detail,
       template_code: detail.template_code || '',
@@ -417,6 +532,10 @@ const handleEdit = async (row) => {
     dialogVisible.value = false
   } finally {
     dialogLoading.value = false
+  }
+
+  if (dialogVisible.value) {
+    await fetchTestCaseSummary(row.id)
   }
 }
 
@@ -521,12 +640,15 @@ const handleUploadTestCases = async () => {
     ElMessage.success('测试点上传成功')
     testCaseFileList.value = []
     selectedTestCaseFile.value = null
+    await fetchTestCaseSummary(currentProblemId.value)
+    await fetchProblems()
   } catch (error) {
     ElMessage.error('测试点上传失败')
   } finally {
     uploadingTestCases.value = false
   }
 }
+
 
 const handleDownloadTestCases = async () => {
   downloadingTestCases.value = true
@@ -553,6 +675,8 @@ const handleDeleteAllTestCases = async () => {
   try {
     await deleteAllTestCases(currentProblemId.value)
     ElMessage.success('所有测试点已删除')
+    await fetchTestCaseSummary(currentProblemId.value)
+    await fetchProblems()
   } catch (error) {
     ElMessage.error('删除失败')
   } finally {
@@ -600,6 +724,42 @@ onMounted(() => {
   margin-top: 20px;
   padding-top: 10px;
   border-top: 1px dashed var(--el-border-color);
+}
+
+.test-case-summary {
+  min-height: 48px;
+  margin-bottom: 16px;
+}
+
+.test-case-overview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.summary-alert {
+  margin-top: 10px;
+}
+
+.test-case-table {
+  margin-top: 12px;
+}
+
+.file-size,
+.test-case-count {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.test-case-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
 }
 
 .editor-container {
