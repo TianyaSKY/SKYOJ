@@ -15,14 +15,16 @@ class SystemService:
     def __init__(self, repository: SystemRepository) -> None:
         self._repository = repository
 
-    def get_config(self) -> dict:
+    def get_config(self, *, include_llm_endpoint: bool = False) -> dict:
         config = self._repository.get_config()
         for key, value in {"title": "SKYOJ", "info": "", "warning": "false", "practice": "true"}.items():
             config.setdefault(key, value)
         config["warning"] = str(config["warning"]).lower() == "true"
         config["practice"] = str(config["practice"]).lower() == "true"
         url, model, key = (os.getenv(name, "").strip() for name in ("LLM_API_URL", "LLM_MODEL_NAME", "LLM_API_KEY"))
-        config.update({"llm_api_url": url, "llm_model_name": model, "llm_env_ready": bool(url and model and key)})
+        config["llm_env_ready"] = bool(url and model and key)
+        if include_llm_endpoint:
+            config.update({"llm_api_url": url, "llm_model_name": model})
         return config
 
     def update_config(self, requester_role: str, values: dict) -> tuple[list[str], list[str]]:

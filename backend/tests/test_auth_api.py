@@ -96,3 +96,25 @@ def test_expired_token_returns_401(client):
 
     assert response.status_code == 401
     assert response.json()["message"] == "Token has expired."
+
+
+def test_problem_list_requires_authentication(client):
+    response = client.get("/api/problems/")
+
+    assert response.status_code == 401
+
+
+def test_dataset_list_requires_authentication(client):
+    response = client.get("/api/datasets")
+
+    assert response.status_code == 401
+
+
+def test_public_sys_info_omits_llm_endpoint(client):
+    response = client.get("/api/sys/info")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "llm_api_url" not in body
+    assert "llm_model_name" not in body
+    assert "llm_env_ready" in body

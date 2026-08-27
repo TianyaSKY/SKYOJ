@@ -88,8 +88,10 @@ def get_problems(
 @router.get("/{problem_id}")
 def get_problem(
     problem_id: int,
+    auth: AuthContext = Depends(get_current_auth),
     service: ProblemService = Depends(get_problem_service),
 ):
+    del auth
     problem = service.get_problem(problem_id)
     return {
         "id": problem.id,

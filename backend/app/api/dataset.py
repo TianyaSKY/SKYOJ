@@ -5,8 +5,6 @@ from fastapi import (
     Depends,
     File,
     Form,
-    Header,
-    HTTPException,
     Query,
     UploadFile,
 )
@@ -15,7 +13,7 @@ from fastapi.responses import FileResponse
 from app.api.deps import get_dataset_service
 from app.domain.dataset import PaginatedDatasets, UploadDatasetParams
 from app.services.dataset_service import DatasetService
-from app.utils.auth_tools import AuthContext, decode_auth_token, get_current_auth
+from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 
@@ -24,8 +22,10 @@ router = APIRouter()
 def get_datasets(
     page: Optional[int] = Query(default=None, ge=1),
     page_size: Optional[int] = Query(default=None, ge=1, le=100),
+    auth: AuthContext = Depends(get_current_auth),
     service: DatasetService = Depends(get_dataset_service),
 ):
+    del auth
     result = service.list_datasets(page=page, page_size=page_size)
     if isinstance(result, PaginatedDatasets):
         return {
@@ -73,30 +73,11 @@ def delete_dataset(
 @router.get("/{id}/download")
 def download_dataset(
     id: int,
-    authorization: Optional[str] = Header(default=None),
-    token: Optional[str] = Query(default=None),
+    auth: AuthContext = Depends(get_current_auth),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    auth_token = None
-    if authorization and authorization.startswith("Bearer "):
-        auth_token = authorization[7:].strip()
-    else:
-        auth_token = token
-
-    if not auth_token:
-        raise HTTPException(
-            status_code=401, detail={"error": "Authentication required"}
-        )
-
-    try:
-        decode_auth_token(auth_token)
-    except Exception:
-        raise HTTPException(
-            status_code=401, detail={"error": "Invalid or expired token"}
-        )
-
+    del auth
     dataset = service.download_dataset(id)
-
     return FileResponse(
         dataset.file_path,
         filename=dataset.filename,

@@ -19,6 +19,9 @@ class DatasetStorageClient:
     MAX_FILE_SIZE = 500 * 1024 * 1024
     COPY_BUFFER_SIZE = 1024 * 1024
 
+    def __init__(self, upload_folder: str | None = None) -> None:
+        self._upload_folder = upload_folder or UPLOAD_FOLDER
+
     def save(self, file_path: str, content: bytes, dataset_id: int) -> None:
         """将上传内容写入目标路径。"""
         try:
@@ -101,13 +104,14 @@ class DatasetStorageClient:
             logger.exception("删除数据集临时文件失败，路径：{}", file_path)
 
     def prepare_path(self, filename: str) -> tuple[str, str]:
-        """校验文件名并创建数据集存储目录。"""
+        """校验文件名并创建带唯一前缀的数据集存储路径。"""
         safe_name = secure_filename(filename)
         if not safe_name:
             raise InvalidStateError("未选择数据集文件")
-        folder = os.path.join(UPLOAD_FOLDER, "datasets")
+        folder = os.path.join(self._upload_folder, "datasets")
         os.makedirs(folder, exist_ok=True)
-        return safe_name, os.path.join(folder, safe_name)
+        stored_name = f"{uuid.uuid4().hex}_{safe_name}"
+        return safe_name, os.path.join(folder, stored_name)
 
     def delete(self, file_path: str, dataset_id: int) -> None:
         """删除存在的数据集文件。"""

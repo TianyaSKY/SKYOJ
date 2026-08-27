@@ -50,6 +50,7 @@ def call_llm(
     auth: AuthContext = Depends(get_current_auth),
     service: LlmFacadeService = Depends(get_llm_facade_service),
 ):
+    _require_teacher(auth)
     return service.ask(
         AskLlmParams(
             system_setting=body.system_setting,
@@ -74,6 +75,7 @@ def call_llm_stream(
       event: done   data:             （结束时）
       event: error  data: <错误信息>  （出错时）
     """
+    _require_teacher(auth)
     params = AskLlmParams(
         system_setting=body.system_setting,
         prompt=body.prompt,

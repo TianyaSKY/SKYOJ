@@ -87,6 +87,20 @@ def test_dataset_service_checks_role_and_submits_file_job() -> None:
     assert task.calls == [result.id]
 
 
+def test_dataset_prepare_path_uses_unique_filename(tmp_path) -> None:
+    from app.clients.dataset_storage_client import DatasetStorageClient
+
+    client = DatasetStorageClient(upload_folder=str(tmp_path))
+    name_a, path_a = client.prepare_path("data.csv")
+    name_b, path_b = client.prepare_path("data.csv")
+
+    assert name_a == "data.csv"
+    assert name_b == "data.csv"
+    assert path_a != path_b
+    assert path_a.endswith("_data.csv")
+    assert path_b.endswith("_data.csv")
+
+
 class FakeProblemRepository:
     """用于验证测试用例服务行为的题目仓储。"""
 
