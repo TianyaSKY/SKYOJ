@@ -2,7 +2,8 @@
 
 from datetime import datetime, timedelta
 
-from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
+from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.utils.time import utcnow
 from app.domain.submission import (
     PaginatedSubmissions,
     SubmissionDetail,
@@ -35,7 +36,9 @@ class SubmissionService:
         if problem is None:
             raise ResourceNotFoundError("题目不存在")
 
-        exam_id = self._resolve_exam_id(params.exam_id)
+        exam_id = self._resolve_exam_id(params.exam_id, params.session_exam_id)
+        if exam_id is not None and self._submission_repository.get_exam_problem(exam_id, params.problem_id) is None:
+            raise PermissionDeniedError("该题目不属于当前考试")
         code = params.code
         if params.is_file_upload:
             if not params.filename or params.file_content is None:
@@ -49,11 +52,15 @@ class SubmissionService:
         self._job_service.enqueue_judge_submission(submission.id)
         return SubmitResult(submission_id=submission.id, status="Pending", exam_id=exam_id)
 
-    def _resolve_exam_id(self, exam_id: int | None) -> int | None:
+    def _resolve_exam_id(self, exam_id: int | None, session_exam_id: int) -> int | None:
         if exam_id is None or exam_id == -1:
             return None
-        exam = self._submission_repository.get_active_exam(exam_id, datetime.now())
-        return exam.id if exam is not None else None
+        if session_exam_id != exam_id:
+            raise PermissionDeniedError("未进入该考试，无法提交")
+        exam = self._submission_repository.get_active_exam(exam_id, utcnow())
+        if exam is None:
+            raise InvalidStateError("考试未在进行中")
+        return exam.id
 
     def list_submissions(self, params: SubmissionQuery) -> PaginatedSubmissions:
         """按访问者权限和筛选条件分页查询提交记录。"""

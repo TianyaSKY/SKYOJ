@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import update
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.exam import Exam
+from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import User
@@ -26,6 +26,14 @@ class SubmissionRepository:
         return (
             self._db.query(Exam)
             .filter(Exam.id == exam_id, Exam.start_time <= now, Exam.end_time >= now)
+            .first()
+        )
+
+    def get_exam_problem(self, exam_id: int, problem_id: int):
+        """查询考试是否包含指定题目。"""
+        return (
+            self._db.query(ExamProblem)
+            .filter(ExamProblem.exam_id == exam_id, ExamProblem.problem_id == problem_id)
             .first()
         )
 

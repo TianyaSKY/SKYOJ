@@ -23,6 +23,12 @@ class FakeSubmissionRepository:
     def get_active_exam(self, exam_id: int, now: datetime):
         return SimpleNamespace(id=exam_id) if exam_id == 5 else None
 
+
+    def get_exam_problem(self, exam_id: int, problem_id: int):
+        if exam_id == 5 and problem_id == 7:
+            return SimpleNamespace(exam_id=exam_id, problem_id=problem_id)
+        return None
+
     def create(self, user_id, problem_id, exam_id, language, code):
         item = SimpleNamespace(
             id=len(self.created) + 1,
@@ -73,6 +79,7 @@ def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
             language="csv",
             code="__file_upload__",
             exam_id=5,
+            session_exam_id=5,
             is_file_upload=True,
             filename="answer.csv",
             file_content=b"id,value\n1,2\n",
@@ -90,6 +97,23 @@ def test_submission_service_rejects_unknown_problem() -> None:
 
     with pytest.raises(ResourceNotFoundError):
         service.submit(SubmitParams(1, 99, "code", "python"))
+
+
+def test_submission_service_rejects_exam_submit_without_session() -> None:
+    service = SubmissionService(FakeSubmissionRepository(), FakeJobService())
+
+    with pytest.raises(PermissionDeniedError):
+        service.submit(SubmitParams(1, 7, "code", "python", exam_id=5, session_exam_id=-1))
+
+
+def test_user_service_blocks_student_listing_other_submissions() -> None:
+    service = UserService(FakeUserRepository(), FakeAvatarStorage())
+
+    with pytest.raises(PermissionDeniedError):
+        service.list_submissions(2, "student", 1)
+
+    assert service.list_submissions(1, "student", 1) == []
+    assert service.list_submissions(9, "teacher", 1) == []
 
 
 class FakeUserRepository:

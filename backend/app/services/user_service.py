@@ -39,8 +39,12 @@ class UserService:
         """获取头像文件的安全路径。"""
         return self._avatar_storage_client.get_path(filename)
 
-    def list_submissions(self, user_id: int) -> list[UserSubmissionItem]:
+    def list_submissions(
+        self, requester_id: int, requester_role: str, user_id: int
+    ) -> list[UserSubmissionItem]:
         """查询指定用户的提交记录。"""
+        if requester_role != "teacher" and requester_id != user_id:
+            raise PermissionDeniedError("无权查看该用户的提交记录")
         self._require_user(user_id)
         return [from_user_submission_orm(item) for item in self._user_repository.list_submissions(user_id)]
 

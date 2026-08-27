@@ -14,6 +14,7 @@ class SubmitParams:
     code: str
     language: str
     exam_id: Optional[int] = None
+    session_exam_id: int = -1
     is_file_upload: bool = False
     filename: Optional[str] = None
     file_content: Optional[bytes] = None

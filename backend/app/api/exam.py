@@ -64,13 +64,13 @@ def get_my_exam_status(auth: AuthContext = Depends(get_current_auth), service: E
 
 @router.get("/{exam_id}")
 def get_exam_detail(exam_id: int, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
-    exam = service.get_detail(exam_id)
+    exam = service.get_detail(exam_id, auth.user.role, auth.exam_id)
     return {**_exam_response(exam), "has_password": exam.has_password, "problems": [{"problem_id": item.problem_id, "display_id": item.display_id, "score": item.score, "title": item.title} for item in exam.problems]}
 
 
 @router.post("/{exam_id}/enter")
 def enter_exam(exam_id: int, body: EnterExamBody | None = None, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
-    target_id = service.enter_exam(auth.user.id, auth.exam_id, EnterExamParams(exam_id, body.password if body else None))
+    target_id = service.enter_exam(auth.user.role, auth.user.id, auth.exam_id, EnterExamParams(exam_id, body.password if body else None))
     return {"message": "Successfully entered exam", "token": encode_auth_token(auth.user.id, auth.user.role, target_id), "exam_id": target_id}
 
 
@@ -82,7 +82,7 @@ def get_exam_monitor(exam_id: int, auth: AuthContext = Depends(get_current_auth)
 
 @router.get("/{exam_id}/rank")
 def get_exam_rank(exam_id: int, as_of: Optional[str] = None, auth: AuthContext = Depends(get_current_auth), service: ExamService = Depends(get_exam_service)):
-    result = service.rank(exam_id, as_of=as_of)
+    result = service.rank(exam_id, auth.user.role, auth.exam_id, as_of=as_of)
     return {
         "exam_title": result.exam_title,
         "problems": [{"problem_id": p.problem_id, "display_id": p.display_id} for p in result.problems],

@@ -128,6 +128,7 @@ async def submit_code(
         SubmitParams(
             user_id=auth.user.id, problem_id=pid, code=user_code,
             language=lang or "", exam_id=exam_id_val,
+            session_exam_id=auth.exam_id,
             is_file_upload=bool(file and file.filename and (lang == "csv" or file.filename.endswith(".csv"))),
             filename=file.filename if file else None,
             file_content=content if file and file.filename and (lang == "csv" or file.filename.endswith(".csv")) else None,

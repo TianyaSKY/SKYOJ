@@ -59,7 +59,7 @@ def get_other_user_submissions(
     auth: AuthContext = Depends(get_current_auth),
     service: UserService = Depends(get_user_service),
 ):
-    return [_submission_response(item) for item in service.list_submissions(user_id)]
+    return [_submission_response(item) for item in service.list_submissions(auth.user.id, auth.user.role, user_id)]
 
 
 @router.get("/submissions")
@@ -67,4 +67,4 @@ def get_user_submissions(
     auth: AuthContext = Depends(get_current_auth),
     service: UserService = Depends(get_user_service),
 ):
-    return [_submission_response(item) for item in service.list_submissions(auth.user.id)]
+    return [_submission_response(item) for item in service.list_submissions(auth.user.id, auth.user.role, auth.user.id)]

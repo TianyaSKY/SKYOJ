@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from app.config import SECRET_KEY
 from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.utils.time import utcnow
 from app.domain.exam import (
     AddExamProblemParams, CreateExamParams, EnterExamParams, ExamDetail, ExamListItem,
     ExamProblemStatus, ExamScoreRow, MonitorEntry, MonitorProblemInfo,
@@ -51,13 +52,22 @@ class ExamService:
             for exam in exams
         ]
 
-    def get_detail(self, exam_id: int) -> ExamDetail:
+    def get_detail(
+        self, exam_id: int, requester_role: str, session_exam_id: int
+    ) -> ExamDetail:
         exam = self._require_exam(exam_id)
+        self._assert_exam_discoverable(requester_role, exam, session_exam_id)
+        if self._should_hide_problems(requester_role, exam, session_exam_id):
+            return from_exam_detail_orm(exam, [])
         return from_exam_detail_orm(exam, self._repository.list_problems(exam_id))
 
-    def enter_exam(self, user_id: int, current_exam_id: int, params: EnterExamParams) -> int:
+    def enter_exam(
+        self, requester_role: str, user_id: int, current_exam_id: int, params: EnterExamParams
+    ) -> int:
+        del user_id
         exam = self._require_exam(params.exam_id)
-        now = datetime.utcnow()
+        self._assert_exam_discoverable(requester_role, exam, current_exam_id)
+        now = utcnow()
         if now < exam.start_time:
             raise PermissionDeniedError("考试尚未开始")
         if now > exam.end_time:
@@ -141,7 +151,13 @@ class ExamService:
         users.sort(key=lambda item: item.total_score, reverse=True)
         return MonitorResult(exam.title, [MonitorProblemInfo(item.problem_id, item.display_id, item.score) for item in problems], users)
 
-    def rank(self, exam_id: int, as_of: str | None = None) -> RankResult:
+    def rank(
+        self,
+        exam_id: int,
+        requester_role: str,
+        session_exam_id: int,
+        as_of: str | None = None,
+    ) -> RankResult:
         """
         排行榜计算。
 
@@ -153,14 +169,15 @@ class ExamService:
           封榜期间所有未 Accepted 提交在 scoreboard 上显示为 '?'。
         """
         from app.utils.exam_cache import get_rank_cache, set_rank_cache
-
-        # 若 as_of 不为 None，则不使用缓存（历史快照每次重新算）。
+        exam = self._require_exam(exam_id)
+        self._assert_exam_discoverable(requester_role, exam, session_exam_id)
+        if self._should_hide_problems(requester_role, exam, session_exam_id):
+            raise PermissionDeniedError("请先进入考试")
         if as_of is None:
             cached = get_rank_cache(exam_id)
             if cached is not None:
                 return RankResult.from_dict(cached)
 
-        exam = self._require_exam(exam_id)
         problems = self._repository.list_problems(exam_id)
         problem_ids = [item.problem_id for item in problems]
 
@@ -228,7 +245,7 @@ class ExamService:
 
     def score_rows(self, requester_role: str, exam_id: int) -> tuple[ExamDetail, list[ExamScoreRow]]:
         self._require_teacher(requester_role)
-        detail = self.get_detail(exam_id)
+        detail = self.get_detail(exam_id, requester_role, -1)
         problem_ids = [problem.problem_id for problem in detail.problems]
         user_ids = self._repository.list_submission_user_ids(exam_id)
         users_map = self._repository.list_users(user_ids)
@@ -255,6 +272,23 @@ class ExamService:
     def _require_teacher(role: str) -> None:
         if role != "teacher":
             raise PermissionDeniedError("没有教师权限")
+
+    @staticmethod
+    def _has_exam_session(session_exam_id: int, exam_id: int) -> bool:
+        return session_exam_id == exam_id
+
+    def _assert_exam_discoverable(self, role: str, exam, session_exam_id: int) -> None:
+        """教师、已入场学生或公开考试可以知道该考试存在。"""
+        if role == "teacher" or self._has_exam_session(session_exam_id, exam.id):
+            return
+        if not exam.is_visible:
+            raise ResourceNotFoundError("考试不存在")
+
+    def _should_hide_problems(self, role: str, exam, session_exam_id: int) -> bool:
+        """密码考试在入场前不返回题目列表。"""
+        if role == "teacher" or self._has_exam_session(session_exam_id, exam.id):
+            return False
+        return bool(exam.password)
 
     @staticmethod
     def _validate_times(start_time: datetime, end_time: datetime) -> None:
