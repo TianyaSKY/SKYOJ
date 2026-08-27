@@ -96,6 +96,8 @@ class SandboxRunner:
             detach=True,
             remove=True,
             network_mode=network_mode,
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
             **kwargs,
         )
 

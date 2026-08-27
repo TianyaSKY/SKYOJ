@@ -36,10 +36,13 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
 
     try:
         with SandboxRunner() as runner:
-            runner.launch(mem_limit=f"{memory_limit}m", nano_cpus=1000000000)
+            runner.launch(pids_limit=50, mem_limit=f"{memory_limit}m", nano_cpus=1000000000)
 
             # 1. 上传学生提交的 CSV
-            runner.put_file_from_path(os.path.abspath(user_csv_content), 'submission.csv')
+            if os.path.isfile(str(user_csv_content)):
+                runner.put_file_from_path(os.path.abspath(user_csv_content), 'submission.csv')
+            else:
+                runner.put_file('submission.csv', user_csv_content)
 
             # 2. 上传教师的评分脚本和真值表
             for f_name in teacher_files:
@@ -48,8 +51,7 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
                 runner.put_file(f_name, content)
 
             # 3. 运行评分脚本
-            # Kaggle 评分脚本可能涉及大量计算，给予较长超时
-            time_limit = getattr(problem, 'time_limit', 30)
+            time_limit = max(1, min(30, (max(100, int(getattr(problem, 'time_limit', 1000) or 1000)) + 999) // 1000))
             exit_code, output = runner.exec_run(f"sh -c 'timeout {time_limit}s python3 main.py'")
             output = output.strip()
 

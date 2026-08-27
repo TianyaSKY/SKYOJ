@@ -12,7 +12,7 @@ JOB_FAILED = "failed"
 DEFAULT_MAX_ATTEMPTS = 3
 # 键为消息任务名字符串，与 app.messaging.task_names 保持一致
 LEASE_SECONDS = {
-    "skyoj.tasks.judge_submission": 10 * 60,
+    "skyoj.tasks.judge_submission": 30 * 60,
     "skyoj.tasks.debug_submission": 5 * 60,
     "skyoj.tasks.execute_test_data": 20 * 60,
     "skyoj.tasks.generate_problem": 10 * 60,

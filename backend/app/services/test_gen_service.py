@@ -15,7 +15,7 @@ def run_test_generation(problem_id, code):
     """
     try:
         with SandboxRunner(image=GEN_IMAGE_NAME) as runner:
-            runner.launch()
+            runner.launch(pids_limit=50, mem_limit="512m", nano_cpus=1000000000)
 
             # 将生成脚本上传到容器
             # 假设脚本是 Python 编写的
@@ -27,7 +27,7 @@ def run_test_generation(problem_id, code):
             # 运行脚本，工作目录设为 /app/output
             # 脚本应该将生成的测试文件直接写在当前目录
             exit_code, output = runner.exec_run(
-                "python3 ../generator.py", workdir="/app/output"
+                "sh -c 'timeout 120s python3 ../generator.py'", workdir="/app/output"
             )
 
             if exit_code != 0:

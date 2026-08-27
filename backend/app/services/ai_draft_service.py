@@ -377,8 +377,8 @@ class AiDraftService:
             content=content,
             language=language,
             problem_type=problem_type,
-            time_limit=max(100, time_limit),
-            memory_limit=max(32, memory_limit),
+            time_limit=max(100, min(30000, time_limit)),
+            memory_limit=max(16, min(4096, memory_limit)),
             template_code=str(result.get("template_code") or ""),
         )
         self._drafts.mark_consumed(draft_id)

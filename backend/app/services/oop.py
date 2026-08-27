@@ -135,7 +135,7 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python', db=No
 
     try:
         with SandboxRunner() as runner:
-            runner.launch(mem_limit=f"{memory_limit}m", nano_cpus=1000000000)
+            runner.launch(pids_limit=50, mem_limit=f"{memory_limit}m", nano_cpus=1000000000)
 
             # 1. 上传学生代码
             runner.put_file(lang_config['student_file'], user_code)
@@ -149,13 +149,12 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python', db=No
 
             # 3. 编译 (如果需要)
             if lang_config['compile']:
-                exit_code, output = runner.exec_run(lang_config['compile'])
+                exit_code, output = runner.exec_run(f"timeout 30s {lang_config['compile']}")
                 if exit_code != 0:
                     return "Compile Error", 0, output
 
             # 4. 运行
-            # 使用 timeout 防止死循环
-            time_limit = getattr(problem, 'time_limit', 5)
+            time_limit = max(1, min(30, (max(100, int(getattr(problem, 'time_limit', 1000) or 1000)) + 999) // 1000))
             run_entry = lang_config['run']
             if language.lower() == 'python':
                 guard_filename = "__skyoj_oop_guard_runner.py"

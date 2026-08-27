@@ -53,12 +53,12 @@ def _prepare_and_run_case(
         runner.put_file(lang_config["src"], user_code)
 
         if lang_config["compile"]:
-            exit_code, output = runner.exec_run(lang_config["compile"])
+            exit_code, output = runner.exec_run(f"timeout 30s {lang_config['compile']}")
             if exit_code != 0:
                 return case_name, "compile_error", output
 
         runner.put_file("input.txt", input_data)
-        time_limit_s = max(1, int(time_limit_ms) // 1000)
+        time_limit_s = max(1, min(30, (max(100, int(time_limit_ms or 1000)) + 999) // 1000))
         run_cmd = f"sh -c 'timeout {time_limit_s}s {lang_config['run']} < /app/input.txt'"
         exit_code, output = runner.exec_run(run_cmd)
         output = output.strip() if output else ""
@@ -91,7 +91,7 @@ def _judge_single_case(
     """在同一个提交容器中串行执行一个测试点。"""
     try:
         runner.put_file("input.txt", input_data)
-        time_limit_s = max(1, int(time_limit_ms) // 1000)
+        time_limit_s = max(1, min(30, (max(100, int(time_limit_ms or 1000)) + 999) // 1000))
         run_cmd = f"sh -c 'timeout {time_limit_s}s {run_entry} < /app/input.txt'"
         exit_code, output = runner.exec_run(run_cmd)
         output = output.strip()
@@ -406,11 +406,11 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         case_payloads.append((case_name, input_data, expected_output))
 
     try:
-        memory_limit = max(16, int(memory_limit or 128))
+        memory_limit = int(memory_limit or 128)
     except (TypeError, ValueError):
         memory_limit = 128
     try:
-        time_limit_ms = max(1, int(time_limit or 1000))
+        time_limit_ms = int(time_limit or 1000)
     except (TypeError, ValueError):
         time_limit_ms = 1000
 
@@ -438,6 +438,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
 
     passed_count = 0
     has_tle = False
+    has_re = False
     logs = []
     case_results: list[dict] = []
     for case_name, result_type, detail in ordered_results:
@@ -450,6 +451,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             logs.append(f"Test Case {case_name}: Time Limit Exceeded")
             case_results.append({"case_name": case_name, "status": "tle"})
         elif result_type == "runtime_error":
+            has_re = True
             logs.append(
                 f"Test Case {case_name}: Runtime Error"
                 + (f"\n{detail}" if detail else "")
@@ -468,6 +470,8 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
     final_score = (passed_count / total_cases) * 100
     if has_tle:
         final_status = "Time Limit Exceeded"
+    elif has_re:
+        final_status = "Runtime Error"
     elif passed_count == total_cases:
         final_status = "Accepted"
     else:
