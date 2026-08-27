@@ -21,6 +21,7 @@ export function uploadDataset(data) {
         url: '/datasets',
         method: 'post',
         data,
+        timeout: 300000,
         headers: {'Content-Type': 'multipart/form-data'}
     })
 }
@@ -33,5 +34,18 @@ export function deleteDataset(id) {
     return request({
         url: `/datasets/${id}`,
         method: 'delete'
+    })
+}
+
+/**
+ * 下载数据集（携带登录态，避免把 token 放进 URL）
+ * @param {number} id 数据集ID
+ */
+export function downloadDataset(id) {
+    return request({
+        url: `/datasets/${id}/download`,
+        method: 'get',
+        responseType: 'blob',
+        timeout: 300000
     })
 }

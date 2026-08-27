@@ -1,6 +1,6 @@
 # 已知安全债务
 
-## API 服务挂载 Docker Socket
+## Judge Worker 挂载 Docker Socket
 
 **状态**：✅ 已闭环（里程碑 2，commit 见 `git log --grep='judge-worker'` / `fix(backend): break judge import cycle`）
 
@@ -17,8 +17,14 @@
   - 限流：登录 5/60s、注册 3/60s、提交 10/60s（Redis fixed-window）。
   - 写操作审计：`AuditMiddleware` 自动记录 POST/PUT/DELETE/PATCH 的 method/path/IP/UA/载荷摘要到 `audit_log` 表。
 
+- 沙箱使用 `network_mode=none`、`pids_limit`、`cap_drop=ALL` 和 `no-new-privileges`。
+
 回归检测（CI/本地）：
 
 - `docker compose config` 检查 `services.backend.volumes` 不含 `/var/run/docker.sock`。
 - `docker compose config` 检查 `services.judge-worker.volumes` 含 `/var/run/docker.sock`。
 - 定期 `grep -R "docker.from_env" backend/app/` 确认调用点仅在 `services/sandbox_runner.py`，且该文件只在 judge 进程的 worker 上下文中被 import。
+
+后续可选加固：
+
+- 使用 rootless Docker 或独立 Judge 主机，进一步缩小 docker.sock 的爆炸半径。

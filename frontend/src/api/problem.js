@@ -29,6 +29,7 @@ export function submitSolution(data) {
         url: '/submissions/submit',
         method: 'post',
         data,
+        timeout: 120000,
         headers: isFormData ? {'Content-Type': 'multipart/form-data'} : undefined
     })
 }
@@ -70,6 +71,7 @@ export function uploadTestCases(id, formData) {
         url: `/problems/${id}/upload_files`,
         method: 'post',
         data: formData,
+        timeout: 300000,
         headers: {'Content-Type': 'multipart/form-data'}
     })
 }

@@ -25,7 +25,7 @@
             {{ new Date(scope.row.created_at).toLocaleString() }}
           </template>
         </el-table-column>
-        <el-table-column align="center" fixed="right" label="操作" width="250">
+        <el-table-column align="center" fixed="right" label="操作" width="180">
           <template #default="scope">
             <el-button-group>
               <el-button
@@ -35,14 +35,6 @@
                   @click="handleDownload(scope.row)"
               >
                 下载
-              </el-button>
-              <el-button
-                  :icon="Link"
-                  size="small"
-                  type="info"
-                  @click="copyDownloadLink(scope.row)"
-              >
-                复制链接
               </el-button>
               <el-popconfirm
                   v-if="isTeacher"
@@ -120,9 +112,9 @@
 <script setup>
 import {computed, onMounted, ref} from 'vue'
 import {useUserStore} from '@/stores/user'
-import {deleteDataset, getDatasetList, uploadDataset} from '@/api/dataset'
+import {deleteDataset, downloadDataset, getDatasetList, uploadDataset} from '@/api/dataset'
 import {ElMessage} from 'element-plus'
-import {Delete, Download, Link, Upload} from '@element-plus/icons-vue'
+import {Delete, Download, Upload} from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const datasets = ref([])
@@ -176,25 +168,20 @@ const handleCurrentChange = (val) => {
   fetchDatasets()
 }
 
-const handleDownload = (row) => {
-  const token = userStore.token
-  const url = `${window.location.origin}${row.download_url}?token=${token}`
-  window.open(url, '_blank')
-}
-
-const copyDownloadLink = (row) => {
-  const token = userStore.token
-  if (!token) {
-    ElMessage.warning('请先登录以获取下载链接')
-    return
+const handleDownload = async (row) => {
+  try {
+    const blob = await downloadDataset(row.id)
+    const url = window.URL.createObjectURL(new Blob([blob]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', row.name || `dataset_${row.id}`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    ElMessage.error('下载失败')
   }
-  const url = `${window.location.origin}${row.download_url}?token=${token}`
-
-  navigator.clipboard.writeText(url).then(() => {
-    ElMessage.success('下载链接已复制到剪贴板（含临时Token）')
-  }).catch(() => {
-    ElMessage.error('复制失败，请手动复制')
-  })
 }
 
 const handleDelete = async (row) => {
