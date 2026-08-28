@@ -53,10 +53,15 @@ class SubmissionService:
         return SubmitResult(submission_id=submission.id, status="Pending", exam_id=exam_id)
 
     def _resolve_exam_id(self, exam_id: int | None, session_exam_id: int) -> int | None:
-        if exam_id is None or exam_id == -1:
+        if session_exam_id != -1:
+            if exam_id not in (None, -1, session_exam_id):
+                raise PermissionDeniedError("未进入该考试，无法提交")
+            exam_id = session_exam_id
+        elif exam_id is None or exam_id == -1:
             return None
-        if session_exam_id != exam_id:
+        else:
             raise PermissionDeniedError("未进入该考试，无法提交")
+
         exam = self._submission_repository.get_active_exam(exam_id, utcnow())
         if exam is None:
             raise InvalidStateError("考试未在进行中")

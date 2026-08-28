@@ -10,7 +10,20 @@ import tarfile
 from loguru import logger
 
 IMAGE_NAME = "skyoj-runner"
+
 _client = None
+COMPILE_TIMEOUT_SECONDS = 30
+MAX_RUN_TIMEOUT_SECONDS = 30
+
+
+def time_limit_seconds(time_limit_ms, default_ms: int = 1000) -> int:
+    """将题目 time_limit（毫秒）转为 timeout 秒数。"""
+    try:
+        milliseconds = int(time_limit_ms if time_limit_ms is not None else default_ms)
+    except (TypeError, ValueError):
+        milliseconds = default_ms
+    milliseconds = max(100, min(30000, milliseconds))
+    return max(1, min(MAX_RUN_TIMEOUT_SECONDS, (milliseconds + 999) // 1000))
 
 
 def _get_docker_client():

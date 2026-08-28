@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 import jwt
+from pydantic import ValidationError
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 
 from app.api.deps import get_submission_service
@@ -95,7 +96,10 @@ async def submit_code(
     pid = problem_id
 
     if "application/json" in content_type:
-        body = SubmitCodeBody.model_validate(await request.json())
+        try:
+            body = SubmitCodeBody.model_validate(await request.json())
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=exc.errors()) from exc
         pid = body.problem_id
         user_code = body.code
         lang = body.language

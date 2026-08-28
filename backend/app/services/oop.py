@@ -2,7 +2,7 @@ import os
 import re
 
 from app.repositories.problem_repository import ProblemRepository
-from app.services.sandbox_runner import SandboxRunner
+from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
 
 
 FORBIDDEN_EXIT_PATTERNS = {
@@ -154,7 +154,7 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python', db=No
                     return "Compile Error", 0, output
 
             # 4. 运行
-            time_limit = max(1, min(30, (max(100, int(getattr(problem, 'time_limit', 1000) or 1000)) + 999) // 1000))
+            time_limit = time_limit_seconds(getattr(problem, 'time_limit', None))
             run_entry = lang_config['run']
             if language.lower() == 'python':
                 guard_filename = "__skyoj_oop_guard_runner.py"

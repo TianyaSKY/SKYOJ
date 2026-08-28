@@ -1,7 +1,7 @@
 import os
 
 from app.repositories.problem_repository import ProblemRepository
-from app.services.sandbox_runner import SandboxRunner
+from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
 
 
 def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
@@ -51,7 +51,7 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
                 runner.put_file(f_name, content)
 
             # 3. 运行评分脚本
-            time_limit = max(1, min(30, (max(100, int(getattr(problem, 'time_limit', 1000) or 1000)) + 999) // 1000))
+            time_limit = time_limit_seconds(getattr(problem, 'time_limit', None))
             exit_code, output = runner.exec_run(f"sh -c 'timeout {time_limit}s python3 main.py'")
             output = output.strip()
 

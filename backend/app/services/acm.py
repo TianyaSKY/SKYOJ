@@ -1,15 +1,13 @@
-"""ACM 模式并发判题实现：每个测试点独立容器并行执行。"""
+"""ACM 模式串行判题实现：每个测试点独立容器串行执行。"""
 
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from loguru import logger
 
 from app.repositories.problem_repository import ProblemRepository
-from app.services.sandbox_runner import SandboxRunner
-
+from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
 
 def natural_sort_key(value: str) -> list[int | str]:
     """按文件名中的数字自然排序。"""
@@ -58,7 +56,7 @@ def _prepare_and_run_case(
                 return case_name, "compile_error", output
 
         runner.put_file("input.txt", input_data)
-        time_limit_s = max(1, min(30, (max(100, int(time_limit_ms or 1000)) + 999) // 1000))
+        time_limit_s = time_limit_seconds(time_limit_ms)
         run_cmd = f"sh -c 'timeout {time_limit_s}s {lang_config['run']} < /app/input.txt'"
         exit_code, output = runner.exec_run(run_cmd)
         output = output.strip() if output else ""
@@ -91,7 +89,7 @@ def _judge_single_case(
     """在同一个提交容器中串行执行一个测试点。"""
     try:
         runner.put_file("input.txt", input_data)
-        time_limit_s = max(1, min(30, (max(100, int(time_limit_ms or 1000)) + 999) // 1000))
+        time_limit_s = time_limit_seconds(time_limit_ms)
         run_cmd = f"sh -c 'timeout {time_limit_s}s {run_entry} < /app/input.txt'"
         exit_code, output = runner.exec_run(run_cmd)
         output = output.strip()
@@ -123,7 +121,7 @@ def _judge_single_case_verbose(
     """单点执行并保留 stdout/stderr 等完整信息，供调试展示使用。"""
     try:
         runner.put_file("input.txt", input_data)
-        time_limit_s = max(1, int(time_limit_ms) // 1000)
+        time_limit_s = time_limit_seconds(time_limit_ms)
         run_cmd = f"sh -c 'timeout {time_limit_s}s {run_entry} < /app/input.txt'"
         exit_code, output = runner.exec_run(run_cmd)
         output_text = str(output) if output is not None else ""
@@ -177,6 +175,29 @@ def _judge_single_case_verbose(
         except Exception as exc:
             logger.warning("清理 ACM 测试输入失败 case_name={}: {}", case_name, exc)
 
+
+def _prepare_container(lang_config, user_code, memory_limit):
+    """创建一个提交专用沙箱并完成源码上传与编译。"""
+    runner = SandboxRunner()
+    try:
+        runner.launch(
+            pids_limit=50,
+            mem_limit=f"{memory_limit}m",
+            nano_cpus=1000000000,
+            workdir="/app",
+        )
+        runner.put_file(lang_config["src"], user_code)
+        if lang_config["compile"]:
+            exit_code, output = runner.exec_run(
+                f"timeout 30s {lang_config['compile']}"
+            )
+            if exit_code != 0:
+                runner.stop()
+                return None, "compile", output
+        return runner, None, None
+    except Exception as exc:
+        runner.stop()
+        return None, "system", str(exc)
 
 _ACM_LANG_CONFIGS = {
     "c": {"src": "main.c", "compile": "gcc main.c -o main", "run": "./main"},
@@ -348,10 +369,10 @@ def run_acm_single_case(
 
 
 def run_acm_judge(submission_id, user_code, problem_id, language="python", db=None):
-    """每个测试点独立容器并发执行，全部完成后汇总结果。
+    """每个测试点独立容器串行执行，全部完成后汇总结果。
 
-    并发上限为 8 个并行容器，超过 8 个测试点时多余排队。
-    编译结果不跨容器复用，每次都重新编译（代码每次都不同，缓存收益低）。
+    判题 Worker 使用单进程串行执行；每个测试点仍使用独立容器，避免
+    测试点之间共享进程状态。编译结果不跨容器复用，每次都重新编译。
 
     返回 ``(status, score, log, case_results)``，其中 ``case_results`` 是
     ``[{"case_name", "status", "error_output"}]`` 形式的列表；与
@@ -415,24 +436,18 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         time_limit_ms = 1000
 
     try:
-        max_workers = min(len(case_payloads), 8)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(
-                    _prepare_and_run_case,
-                    lang_config,
-                    user_code,
-                    case_name,
-                    input_data,
-                    expected_output,
-                    memory_limit,
-                    time_limit_ms,
-                ): case_name
-                for case_name, input_data, expected_output in case_payloads
-            }
-            ordered_results = []
-            for future in as_completed(futures):
-                ordered_results.append(future.result())
+        ordered_results = [
+            _prepare_and_run_case(
+                lang_config,
+                user_code,
+                case_name,
+                input_data,
+                expected_output,
+                memory_limit,
+                time_limit_ms,
+            )
+            for case_name, input_data, expected_output in case_payloads
+        ]
     except Exception as exc:
         return "Runtime Error", 0, str(exc), []
 

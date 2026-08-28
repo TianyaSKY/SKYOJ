@@ -116,26 +116,9 @@ def _alter_if_missing(table: str, column: str, definition: str):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """FastAPI 推荐的 lifespan 处理器，替换弃用的 on_event。
-
-    启动时：数据库初始化 + 启动后台任务定期刷新 Celery 队列深度。
-    """
+    """FastAPI 推荐的 lifespan 处理器，负责启动时初始化数据库。"""
     init_db()
-
-    import asyncio
-    from app.utils.metrics import refresh_celery_queue_depth
-
-    async def _refresh_loop():
-        while True:
-            try:
-                refresh_celery_queue_depth()
-            except Exception:
-                pass
-            await asyncio.sleep(30)
-
-    task = asyncio.create_task(_refresh_loop())
     yield
-    task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -171,8 +154,13 @@ def create_app() -> FastAPI:
     @application.get("/metrics")
     def metrics_endpoint():
         """Prometheus 抓取端点。"""
-        from app.utils.metrics import get_metrics, get_metrics_content_type
+        from app.utils.metrics import (
+            get_metrics,
+            get_metrics_content_type,
+            refresh_celery_queue_depth,
+        )
 
+        refresh_celery_queue_depth()
         return Response(content=get_metrics(), media_type=get_metrics_content_type())
 
     def _envelope(status_code: int, code: str, **fields) -> dict:
