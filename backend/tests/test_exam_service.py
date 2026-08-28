@@ -167,7 +167,7 @@ def test_score_rows_matches_manual_expectation(seeded):
 
 
 def test_rank_keeps_ac_and_penalty_semantics(seeded):
-    result = seeded["service"].rank(seeded["exam"].id)
+    result = seeded["service"].rank(seeded["exam"].id, "teacher", -1)
 
     assert result.exam_title == "期中考试"
     # 仅 alice 与 bob 有非 Pending 提交

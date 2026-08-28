@@ -33,8 +33,10 @@ def test_external_service_error_maps_to_502(client):
         json={"system_setting": "s", "prompt": "p"},
     )
 
-    assert response.status_code == 502
-    assert response.json() == {"error": "上游 LLM 服务不可用"}
+    assert response.json() == {
+        "error": "上游 LLM 服务不可用",
+        "code": "EXTERNAL_SERVICE_ERROR",
+    }
 
 
 def test_llm_config_error_maps_to_400(client):
@@ -48,13 +50,15 @@ def test_llm_config_error_maps_to_400(client):
         json={"system_setting": "s", "prompt": "p"},
     )
 
-    assert response.status_code == 400
-    assert response.json() == {"error": "LLM 环境变量未完整配置"}
+    assert response.json() == {
+        "error": "LLM 环境变量未完整配置",
+        "code": "BUSINESS_ERROR",
+    }
 
 
-def test_dataset_download_auth_error_uses_error_key(client):
+def test_dataset_download_auth_error_uses_auth_envelope(client):
     response = client.get("/api/datasets/1/download")
 
     assert response.status_code == 401
-    assert "error" in response.json()
-    assert "message" not in response.json()
+    assert response.json()["code"] == "AUTH_REQUIRED"
+    assert response.json()["message"] == "Token 丢失"

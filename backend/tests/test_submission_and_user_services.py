@@ -103,8 +103,28 @@ def test_submission_service_rejects_exam_submit_without_session() -> None:
     service = SubmissionService(FakeSubmissionRepository(), FakeJobService())
 
     with pytest.raises(PermissionDeniedError):
-        service.submit(SubmitParams(1, 7, "code", "python", exam_id=5, session_exam_id=-1))
+        service.submit(
+            SubmitParams(1, 7, "code", "python", exam_id=5, session_exam_id=-1)
+        )
 
+
+def test_submission_service_uses_active_exam_session_when_body_omits_id() -> None:
+    repository = FakeSubmissionRepository()
+    job_service = FakeJobService()
+    service = SubmissionService(repository, job_service, FakeSubmissionStorage())
+
+    result = service.submit(
+        SubmitParams(
+            user_id=3,
+            problem_id=7,
+            language="python",
+            code="print(7)",
+            exam_id=-1,
+            session_exam_id=5,
+        )
+    )
+
+    assert result.exam_id == 5
 
 def test_user_service_blocks_student_listing_other_submissions() -> None:
     service = UserService(FakeUserRepository(), FakeAvatarStorage())

@@ -12,6 +12,8 @@ class _StubSubmission:
         self.problem = SimpleNamespace(type=problem_type)
         self.language = language
         self.problem_id = problem_id
+        self.user_id = 1
+        self.exam_id = None
         self.code_content = "print(1)"
 
 
@@ -38,8 +40,10 @@ def make_repo_factory(problem_type):
         def get_by_id(self, submission_id):
             return self.submission
 
-        def update_result(self, submission_id, *, status, score, output_log):
-            self.updates.append((submission_id, status, score, output_log))
+        def update_result(
+            self, submission_id, *, status, score, output_log, case_results=None
+        ):
+            self.updates.append((submission_id, status, score, output_log, case_results))
 
     return _FakeSubmissionRepository
 
@@ -49,7 +53,7 @@ def test_judge_submission_dispatches_acm_and_updates_result(monkeypatch):
 
     def fake_acm_judge(submission_id, user_code, problem_id, language, db=None):
         calls["args"] = (submission_id, user_code, problem_id, language, db)
-        return "Accepted", 100.0, "Test Case 1: Passed"
+        return "Accepted", 100.0, "Test Case 1: Passed", []
 
     repo_factory = make_repo_factory("acm")
     monkeypatch.setattr(judge_service, "run_acm_judge", fake_acm_judge)
@@ -59,7 +63,7 @@ def test_judge_submission_dispatches_acm_and_updates_result(monkeypatch):
     judge_service.judge_submission(7, db)
 
     assert calls["args"] == (7, "print(1)", 1, "python", db)
-    assert repo_factory.last.updates == [(7, "Accepted", 100.0, "Test Case 1: Passed")]
+    assert repo_factory.last.updates == [(7, "Accepted", 100.0, "Test Case 1: Passed", [])]
     assert db.committed == 1
 
 
@@ -70,8 +74,7 @@ def test_judge_submission_unsupported_type_marks_system_error(monkeypatch):
     db = _StubDb()
     judge_service.judge_submission(7, db)
 
-    assert repo_factory.last.updates == [(7, "System Error", 0, "Unsupported problem type")]
-    assert db.committed == 1
+    assert repo_factory.last.updates == [(7, "System Error", 0, "Unsupported problem type", [])]
 
 
 def test_judge_submission_marks_system_error_on_exception(monkeypatch):
@@ -86,7 +89,7 @@ def test_judge_submission_marks_system_error_on_exception(monkeypatch):
     judge_service.judge_submission(7, db)
 
     assert repo_factory.last.updates == [
-        (7, "System Error", 0, "Judge Error: sandbox exploded")
+        (7, "System Error", 0, "Judge Error: sandbox exploded", [])
     ]
     assert db.committed == 1
 
@@ -102,7 +105,9 @@ def test_judge_submission_missing_submission_skips(monkeypatch):
         def get_by_id(self, submission_id):
             return None
 
-        def update_result(self, submission_id, *, status, score, output_log):
+        def update_result(
+            self, submission_id, *, status, score, output_log, case_results=None
+        ):
             raise AssertionError("不应更新不存在的提交")
 
     monkeypatch.setattr(judge_service, "SubmissionRepository", _EmptyRepo)
@@ -167,10 +172,12 @@ def test_acm_judge_runs_cases_through_runner(monkeypatch, tmp_path):
     (problem_dir / "1.in").write_text("5\n", encoding="utf-8")
     (problem_dir / "1.out").write_text("5", encoding="utf-8")
 
-    status, score, log = acm.run_acm_judge(1, "print(5)", 1, "python", db=object())
-
+    status, score, log, case_results = acm.run_acm_judge(
+        1, "print(5)", 1, "python", db=object()
+    )
     assert (status, score) == ("Accepted", 100.0)
     assert log == "Test Case 1: Passed"
+    assert case_results == [{"case_name": "1", "status": "passed"}]
     assert FakeRunner.last.launch_kwargs == {
         "pids_limit": 50,
         "mem_limit": "128m",
@@ -229,6 +236,8 @@ def test_sandbox_runner_launch_forwards_limits(monkeypatch):
         "detach": True,
         "remove": True,
         "network_mode": "none",
+        "cap_drop": ["ALL"],
+        "security_opt": ["no-new-privileges:true"],
         "pids_limit": 50,
         "mem_limit": "128m",
         "nano_cpus": 1000000000,

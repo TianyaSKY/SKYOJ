@@ -87,6 +87,7 @@ def test_from_submission_detail_orm_renames_code_and_log():
         code_content="print(1)",
         language="python",
         exam_id=1,
+        case_results=[],
         created_at=NOW,
     )
 
@@ -174,6 +175,8 @@ def test_from_exam_orm_counts_and_password():
         end_time=NOW,
         is_visible=True,
         created_by=1,
+        contest_type="icpc",
+        freeze_minutes=None,
         password="hashed",
     )
 
@@ -184,7 +187,6 @@ def test_from_exam_orm_counts_and_password():
     assert item.submission_count == 5
     assert item.has_password is True
 
-
 def test_from_exam_detail_orm_problems_with_titles():
     exam = SimpleNamespace(
         id=1,
@@ -194,6 +196,8 @@ def test_from_exam_detail_orm_problems_with_titles():
         end_time=NOW,
         is_visible=True,
         created_by=1,
+        contest_type="icpc",
+        freeze_minutes=None,
         password=None,
     )
     problems = [

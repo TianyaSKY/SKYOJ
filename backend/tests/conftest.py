@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 @pytest.fixture(scope="session")
 def engine():
     """SQLite 内存引擎，所有测试共享同一 schema。"""
+    from app import models  # noqa: F401
     from app.database import Base
 
     eng = create_engine(
@@ -36,7 +37,7 @@ def db_session(engine):
 
     connection = engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection)
+    session = Session(bind=connection, expire_on_commit=False)
     yield session
     session.close()
     transaction.rollback()
@@ -64,7 +65,7 @@ def client(db_session, monkeypatch):
         from app.main import app
 
         yield TestClient(app)
-
+        app.dependency_overrides.clear()
 
 @pytest.fixture
 def teacher_user(db_session):
@@ -125,7 +126,7 @@ def sample_problem(db_session):
         title="两数之和",
         content="给定一个整数数组 nums 和目标值 target，返回两个数的下标。",
         type="acm",
-        language="python,cpp",
+        language="python",
         time_limit=1000,
         memory_limit=128,
     )

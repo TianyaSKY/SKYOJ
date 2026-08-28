@@ -32,7 +32,7 @@ class TestExamCRUD:
                 "is_visible": True,
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         data = resp.json()
         assert data["title"] == "数据结构期末考试"
         assert "id" in data
@@ -92,7 +92,10 @@ class TestExamRank:
             },
         )
         exam_id = create.json()["id"]
-        resp = client.get(f"/api/exams/{exam_id}/rank")
+        resp = client.get(
+            f"/api/exams/{exam_id}/rank",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["exam_title"] == "空考试"

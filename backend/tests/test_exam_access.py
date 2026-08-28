@@ -46,6 +46,8 @@ def _exam(*, visible: bool, password: str | None = None):
         description="",
         start_time=now - timedelta(hours=1),
         end_time=now + timedelta(hours=1),
+        contest_type="icpc",
+        freeze_minutes=None,
         is_visible=visible,
         created_by=1,
         password=password,

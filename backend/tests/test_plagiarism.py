@@ -38,10 +38,11 @@ class TestJPlagClient:
         )
 
         client = JPlagClient()
-        client.compare(
-            [{"id": 1, "code": "x = 1"}, {"id": 2, "code": "x = 2"}],
-            language="python",
-        )
+        with patch.object(client, "_poll_result", return_value=[]):
+            client.compare(
+                [{"id": 1, "code": "x = 1"}, {"id": 2, "code": "x = 2"}],
+                language="python",
+            )
 
         mock_post.assert_called_once()
         call_url = mock_post.call_args[0][0]
@@ -130,10 +131,26 @@ class TestPlagiarismService:
             )
         ]
 
-        mock_sub_a = MagicMock()
+        mock_sub_a = MagicMock(
+            id=1,
+            problem_id=1,
+            status="Accepted",
+            code_content="x = 1",
+            language="python",
+        )
         mock_sub_a.user = MagicMock(username="alice")
-        mock_sub_b = MagicMock()
+        mock_sub_b = MagicMock(
+            id=2,
+            problem_id=1,
+            status="Accepted",
+            code_content="x = 2",
+            language="python",
+        )
         mock_sub_b.user = MagicMock(username="bob")
+        mock_db.query.return_value.filter.return_value.options.return_value.all.return_value = [
+            mock_sub_a,
+            mock_sub_b,
+        ]
 
         service = PlagiarismService(
             plagiarism_repo=mock_plagiarism_repo,

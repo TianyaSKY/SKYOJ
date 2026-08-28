@@ -4,8 +4,9 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 
+from app.config import SECRET_KEY
 
-TEST_SECRET = "test-secret-key-for-milestone-one"
+TEST_SECRET = SECRET_KEY
 
 
 def test_public_registration_creates_student(client):
