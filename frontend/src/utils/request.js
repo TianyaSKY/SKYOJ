@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
 import router from '@/router'
+import { useUserStore } from '@/stores/user'
 
 const tokenErrorCodes = new Set([
     'AUTH_REQUIRED', 'AUTH_TOKEN_EXPIRED', 'AUTH_INVALID_TOKEN'
@@ -53,10 +54,14 @@ service.interceptors.response.use(
                     type: 'warning'
                 }
             ).then(() => {
-                localStorage.removeItem('token')
-                localStorage.removeItem('user')
+                useUserStore().logout()
                 if (router.currentRoute.value.name !== 'login') {
-                    router.push('/login')
+                    return router.push('/login')
+                }
+            }).catch(error => {
+                // 取消和关闭是正常交互；其他异常保留诊断信息。
+                if (error !== 'cancel' && error !== 'close') {
+                    console.error('登录失效恢复失败', error)
                 }
             }).finally(() => {
                 isHandlingAuthError = false

@@ -3,7 +3,9 @@
  * 验证 request.js 的响应拦截器能在 401 / 5xx 时把
  * 后端 envelope 中的 code 字段挂到 error.code 上。
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { flushPromises } from '@vue/test-utils'
 
 // Mock element-plus + router，避免弹窗副作用。
 vi.mock('element-plus', () => ({
@@ -17,7 +19,10 @@ import request from '@/utils/request'
 
 beforeEach(() => {
   localStorage.clear()
+  setActivePinia(createPinia())
 })
+
+afterEach(() => flushPromises())
 
 describe('request.js 响应拦截器 - 错误信封解析', () => {
   it('把 401 + AUTH_REQUIRED envelope 的 code 挂到 error 上', async () => {
