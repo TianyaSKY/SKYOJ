@@ -260,7 +260,7 @@ async function openComments (item) {
   await loadComments()
 }
 
-async function loadComments (pageNo = commentsPage.value) {
+async function loadComments (pageNo = commentsPage.value, latest = false) {
   const item = currentSolution.value
   if (!item) return
   const scope = scopeVersion, version = commentsVersion
@@ -275,7 +275,9 @@ async function loadComments (pageNo = commentsPage.value) {
     })
     if (!isCurrent()) return
     const lastPage = Math.max(1, Math.ceil((resp.total || 0) / commentsPageSize))
-    if (pageNo > lastPage) return await loadComments(lastPage)
+    if (pageNo > lastPage || (latest && pageNo !== lastPage)) {
+      return await loadComments(lastPage, latest)
+    }
     commentsPage.value = pageNo
     comments.value = resp.items || []
     commentsTotal.value = resp.total || 0
@@ -307,7 +309,9 @@ async function submitComment () {
     item.comment_count += 1
     if (!isCurrentComments(scope, version, item)) return
     if (newComment.value === content) newComment.value = ''
-    await loadComments(1)
+    // 评论按时间正序排列，发布后定位末页；以查询返回的总数修正旧计数。
+    const estimatedLastPage = Math.max(1, Math.ceil((commentsTotal.value + 1) / commentsPageSize))
+    await loadComments(estimatedLastPage, true)
   } catch (e) {
     if (isCurrentComments(scope, version, item)) ElMessage.error(e.message || '评论失败')
   } finally {

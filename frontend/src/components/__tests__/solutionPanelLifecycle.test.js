@@ -315,3 +315,21 @@ it.each([
   expect(wrapper.vm[pageField]).toBe(1)
   expect(wrapper.vm[loadingField]).toBe(false)
 })
+
+it.each([50, 101])('发布评论后根据最新总数定位末页（已有 %i 条评论）', async count => {
+  let posted = false
+  request.mockImplementation(config => {
+    if (config.method === 'post') { posted = true; return Promise.resolve({ id: count + 1 }) }
+    if (!config.url.endsWith('/comments')) return Promise.resolve({ items: [], total: 0 })
+    const total = posted ? count + 1 : 50
+    const lastPage = Math.ceil(total / 50)
+    return Promise.resolve({ items: [{ id: config.params.page === lastPage ? total : 1 }], total })
+  })
+  mountPage(); await flushPromises()
+  await wrapper.vm.openComments(solution(1))
+  wrapper.vm.newComment = 'new comment'
+  await wrapper.vm.submitComment()
+  expect(wrapper.vm.commentsPage).toBe(Math.ceil((count + 1) / 50))
+  expect(wrapper.vm.comments[0].id).toBe(count + 1)
+  expect(wrapper.vm.commentsTotal).toBe(count + 1)
+})
