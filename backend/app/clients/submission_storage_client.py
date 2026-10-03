@@ -1,6 +1,10 @@
 """提交附件文件存储客户端。"""
 
 import os
+import shutil
+import tempfile
+
+from loguru import logger
 
 from app.core.files import secure_filename
 
@@ -17,7 +21,16 @@ class SubmissionStorageClient:
         if not safe_name:
             raise ValueError("提交文件名无效")
         os.makedirs(self._base_dir, exist_ok=True)
-        path = os.path.join(self._base_dir, f"{user_id}_{problem_id}_{safe_name}")
-        with open(path, "wb") as output:
-            output.write(content)
+        # 目录由操作系统原子分配，同名及并发上传均不能覆盖其他提交。
+        upload_dir = tempfile.mkdtemp(prefix=f"{user_id}_{problem_id}_", dir=self._base_dir)
+        path = os.path.join(upload_dir, safe_name)
+        try:
+            with open(path, "xb") as output:
+                output.write(content)
+        except OSError:
+            try:
+                shutil.rmtree(upload_dir)
+            except OSError:
+                logger.exception("清理失败的提交附件目录失败 path={}", upload_dir)
+            raise
         return path
