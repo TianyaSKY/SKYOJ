@@ -13,7 +13,7 @@ class FakeSubmissionRepository:
 
     def __init__(self) -> None:
         self.unit_of_work = MagicMock()
-        self.problem = SimpleNamespace(id=7, type="acm")
+        self.problem = SimpleNamespace(id=7, type="acm", language="python")
         self.created = []
 
     def get_problem(self, problem_id: int):
@@ -68,6 +68,7 @@ class FakeSubmissionStorage:
 
 def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
     repository = FakeSubmissionRepository()
+    repository.problem.type = "kaggle"
     job_service = FakeJobService()
     service = SubmissionService(
         repository, job_service, FakeSubmissionStorage(), uow=MagicMock()

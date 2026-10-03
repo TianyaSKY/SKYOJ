@@ -13,6 +13,7 @@ from app.judging.acm import SingleCaseResult
 from app.persistence.submission import DebugRunRecord, DebugRunRepository
 from app.persistence.unit_of_work import UnitOfWork
 from app.services.async_job import AsyncJobService
+from app.services.submission_rules import validate_submission_language
 from loguru import logger
 
 
@@ -105,6 +106,7 @@ class DebugService:
         problem_type = (problem.type or "acm").lower()
         if problem_type != "acm":
             raise ResourceNotFoundError("仅 ACM 类型题目支持调试运行")
+        validate_submission_language(problem, params.language)
 
         exam_id = self._resolve_exam_id(params.exam_id)
         code = params.code

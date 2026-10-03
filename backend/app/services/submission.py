@@ -20,6 +20,7 @@ from app.persistence.submission import (
 )
 from app.persistence.unit_of_work import UnitOfWork
 from app.services.async_job import AsyncJobService
+from app.services.submission_rules import validate_submission_language
 
 
 @dataclass(frozen=True)
@@ -175,6 +176,9 @@ class SubmissionService:
         problem = self._submission_repository.get_problem(params.problem_id)
         if problem is None:
             raise ResourceNotFoundError("题目不存在")
+        validate_submission_language(
+            problem, params.language, is_file_upload=params.is_file_upload
+        )
 
         exam_id = self._resolve_exam_id(params.exam_id, params.session_exam_id)
         if (
