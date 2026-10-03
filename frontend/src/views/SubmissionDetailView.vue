@@ -1,5 +1,8 @@
 <template>
   <div class="submission-detail-container">
+    <el-alert v-if="loadError" class="mb-4" type="error" title="提交详情加载失败" :closable="false" show-icon>
+      <el-button :loading="loading" :disabled="loading" size="small" @click="retrySubmission">重新加载</el-button>
+    </el-alert>
     <!-- Status Overview -->
     <el-card v-loading="loading" class="status-card mb-4" shadow="hover">
       <div class="status-wrapper">
@@ -96,6 +99,7 @@ import {
 
 const route = useRoute()
 const loading = ref(false)
+const loadError = ref(false)
 let timer = null
 let requestVersion = 0
 let disposed = false
@@ -163,6 +167,7 @@ const fetchSubmission = async (silent = false) => {
     const data = await getSubmissionDetail(submissionId)
     if (disposed || version !== requestVersion) return
     submission.value = data
+    loadError.value = false
 
     if (isPending.value) {
       startPolling()
@@ -171,11 +176,19 @@ const fetchSubmission = async (silent = false) => {
     }
   } catch (error) {
     if (disposed || version !== requestVersion) return
+    loadError.value = true
+    if (submission.value.status === 'Loading...') submission.value.status = 'Load Failed'
     ElMessage.error('Failed to load submission details')
     stopPolling()
   } finally {
     if (!silent && !disposed && version === requestVersion) loading.value = false
   }
+}
+
+const retrySubmission = async () => {
+  if (disposed || loading.value) return
+  stopPolling()
+  await fetchSubmission()
 }
 
 const startPolling = () => {
@@ -197,6 +210,7 @@ const stopPolling = () => {
 watch(() => route.params.id, (id) => {
   stopPolling()
   submission.value = initialSubmission(id)
+  loadError.value = false
   fetchSubmission()
 }, { immediate: true })
 

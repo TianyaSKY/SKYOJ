@@ -25,8 +25,9 @@ function mountPage() {
   wrapper = shallowMount(SubmissionDetailView, {
     global: {
       directives: { loading: () => {} },
-      stubs: Object.fromEntries(['el-card', 'el-icon', 'el-tag', 'el-progress', 'el-button', 'el-empty']
-        .map(name => [name, true])),
+      stubs: { ...Object.fromEntries(['el-card', 'el-icon', 'el-tag', 'el-progress', 'el-button', 'el-empty']
+        .map(name => [name, true])), 'el-alert': { template: '<div class="load-error"><slot /></div>' } },
+
     },
   })
 }
@@ -116,4 +117,49 @@ describe('提交详情轮询生命周期', () => {
     expect(getSubmissionDetail).toHaveBeenCalledTimes(2)
     expect(ElMessage.error).toHaveBeenCalledWith('Failed to load submission details')
   })
+})
+
+it('首次加载失败显示可重试状态，重复点击只请求一次', async () => {
+  const retry = deferred()
+  getSubmissionDetail.mockRejectedValueOnce(new Error('offline')).mockReturnValueOnce(retry.promise)
+  mountPage(); await flushPromises()
+  expect(wrapper.vm.submission.status).toBe('Load Failed')
+  expect(wrapper.find('.load-error').exists()).toBe(true)
+  const button = wrapper.findComponent('el-button-stub')
+  button.vm.$emit('click'); button.vm.$emit('click')
+  await nextTick()
+  expect(getSubmissionDetail).toHaveBeenCalledTimes(2)
+  expect(wrapper.vm.loading).toBe(true)
+  retry.resolve(result(1, 'Accepted')); await flushPromises()
+  expect(wrapper.vm.submission.status).toBe('Accepted')
+  expect(wrapper.find('.load-error').exists()).toBe(false)
+  expect(wrapper.vm.loading).toBe(false)
+})
+it('轮询失败后重试可恢复 Pending 查询并等待终态', async () => {
+  getSubmissionDetail.mockResolvedValueOnce(result(1, 'Pending'))
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce(result(1, 'Pending'))
+    .mockResolvedValueOnce(result(1, 'Accepted'))
+  mountPage(); await flushPromises()
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(wrapper.vm.loadError).toBe(true)
+  expect(wrapper.vm.submission.status).toBe('Pending')
+  await wrapper.vm.retrySubmission()
+  expect(wrapper.vm.loadError).toBe(false)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(wrapper.vm.submission.status).toBe('Accepted')
+  expect(getSubmissionDetail).toHaveBeenCalledTimes(4)
+})
+it('切换提交时清除旧失败提示，旧重试响应不能覆盖新记录', async () => {
+  const old = deferred()
+  getSubmissionDetail.mockRejectedValueOnce(new Error('offline')).mockReturnValueOnce(old.promise)
+    .mockResolvedValueOnce(result(2, 'Accepted'))
+  mountPage(); await flushPromises()
+  const retry = wrapper.vm.retrySubmission()
+  state.route.params.id = '2'; await nextTick(); await flushPromises()
+  expect(wrapper.vm.loadError).toBe(false)
+  old.reject(new Error('old retry')); await retry
+  expect(wrapper.vm.submission.id).toBe(2)
+  expect(wrapper.vm.loadError).toBe(false)
+  expect(ElMessage.error).toHaveBeenCalledTimes(1)
 })
