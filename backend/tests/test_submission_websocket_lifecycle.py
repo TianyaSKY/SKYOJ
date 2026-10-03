@@ -24,6 +24,9 @@ class Socket:
     async def send_text(self, message):
         self.messages.append(message)
 
+    async def send_json(self, message):
+        self.messages.append(message)
+
     async def close(self, code=1000, reason=''):
         self.closed.append(code)
 
@@ -45,7 +48,9 @@ def setup_subscription(monkeypatch):
 
 
 def call_socket(socket):
-    return submission.submission_websocket(socket, 1, 'token', db=object(), service=MagicMock())
+    service = MagicMock()
+    service.get_submission.return_value = SimpleNamespace(status='Pending')
+    return submission.submission_websocket(socket, 1, 'token', db=MagicMock(), service=service)
 
 
 def test_redis_wait_allows_other_coroutines_to_progress(monkeypatch):
@@ -147,4 +152,27 @@ def test_subscription_timeout_closes_and_releases_connection(monkeypatch):
 
     asyncio.run(scenario())
     assert requested_timeouts == [300]
+    pubsub.close.assert_called_once()
+
+
+def test_completed_database_result_recovers_missing_redis_notification(monkeypatch):
+    pubsub = setup_subscription(monkeypatch)
+    pubsub.get_message.return_value = None
+    service = MagicMock()
+    service.get_submission.side_effect = [
+        SimpleNamespace(status='Pending'), SimpleNamespace(status='Pending'),
+        SimpleNamespace(status='Accepted', score=100, log='完成'),
+    ]
+    db = MagicMock()
+
+    async def scenario():
+        socket = Socket()
+        await submission.submission_websocket(socket, 1, 'token', db=db, service=service)
+        assert socket.messages == [{
+            'submission_id': 1, 'status': 'Accepted', 'score': 100, 'output_log': '完成',
+        }]
+        assert socket.closed == [1000]
+
+    asyncio.run(scenario())
+    assert db.rollback.call_count == 2
     pubsub.close.assert_called_once()

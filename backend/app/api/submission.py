@@ -32,7 +32,7 @@ from app.clients.redis_client import redis_client
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
 from app.persistence.database import get_db
 from app.middleware.rate_limit import enforce
-from app.services.submission import SubmissionQuery, SubmissionService, SubmitParams
+from app.services.submission import SubmissionDetail, SubmissionQuery, SubmissionService, SubmitParams
 
 router = APIRouter()
 
@@ -57,7 +57,7 @@ async def submission_websocket(
         return
 
     try:
-        await run_in_threadpool(service.get_submission, submission_id, auth.user.id, auth.user.role)
+        detail = await run_in_threadpool(service.get_submission, submission_id, auth.user.id, auth.user.role)
     except PermissionDeniedError:
         await ws.close(code=4003, reason="Forbidden")
         return
@@ -66,14 +66,37 @@ async def submission_websocket(
         return
 
     pubsub = None
+
+    async def send_completed(snapshot: SubmissionDetail) -> bool:
+        if snapshot.status in {"Pending", "Judging", "Compiling"}:
+            return False
+        await ws.send_json({
+            "submission_id": submission_id,
+            "status": snapshot.status,
+            "score": snapshot.score,
+            "output_log": snapshot.log or "",
+        })
+        await ws.close(code=1000, reason="Result delivered")
+        return True
+
+    def refresh_result() -> SubmissionDetail:
+        # 此连接只读；结束旧事务，避免身份映射或 MySQL 快照缓存旧的 Pending 状态。
+        db.rollback()
+        return service.get_submission(submission_id, auth.user.id, auth.user.role)
+
     try:
         await ws.accept()
+        if await send_completed(detail):
+            return
         client = await run_in_threadpool(redis_client.get_client)
         if client is None:
             await ws.close(code=1011, reason="Redis not available")
             return
         pubsub = await run_in_threadpool(client.pubsub)
         await run_in_threadpool(pubsub.subscribe, f"skyoj:submission:{submission_id}")
+        # 订阅建立期间可能已经完成判题，数据库是最终结果的权威来源。
+        if await send_completed(await run_in_threadpool(refresh_result)):
+            return
 
         async with anyio.create_task_group() as tasks:
             async def watch_disconnect():
@@ -94,6 +117,8 @@ async def submission_websocket(
                         if msg and msg["type"] == "message":
                             await ws.send_text(msg["data"])
                             break
+                        if msg is None and await send_completed(await run_in_threadpool(refresh_result)):
+                            return
                 await ws.close(
                     code=1000,
                     reason="Subscription timed out" if timeout.cancel_called else "Result delivered",
@@ -101,6 +126,8 @@ async def submission_websocket(
             except RedisError:
                 logger.exception("读取提交订阅失败 submission_id={}", submission_id)
                 await ws.close(code=1011, reason="Redis not available")
+            except ResourceNotFoundError:
+                await ws.close(code=4004, reason="Submission not found")
             except WebSocketDisconnect:
                 pass
             finally:
@@ -108,6 +135,8 @@ async def submission_websocket(
     except RedisError:
         logger.exception("建立提交订阅失败 submission_id={}", submission_id)
         await ws.close(code=1011, reason="Redis not available")
+    except ResourceNotFoundError:
+        await ws.close(code=4004, reason="Submission not found")
     except WebSocketDisconnect:
         pass
     finally:

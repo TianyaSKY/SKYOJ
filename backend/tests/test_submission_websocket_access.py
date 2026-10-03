@@ -41,6 +41,7 @@ def test_owner_and_teacher_can_receive_submission_result(
     client, db_session, student_user, teacher_user, sample_problem, redis_subscription, teacher
 ):
     record = SubmissionRepository(db_session).create(student_user.id, sample_problem.id, None, 'python', 'code')
+    db_session.commit()
     user = teacher_user if teacher else student_user
     token = encode_auth_token(user.id, user.role)
     with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}') as websocket:
@@ -58,6 +59,40 @@ def test_missing_submission_is_rejected_before_redis(
             pass
     assert error.value.code == 4004
     redis_subscription[0].pubsub.assert_not_called()
+
+
+def test_already_completed_result_is_delivered_without_redis(
+    client, db_session, student_user, sample_problem, redis_subscription
+):
+    repo = SubmissionRepository(db_session)
+    record = repo.create(student_user.id, sample_problem.id, None, 'python', 'code')
+    repo.update_result(record.id, status='Accepted', score=100, output_log='完成')
+    db_session.commit()
+    token = encode_auth_token(student_user.id, 'student')
+    with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}') as websocket:
+        assert websocket.receive_json() == {
+            'submission_id': record.id, 'status': 'Accepted', 'score': 100, 'output_log': '完成',
+        }
+    redis_subscription[0].pubsub.assert_not_called()
+
+
+def test_result_completed_during_subscription_is_delivered_from_database(
+    client, db_session, student_user, sample_problem, redis_subscription
+):
+    repo = SubmissionRepository(db_session)
+    record = repo.create(student_user.id, sample_problem.id, None, 'python', 'code')
+    db_session.commit()
+
+    def complete(*args):
+        repo.update_result(record.id, status='Wrong Answer', score=0, output_log='判题完成')
+        db_session.commit()
+
+    redis_subscription[1].subscribe.side_effect = complete
+    token = encode_auth_token(student_user.id, 'student')
+    with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}') as websocket:
+        assert websocket.receive_json()['status'] == 'Wrong Answer'
+    redis_subscription[1].get_message.assert_not_called()
+    redis_subscription[1].close.assert_called_once()
 
 
 def test_token_for_nonexistent_user_is_rejected_before_redis(client, redis_subscription):
