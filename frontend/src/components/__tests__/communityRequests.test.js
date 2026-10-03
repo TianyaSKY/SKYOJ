@@ -69,6 +69,7 @@ describe('社区组件的 API 请求路径', () => {
   it('挂标签和移除标签也只添加一次 API 前缀', async () => {
     wrapper = shallowMount(TagPanel, mountOptions)
     await flushPromises()
+    wrapper.vm.openAttach()
     wrapper.vm.selectedTagId = 7
     await wrapper.vm.confirmAttach()
     await wrapper.vm.detach({id: 7, name: '数组'})

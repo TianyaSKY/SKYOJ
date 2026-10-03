@@ -22,10 +22,14 @@ const attached = ref([])        // 当前题目已贴标签
 const all = ref([])              // 全站标签
 const attachDialogVisible = ref(false)
 const selectedTagId = ref(null)
+const submittingAttach = ref(false)
+let attachVersion = 0
 let scopeVersion = 0
 let loadVersion = 0
 let disposed = false
 const isCurrentScope = version => !disposed && version === scopeVersion
+const isCurrentAttach = (scope, version) =>
+  isCurrentScope(scope) && version === attachVersion && attachDialogVisible.value
 
 const userStore = useUserStore()
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
@@ -58,32 +62,48 @@ watch(() => props.problemId, () => {
   attachDialogVisible.value = false
   load()
 }, { immediate: true })
+watch(attachDialogVisible, visible => {
+  if (!visible) {
+    attachVersion += 1
+    submittingAttach.value = false
+  }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
 
 function openAttach () {
+  attachVersion += 1
+  submittingAttach.value = false
   selectedTagId.value = null
   attachDialogVisible.value = true
 }
 
 async function confirmAttach () {
+  if (!attachDialogVisible.value || submittingAttach.value) return
   const scope = scopeVersion
+  const version = attachVersion
+  const approved = isTeacher.value
   const problemId = props.problemId
   if (!selectedTagId.value) {
     ElMessage.warning('请选择标签')
     return
   }
+  submittingAttach.value = true
   try {
     await request({
       url: `/tags/problems/${problemId}/attach`,
       method: 'post',
-      data: { tag_id: selectedTagId.value, approved: isTeacher.value }
+      data: { tag_id: selectedTagId.value, approved }
     })
     if (!isCurrentScope(scope)) return
-    ElMessage.success(isTeacher.value ? '标签已挂上' : '已提交建议，等待教师审核')
-    attachDialogVisible.value = false
+    // 已生效的操作刷新标签列表，但不影响后来打开的窗口。
     load()
+    if (!isCurrentAttach(scope, version)) return
+    ElMessage.success(approved ? '标签已挂上' : '已提交建议，等待教师审核')
+    attachDialogVisible.value = false
   } catch (e) {
-    if (isCurrentScope(scope)) ElMessage.error(e.message || '操作失败')
+    if (isCurrentAttach(scope, version)) ElMessage.error(e.message || '操作失败')
+  } finally {
+    if (isCurrentAttach(scope, version)) submittingAttach.value = false
   }
 }
 
@@ -142,7 +162,7 @@ async function detach (tag) {
       </el-form>
       <template #footer>
         <el-button @click="attachDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmAttach">提交</el-button>
+        <el-button type="primary" :loading="submittingAttach" :disabled="submittingAttach" @click="confirmAttach">提交</el-button>
       </template>
     </el-dialog>
   </div>

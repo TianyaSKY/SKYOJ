@@ -55,6 +55,7 @@ it('旧挂标签请求完成不能关闭新题目的添加窗口', async () => {
   const attach = deferred()
   request.mockImplementation(config => config.method === 'post' ? attach.promise : Promise.resolve([]))
   mountPage(); await flushPromises()
+  wrapper.vm.openAttach()
   wrapper.vm.selectedTagId = 3
   const mutation = wrapper.vm.confirmAttach()
   await wrapper.setProps({ problemId: 2 }); await flushPromises()
@@ -73,4 +74,59 @@ it('卸载后标签请求失败不弹出错误', async () => {
   wrapper.unmount(); wrapper = undefined
   response.reject(new Error('gone')); await flushPromises()
   expect(ElMessage.error).not.toHaveBeenCalled()
+})
+
+it('标签提交期间重复点击只发送一次请求', async () => {
+  const attach = deferred()
+  request.mockImplementation(config => config.method === 'post' ? attach.promise : Promise.resolve([]))
+  mountPage(); await flushPromises()
+  wrapper.vm.openAttach(); wrapper.vm.selectedTagId = 3
+  const first = wrapper.vm.confirmAttach(), second = wrapper.vm.confirmAttach()
+  expect(wrapper.vm.submittingAttach).toBe(true)
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(1)
+  attach.resolve({}); await Promise.all([first, second])
+  expect(wrapper.vm.submittingAttach).toBe(false)
+  expect(wrapper.vm.attachDialogVisible).toBe(false)
+})
+it('同一题目的旧提交成功不能关闭新添加窗口', async () => {
+  const attach = deferred()
+  request.mockImplementation(config => config.method === 'post' ? attach.promise : Promise.resolve([]))
+  mountPage(); await flushPromises()
+  wrapper.vm.openAttach(); wrapper.vm.selectedTagId = 3
+  const first = wrapper.vm.confirmAttach()
+  wrapper.vm.attachDialogVisible = false
+  wrapper.vm.openAttach(); wrapper.vm.selectedTagId = 4
+  attach.resolve({}); await first
+  expect(wrapper.vm.attachDialogVisible).toBe(true)
+  expect(wrapper.vm.selectedTagId).toBe(4)
+  expect(ElMessage.success).not.toHaveBeenCalled()
+  expect(request.mock.calls.filter(([config]) => config.url === '/tags/problems/1')).toHaveLength(2)
+})
+it('旧提交失败不能解除新窗口提交状态或显示错误', async () => {
+  const old = deferred(), current = deferred()
+  request.mockImplementation(config => config.method === 'post' ? (config.data.tag_id === 3 ? old.promise : current.promise) : Promise.resolve([]))
+  mountPage(); await flushPromises()
+  wrapper.vm.openAttach(); wrapper.vm.selectedTagId = 3
+  const first = wrapper.vm.confirmAttach()
+  wrapper.vm.attachDialogVisible = false
+  wrapper.vm.openAttach(); wrapper.vm.selectedTagId = 4
+  const second = wrapper.vm.confirmAttach()
+  old.reject(new Error('old failed')); await first
+  expect(wrapper.vm.submittingAttach).toBe(true)
+  expect(ElMessage.error).not.toHaveBeenCalled()
+  current.resolve({}); await second
+  expect(wrapper.vm.submittingAttach).toBe(false)
+  expect(wrapper.vm.attachDialogVisible).toBe(false)
+})
+it('当前提交失败保留选择并允许重试，关闭窗口后不发送请求', async () => {
+  mountPage(); await flushPromises()
+  request.mockRejectedValueOnce(new Error('failed')).mockResolvedValue([])
+  wrapper.vm.openAttach(); wrapper.vm.selectedTagId = 3
+  await wrapper.vm.confirmAttach()
+  expect(wrapper.vm.selectedTagId).toBe(3)
+  expect(wrapper.vm.submittingAttach).toBe(false)
+  expect(wrapper.vm.attachDialogVisible).toBe(true)
+  await wrapper.vm.confirmAttach()
+  await wrapper.vm.confirmAttach()
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(2)
 })
