@@ -409,8 +409,23 @@ class ProblemCommunityRepository:
                 selectinload(ProblemSolution.favorites),
             )
             .filter(ProblemSolution.id == solution_id)
+            .populate_existing()
             .first()
         )
+
+    def get_solution_for_update(
+        self, solution_id: int
+    ) -> Optional[ProblemSolutionRecord]:
+        """锁定题解行，串行化同一题解的关系切换；保持更新时间不变。"""
+        # 无值变化的 UPDATE 在 MySQL 和 SQLite 都持有写锁，避免 SQLite 忽略 FOR UPDATE。
+        self._db.query(ProblemSolution).filter(ProblemSolution.id == solution_id).update(
+            {
+                ProblemSolution.id: ProblemSolution.id,
+                ProblemSolution.updated_at: ProblemSolution.updated_at,
+            },
+            synchronize_session=False,
+        )
+        return self.get_solution_by_id(solution_id)
 
     def list_solutions(
         self,
@@ -452,6 +467,8 @@ class ProblemCommunityRepository:
                 ProblemSolutionLike.solution_id == solution_id,
                 ProblemSolutionLike.user_id == user_id,
             )
+            .with_for_update()
+            .populate_existing()
             .first()
         )
 
@@ -488,6 +505,8 @@ class ProblemCommunityRepository:
                 ProblemSolutionFavorite.solution_id == solution_id,
                 ProblemSolutionFavorite.user_id == user_id,
             )
+            .with_for_update()
+            .populate_existing()
             .first()
         )
 

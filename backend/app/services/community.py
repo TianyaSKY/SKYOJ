@@ -234,7 +234,7 @@ class SolutionService:
 
     def toggle_like(self, solution_id: int, user_id: int) -> ToggleLikeResult:
         with self._uow.transaction():
-            solution = self._repo.get_solution_by_id(solution_id)
+            solution = self._repo.get_solution_for_update(solution_id)
             if solution is None or solution.status == "hidden":
                 raise ResourceNotFoundError("题解不存在")
             existing = self._repo.get_like(solution_id, user_id)
@@ -254,7 +254,7 @@ class SolutionService:
 
     def toggle_favorite(self, solution_id: int, user_id: int) -> ToggleFavoriteResult:
         with self._uow.transaction():
-            solution = self._repo.get_solution_by_id(solution_id)
+            solution = self._repo.get_solution_for_update(solution_id)
             if solution is None or solution.status == "hidden":
                 raise ResourceNotFoundError("题解不存在")
             existing = self._repo.get_favorite(solution_id, user_id)

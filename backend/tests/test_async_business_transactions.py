@@ -233,3 +233,43 @@ def test_csv_attachment_follows_submission_transaction(
         assert list((tmp_path / 'submissions').rglob('answer.csv')) == [previous]
         assert list((tmp_path / 'submissions').iterdir()) == [previous.parent]
     assert previous.read_bytes() == b'previous'
+
+@pytest.mark.parametrize('kind', ['like', 'favorite'])
+@pytest.mark.parametrize('initially_active', [False, True])
+def test_overlapping_reaction_toggles_are_serialized(kind, initially_active, business_database):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from app.persistence.community import ProblemCommunityRepository, ProblemSolution, ProblemSolutionLike, ProblemSolutionFavorite
+    from app.services.community import SolutionService, CreateSolutionParams
+
+    db, engine = business_database
+    repo = ProblemCommunityRepository(db)
+    service = SolutionService(repo, uow=UnitOfWork(db))
+    created = service.create(CreateSolutionParams(1, 1, '题解', '正文'))
+    solution_id = created.id
+    if initially_active:
+        (service.toggle_like if kind == 'like' else service.toggle_favorite)(solution_id, 1)
+    barrier = Barrier(2)
+
+    def toggle():
+        with Session(engine) as session:
+            repository = ProblemCommunityRepository(session)
+            original = repository.get_solution_for_update
+
+            def synchronized_lock(identifier):
+                barrier.wait(timeout=5)
+                return original(identifier)
+
+            repository.get_solution_for_update = synchronized_lock
+            worker = SolutionService(repository, uow=UnitOfWork(session))
+            result = (worker.toggle_like if kind == 'like' else worker.toggle_favorite)(solution_id, 1)
+            return result.liked if kind == 'like' else result.favorited
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        futures = [workers.submit(toggle) for _ in range(2)]
+        assert sorted(future.result(timeout=10) for future in futures) == [False, True]
+    with Session(engine) as observer:
+        current = observer.get(ProblemSolution, solution_id)
+        model = ProblemSolutionLike if kind == 'like' else ProblemSolutionFavorite
+        assert observer.query(model).count() == int(initially_active)
+        assert (current.vote_count if kind == 'like' else current.favorite_count) == int(initially_active)
