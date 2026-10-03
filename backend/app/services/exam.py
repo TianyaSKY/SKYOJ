@@ -14,7 +14,7 @@ from app.core.errors import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
-from app.core.time import utcnow
+from app.core.time import to_utc_naive, utcnow
 from app.persistence.exam import ExamProblemRecord, ExamRecord, ExamRepository
 from app.persistence.unit_of_work import UnitOfWork
 from loguru import logger
@@ -271,12 +271,14 @@ class ExamService:
 
     def create_exam(self, requester_role: str, params: CreateExamParams) -> ExamDetail:
         self._require_teacher(requester_role)
-        self._validate_times(params.start_time, params.end_time)
+        start_time = to_utc_naive(params.start_time)
+        end_time = to_utc_naive(params.end_time)
+        self._validate_times(start_time, end_time)
         exam = self._repository.create(
             title=params.title,
             description=params.description,
-            start_time=params.start_time,
-            end_time=params.end_time,
+            start_time=start_time,
+            end_time=end_time,
             contest_type=params.contest_type,
             freeze_minutes=params.freeze_minutes,
             password=self._hash_password(params.password),
@@ -362,16 +364,18 @@ class ExamService:
     ) -> ExamDetail:
         self._require_teacher(requester_role)
         exam = self._require_exam(exam_id)
-        start_time = (
+        start_time = to_utc_naive(
             params.start_time if params.start_time is not None else exam.start_time
         )
-        end_time = params.end_time if params.end_time is not None else exam.end_time
+        end_time = to_utc_naive(
+            params.end_time if params.end_time is not None else exam.end_time
+        )
         self._validate_times(start_time, end_time)
         for field, value in (
             ("title", params.title),
             ("description", params.description),
-            ("start_time", params.start_time),
-            ("end_time", params.end_time),
+            ("start_time", start_time),
+            ("end_time", end_time),
             ("is_visible", params.is_visible),
             ("contest_type", params.contest_type),
             ("freeze_minutes", params.freeze_minutes),

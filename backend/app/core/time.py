@@ -8,4 +8,11 @@ def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-__all__ = ["utcnow"]
+def to_utc_naive(value: datetime) -> datetime:
+    """将带时区时间转换为数据库使用的 UTC；无时区时间沿用现有 UTC 约定。"""
+    if value.tzinfo is not None:
+        return value.astimezone(UTC).replace(tzinfo=None)
+    return value
+
+
+__all__ = ["utcnow", "to_utc_naive"]

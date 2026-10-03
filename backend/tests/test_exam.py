@@ -5,6 +5,32 @@ import datetime
 import pytest
 
 
+def test_exam_api_normalizes_timezone_and_accepts_partial_updates(client, teacher_token):
+    """带时区的请求和无时区的数据库时间使用同一 UTC 时间轴。"""
+    headers = {"Authorization": f"Bearer {teacher_token}"}
+    created = client.post(
+        "/api/exams/",
+        headers=headers,
+        json={
+            "title": "时区考试",
+            "start_time": "2026-01-01T17:00:00+08:00",
+            "end_time": "2026-01-01T11:00:00",
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["start_time"] == "2026-01-01T09:00:00"
+    assert created.json()["end_time"] == "2026-01-01T11:00:00"
+
+    updated = client.put(
+        f"/api/exams/{created.json()['id']}",
+        headers=headers,
+        json={"end_time": "2026-01-01T07:00:00-05:00"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["start_time"] == "2026-01-01T09:00:00"
+    assert updated.json()["end_time"] == "2026-01-01T12:00:00"
+
+
 class TestExamCRUD:
     def test_create_exam_requires_teacher(self, client, student_token):
         resp = client.post(

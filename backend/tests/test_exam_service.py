@@ -10,7 +10,14 @@ from app.persistence.problem import Problem
 from app.persistence.submission import Submission
 from app.persistence.unit_of_work import UnitOfWork
 from app.persistence.user import User
-from app.services.exam import AddExamProblemParams, ExamService, UpdateExamParams
+from app.core.errors import InvalidStateError
+from app.services.exam import (
+    AddExamProblemParams,
+    CreateExamParams,
+    EnterExamParams,
+    ExamService,
+    UpdateExamParams,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -293,3 +300,74 @@ def test_latest_submission_breaks_timestamp_ties_by_id(seeded):
     _, rows = seeded["service"].score_rows("teacher", old.exam_id)
     alice_row = next(row for row in rows if row.user_id == old.user_id)
     assert alice_row.scores == [0.0, 100.0]
+
+
+@pytest.mark.parametrize(
+    "start,end",
+    [
+        ("2026-01-01T17:00:00+08:00", "2026-01-01T06:00:00-05:00"),
+        ("2026-01-01T17:00:00+08:00", "2026-01-01T11:00:00"),
+        ("2026-01-01T09:00:00", "2026-01-01T19:00:00+08:00"),
+    ],
+)
+def test_create_exam_normalizes_timezones_before_validation_and_storage(
+    seeded, monkeypatch, start, end
+):
+    service = seeded["service"]
+    detail = service.create_exam(
+        "teacher",
+        CreateExamParams(
+            title="带时区考试",
+            description="",
+            start_time=datetime.fromisoformat(start),
+            end_time=datetime.fromisoformat(end),
+            created_by=seeded["teacher"].id,
+            is_visible=True,
+        ),
+    )
+    assert detail.start_time == T0
+    assert detail.end_time == T0 + timedelta(hours=2)
+    stored = seeded["repository"].get_by_id(detail.id)
+    assert stored.start_time == T0
+    assert stored.end_time == T0 + timedelta(hours=2)
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + timedelta(minutes=30))
+    assert (
+        service.enter_exam("student", seeded["alice"].id, -1, EnterExamParams(detail.id))
+        == detail.id
+    )
+
+
+@pytest.mark.parametrize(
+    "params,expected_start,expected_end",
+    [
+        (
+            UpdateExamParams(start_time=datetime.fromisoformat("2026-01-01T18:00:00+08:00")),
+            T0 + timedelta(hours=1),
+            T0 + timedelta(hours=2),
+        ),
+        (
+            UpdateExamParams(end_time=datetime.fromisoformat("2026-01-01T20:00:00+08:00")),
+            T0,
+            T0 + timedelta(hours=3),
+        ),
+    ],
+)
+def test_partial_exam_update_accepts_timezone(seeded, params, expected_start, expected_end):
+    detail = seeded["service"].update_exam("teacher", seeded["exam"].id, params)
+    assert detail.start_time == expected_start
+    assert detail.end_time == expected_end
+    stored = seeded["repository"].get_by_id(detail.id)
+    assert stored.start_time == expected_start
+    assert stored.end_time == expected_end
+
+
+@pytest.mark.parametrize("end", ["2026-01-01T09:00:00", "2026-01-01T08:00:00Z"])
+def test_timezone_update_rejects_equal_or_reversed_times_without_persisting(seeded, end):
+    exam_id = seeded["exam"].id
+    with pytest.raises(InvalidStateError, match="考试开始时间必须早于结束时间"):
+        seeded["service"].update_exam(
+            "teacher", exam_id, UpdateExamParams(end_time=datetime.fromisoformat(end))
+        )
+    stored = seeded["repository"].get_by_id(exam_id)
+    assert stored.start_time == T0
+    assert stored.end_time == T0 + timedelta(hours=2)
