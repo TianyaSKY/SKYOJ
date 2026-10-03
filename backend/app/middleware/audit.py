@@ -1,7 +1,7 @@
 """审计中间件：自动记录所有写操作（POST/PUT/DELETE/PATCH）的请求和响应摘要。"""
 
 import json
-from datetime import datetime
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 from loguru import logger
@@ -13,6 +13,31 @@ from app.persistence.system import AuditLog
 
 
 _AUDITED_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
+_REDACTED = "<redacted>"
+_SENSITIVE_KEYS = {
+    "password", "passwordhash", "passwd", "token", "accesstoken", "refreshtoken",
+    "apikey", "secret", "secretkey", "clientsecret", "authorization", "cookie", "setcookie",
+}
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """统一大小写和命名分隔符，识别常见凭据字段。"""
+    normalized = "".join(char for char in key.casefold() if char.isalnum())
+    return normalized in _SENSITIVE_KEYS or normalized.endswith(
+        ("password", "apikey", "secretkey", "accesstoken", "refreshtoken")
+    )
+
+
+def _redact_payload(value: object) -> object:
+    """递归遮蔽结构化请求中的凭据字段，保留普通业务上下文。"""
+    if isinstance(value, dict):
+        return {
+            key: _REDACTED if _is_sensitive_key(key) else _redact_payload(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_payload(item) for item in value]
+    return value
 
 
 def _resolve_user_id_from_state(request: Request) -> int | None:
@@ -31,15 +56,30 @@ def _summarize_payload(payload: bytes, content_type: str) -> str | None:
     """提取请求体摘要，避免直接存储大字段或敏感信息。"""
     if not payload:
         return None
-    if "multipart/form-data" in content_type:
+    media_type = content_type.split(";", 1)[0].strip().casefold()
+    if media_type == "multipart/form-data":
         return "<multipart>"
     try:
         text = payload.decode("utf-8")
-        if len(text) > 1024:
-            return text[:1024] + "..."
-        return text
     except UnicodeDecodeError:
         return "<binary>"
+    if media_type == "application/x-www-form-urlencoded":
+        text = urlencode([
+            (key, _REDACTED if _is_sensitive_key(key) else value)
+            for key, value in parse_qsl(text, keep_blank_values=True)
+        ])
+    elif not media_type or media_type == "application/json" or media_type.endswith("+json"):
+        try:
+            parsed = json.loads(text)
+            if not isinstance(parsed, (dict, list)):
+                return "<json>"
+            text = json.dumps(_redact_payload(parsed), ensure_ascii=False)
+        except (ValueError, RecursionError):
+            return "<invalid-json>"
+    else:
+        return "<text>"
+    # 完成遮蔽后再截断，避免凭据被原样写入摘要前段。
+    return text[:1024] + "..." if len(text) > 1024 else text
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
