@@ -134,7 +134,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
 import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
@@ -150,6 +150,8 @@ const searchQuery = ref('')
 const typeFilter = ref('')
 const tagFilter = ref('')
 const allTags = ref([])
+let requestVersion = 0
+let disposed = false
 
 const capitalize = (str) => {
   if (!str) return ''
@@ -173,24 +175,30 @@ const getTypeTag = (type) => {
 const handleSearch = async () => {
   if (!searchQuery.value) {
     searchResults.value = []
-    fetchProblems()
+    await fetchProblems()
     return
   }
+  const version = ++requestVersion
+  const query = searchQuery.value
+  const isCurrent = () => !disposed && version === requestVersion && query === searchQuery.value
   loading.value = true
   try {
     const data = await searchProblems({
-      query: searchQuery.value,
+      query,
       top_k: 50
     })
+    if (!isCurrent()) return
     searchResults.value = data
     // 更新总数，使分页组件显示正确的搜索结果数量
     total.value = data.length
     currentPage.value = 1
   } catch (error) {
-    console.error(error)
-    ElMessage.error('搜索失败')
+    if (isCurrent()) {
+      console.error(error)
+      ElMessage.error('搜索失败')
+    }
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
 
@@ -207,20 +215,26 @@ const filteredProblems = computed(() => {
 
 let debounceTimer = null
 watch(searchQuery, (newVal) => {
+  requestVersion += 1
+  searchResults.value = []
+  total.value = 0
   if (debounceTimer) clearTimeout(debounceTimer)
   if (newVal) {
     loading.value = true
     debounceTimer = setTimeout(() => {
+      debounceTimer = null
       handleSearch()
     }, 500)
   } else {
     searchResults.value = []
     fetchProblems()
-    loading.value = false
   }
 })
 
 const fetchProblems = async () => {
+  if (disposed || searchQuery.value) return
+  const version = ++requestVersion
+  const isCurrent = () => !disposed && version === requestVersion && !searchQuery.value
   loading.value = true
   try {
     const params = {
@@ -231,6 +245,7 @@ const fetchProblems = async () => {
       params.tag_id = tagFilter.value
     }
     const res = await getProblemList(params)
+    if (!isCurrent()) return
     if (res.problems) {
       problems.value = res.problems
       total.value = res.total
@@ -239,17 +254,19 @@ const fetchProblems = async () => {
       total.value = res.length
     }
   } catch (error) {
-    console.error(error)
-    ElMessage.error('获取题目列表失败')
+    if (isCurrent()) {
+      console.error(error)
+      ElMessage.error('获取题目列表失败')
+    }
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
 
 const fetchTags = async () => {
   try {
     const res = await request({ url: '/tags', method: 'get' })
-    allTags.value = res || []
+    if (!disposed) allTags.value = res || []
   } catch {
     // 标签加载失败不影响题目列表
   }
@@ -270,6 +287,12 @@ const handleCurrentChange = (val) => {
   currentPage.value = val
   fetchProblems()
 }
+
+onBeforeUnmount(() => {
+  disposed = true
+  requestVersion += 1
+  if (debounceTimer !== null) clearTimeout(debounceTimer)
+})
 
 onMounted(() => {
   fetchTags()
