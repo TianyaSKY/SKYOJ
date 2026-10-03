@@ -244,7 +244,7 @@
 </template>
 
 <script setup>
-import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {computed, inject, onBeforeUnmount, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {getProblemDetail, submitSolution} from '@/api/problem'
 import {debugSolution} from '@/api/debug'
@@ -262,10 +262,14 @@ import {renderMarkdown} from '@/utils/markdown'
 const route = useRoute()
 const router = useRouter()
 const setAnswerWorkspaceActive = inject('setAnswerWorkspaceActive', null)
-const problemId = route.params.id
+const problemId = computed(() => route.params.id)
+let pageVersion = 0
+let disposed = false
+const problemLoaded = ref(false)
+const isCurrentPage = version => !disposed && version === pageVersion
 const examId = computed(() => route.query.exam_id)
 
-const problem = ref({
+const emptyProblem = () => ({
   id: '',
   title: 'Loading...',
   content: '',
@@ -274,6 +278,7 @@ const problem = ref({
   type: '',
   language: ''
 })
+const problem = ref(emptyProblem())
 
 const language = ref('python')
 const code = ref('')
@@ -295,20 +300,24 @@ function clearRealtimeWS() {
 }
 
 function startRealtimeWait(submissionId) {
+  const version = pageVersion
   clearRealtimeWS()
   realtimeResult.value = null
   realtimeStatus.value = 'pending'
   const token = localStorage.getItem('token') || ''
   activeWS = createSubmissionWS(submissionId, token, {
     onMessage: (data) => {
+      if (!isCurrentPage(version)) return
       realtimeResult.value = data
       realtimeStatus.value = 'received'
       ElMessage.success(`判题完成：${data.status || ''} (${(data.score ?? 0).toFixed(1)} 分)`)
     },
     onError: () => {
+      if (!isCurrentPage(version)) return
       realtimeStatus.value = 'closed'
     },
     onClose: () => {
+      if (!isCurrentPage(version)) return
       realtimeStatus.value = 'closed'
     },
   })
@@ -408,18 +417,21 @@ watch(language, (newLang) => {
 
 const renderedContent = computed(() => renderMarkdown(problem.value.content))
 
-const fetchProblem = async () => {
+const fetchProblem = async (version) => {
   try {
-    const data = await getProblemDetail(problemId)
+    const data = await getProblemDetail(problemId.value)
+    if (!isCurrentPage(version)) return
     if (data) {
       problem.value = data
       // Set default language from allowed list
       if (availableLanguageOptions.value.length > 0) {
         language.value = availableLanguageOptions.value[0].value
       }
+      code.value = templates[language.value] || ''
+      problemLoaded.value = true
     }
   } catch (error) {
-    ElMessage.error('Failed to load problem')
+    if (isCurrentPage(version)) ElMessage.error('Failed to load problem')
   }
 }
 
@@ -429,6 +441,8 @@ const backToExam = () => {
 
 // Standard Submission
 const handleSubmit = async () => {
+  if (!problemLoaded.value || submitting.value) return
+  const version = pageVersion
   if (!code.value.trim()) {
     ElMessage.warning('Code cannot be empty')
     return
@@ -437,17 +451,18 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     const res = await submitSolution({
-      problem_id: parseInt(problemId),
+      problem_id: parseInt(problemId.value),
       code: code.value,
       language: language.value,
       exam_id: examId.value || -1
     })
+    if (!isCurrentPage(version)) return
     ElMessage.success('Submission received!')
     startRealtimeWait(res.submission_id)
   } catch (error) {
-    ElMessage.error('Submission failed')
+    if (isCurrentPage(version)) ElMessage.error('Submission failed')
   } finally {
-    submitting.value = false
+    if (isCurrentPage(version)) submitting.value = false
   }
 }
 
@@ -460,6 +475,8 @@ const goToSubmissionDetail = () => {
 
 // Debug Run（仅 ACM 题目，不计入成绩，仅跑第一个测试点）
 const handleDebug = async () => {
+  if (!problemLoaded.value || debugging.value) return
+  const version = pageVersion
   if (!isAcm.value) {
     ElMessage.warning('仅 ACM 类型题目支持调试运行')
     return
@@ -472,17 +489,18 @@ const handleDebug = async () => {
   debugging.value = true
   try {
     const res = await debugSolution({
-      problem_id: parseInt(problemId),
+      problem_id: parseInt(problemId.value),
       code: code.value,
       language: language.value,
       exam_id: examId.value || -1
     })
+    if (!isCurrentPage(version)) return
     debugRunId.value = res.debug_run_id
     debugDrawerVisible.value = true
   } catch (error) {
-    ElMessage.error('调试运行失败')
+    if (isCurrentPage(version)) ElMessage.error('调试运行失败')
   } finally {
-    debugging.value = false
+    if (isCurrentPage(version)) debugging.value = false
   }
 }
 
@@ -502,6 +520,8 @@ const handleFileRemove = () => {
 
 // Kaggle Submission
 const handleSubmitKaggle = async () => {
+  if (!problemLoaded.value || submitting.value) return
+  const version = pageVersion
   if (!selectedFile.value) {
     ElMessage.warning('Please select a CSV file')
     return
@@ -515,27 +535,44 @@ const handleSubmitKaggle = async () => {
   submitting.value = true
   try {
     const formData = new FormData()
-    formData.append('problem_id', problemId)
+    formData.append('problem_id', problemId.value)
     formData.append('file', selectedFile.value)
     formData.append('code', 'Kaggle Submission')
     formData.append('language', 'csv')
     formData.append('exam_id', examId.value || -1)
 
     const res = await submitSolution(formData)
+    if (!isCurrentPage(version)) return
     ElMessage.success('File uploaded successfully!')
     startRealtimeWait(res.submission_id)
   } catch (error) {
-    ElMessage.error('Upload failed')
+    if (isCurrentPage(version)) ElMessage.error('Upload failed')
   } finally {
-    submitting.value = false
+    if (isCurrentPage(version)) submitting.value = false
   }
 }
 
-onMounted(() => {
-  fetchProblem()
-})
+// 路由复用时清除旧题目状态，并使未完成的请求和订阅回调失效。
+watch(() => [problemId.value, examId.value], () => {
+  const version = ++pageVersion
+  clearRealtimeWS()
+  problemLoaded.value = false
+  problem.value = emptyProblem()
+  code.value = ''
+  selectedFile.value = null
+  fileList.value = []
+  submitting.value = false
+  debugging.value = false
+  debugRunId.value = null
+  debugDrawerVisible.value = false
+  realtimeResult.value = null
+  realtimeStatus.value = 'idle'
+  fetchProblem(version)
+}, {immediate: true})
 
 onBeforeUnmount(() => {
+  disposed = true
+  pageVersion += 1
   setAnswerWorkspaceActive?.(false)
   clearRealtimeWS()
 })
