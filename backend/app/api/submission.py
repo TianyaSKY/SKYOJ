@@ -1,6 +1,5 @@
 from typing import Optional
 
-import jwt
 from fastapi import (
     APIRouter,
     Depends,
@@ -15,6 +14,7 @@ from fastapi import (
 )
 from loguru import logger
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
 from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_submission_service
@@ -25,7 +25,8 @@ from app.api.schemas.submission import (
     SubmitCodeResponse,
 )
 from app.clients.redis_client import redis_client
-from app.core.config import SECRET_KEY
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.persistence.database import get_db
 from app.middleware.rate_limit import enforce
 from app.services.submission import SubmissionQuery, SubmissionService, SubmitParams
 
@@ -37,16 +38,27 @@ async def submission_websocket(
     ws: WebSocket,
     submission_id: int,
     token: str = Query(...),
+    db: Session = Depends(get_db),
+    service: SubmissionService = Depends(get_submission_service),
 ):
     """实时推送提交判题结果。
 
-    鉴权：token 放在 query 参数中。
+    鉴权：token 放在 query 参数中，按当前用户身份校验提交归属；教师可订阅全部提交。
     推送消息：{"status": "...", "score": 100.0, "output_log": "..."}
     """
     try:
-        jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-    except jwt.PyJWTError:
+        auth = get_current_auth(authorization=token, db=db)
+    except HTTPException:
         await ws.close(code=4001, reason="Invalid token")
+        return
+
+    try:
+        service.get_submission(submission_id, auth.user.id, auth.user.role)
+    except PermissionDeniedError:
+        await ws.close(code=4003, reason="Forbidden")
+        return
+    except ResourceNotFoundError:
+        await ws.close(code=4004, reason="Submission not found")
         return
 
     client = redis_client.get_client()
