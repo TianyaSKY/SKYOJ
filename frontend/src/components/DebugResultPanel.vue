@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {computed, onBeforeUnmount, ref, watch} from 'vue'
 import {getDebugRun} from '@/api/debug'
 import {ElMessage} from 'element-plus'
 
@@ -66,10 +66,10 @@ const props = defineProps({
 const detail = ref(null)
 const loading = ref(false)
 let timer = null
-let pollCount = 0
-const MAX_POLL_ATTEMPTS = 120  // 最多 3 分钟 (120 * 1.5s)
-
-const isFinished = computed(() => detail.value && detail.value.status !== 'Pending')
+let timeoutTimer = null
+let generation = 0
+let disposed = false
+const MAX_POLL_DURATION_MS = 180000  // 每次运行最多等待三分钟
 
 const isWrongAnswer = computed(() => detail.value?.status === 'Wrong Answer')
 
@@ -132,61 +132,75 @@ const statusTagType = computed(() => {
 })
 
 const fetchDebugRun = async (silent = false) => {
-  if (!props.debugRunId) return
+  const currentGeneration = generation
+  const id = props.debugRunId
+  if (!id || disposed) return
   if (!silent) loading.value = true
   try {
-    const data = await getDebugRun(props.debugRunId)
+    const data = await getDebugRun(id)
+    if (disposed || currentGeneration !== generation) return
     detail.value = data
     if (data.status && data.status !== 'Pending') {
       stopPolling()
+    } else {
+      startPolling()
     }
   } catch (err) {
+    if (disposed || currentGeneration !== generation) return
+    console.error('获取调试结果失败', err)
+    ElMessage.error('获取调试结果失败，请稍后重试')
     stopPolling()
   } finally {
-    if (!silent) loading.value = false
+    if (!silent && !disposed && currentGeneration === generation) loading.value = false
   }
 }
 
 const startPolling = () => {
-  if (timer) return
-  pollCount = 0
-  timer = setInterval(() => {
-    pollCount++
+  if (disposed || timer !== null) return
+  // 上次请求完成后再轮询，避免慢请求重叠。
+  timer = setTimeout(() => {
+    timer = null
     fetchDebugRun(true)
-    if (pollCount >= MAX_POLL_ATTEMPTS) {
-      stopPolling()
-      ElMessage.warning('判题超时，请稍后刷新重试')
-    }
   }, 1500)
 }
 
 const stopPolling = () => {
-  if (timer) {
-    clearInterval(timer)
+  if (timer !== null) {
+    clearTimeout(timer)
     timer = null
+  }
+  if (timeoutTimer !== null) {
+    clearTimeout(timeoutTimer)
+    timeoutTimer = null
   }
 }
 
 watch(
     () => props.debugRunId,
     (newId) => {
+      generation++
+      stopPolling()
+      detail.value = null
+      loading.value = false
       if (newId) {
-        stopPolling()
-        detail.value = null
+        timeoutTimer = setTimeout(() => {
+          generation++
+          stopPolling()
+          loading.value = false
+          ElMessage.warning('判题超时，请稍后刷新重试')
+        }, MAX_POLL_DURATION_MS)
         fetchDebugRun()
-        startPolling()
       }
     },
     {immediate: true}
 )
 
-onMounted(() => {
-  if (props.debugRunId) startPolling()
-})
-
 onBeforeUnmount(() => {
+  disposed = true
+  generation++
   stopPolling()
 })
+
 </script>
 
 <style scoped>
