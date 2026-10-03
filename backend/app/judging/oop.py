@@ -1,5 +1,6 @@
 import os
 import re
+from math import isfinite
 
 from app.judging.sandbox import SandboxRunner, time_limit_seconds
 from app.persistence.problem import ProblemRepository
@@ -175,7 +176,7 @@ def run_oop_judge(submission_id, user_code, problem_id, language="python", db=No
                 try:
                     # 尝试解析最后一行作为分数
                     final_score = float(lines[-1].strip())
-                    if final_score < 0 or final_score > 100:
+                    if not isfinite(final_score) or final_score < 0 or final_score > 100:
                         return (
                             "Runtime Error",
                             0,
