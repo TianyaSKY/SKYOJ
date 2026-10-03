@@ -66,7 +66,12 @@ Breaks the limitations of traditional algorithm problems to meet diverse teachin
 ```text
 SKYOJ/
 ├── backend/                # FastAPI backend business logic
-│   └── app/                # API interfaces and model definitions
+│   └── app/
+│       ├── api/            # HTTP routes and Pydantic schemas
+│       ├── services/       # Business dataclasses and services
+│       ├── persistence/    # Models, repositories and mappings by context
+│       ├── clients/        # External services and file storage
+│       └── core/           # Configuration, errors and shared types
 ├── frontend/               # Vue3 frontend source code
 ├── docker/                 # All Docker configs (single directory)
 │   ├── backend/            # Backend container Dockerfile

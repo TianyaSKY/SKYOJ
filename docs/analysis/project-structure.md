@@ -38,7 +38,7 @@ SKYOJ/
 | 层 | 选型 | 关键证据 |
 |---|---|---|
 | Web 框架 | FastAPI 0.141 | `pyproject.toml:11`、`backend/app/main.py:73` |
-| ORM | SQLAlchemy 2.0 | `pyproject.toml:22`、`backend/app/models/*.py` |
+| ORM | SQLAlchemy 2.0 | `pyproject.toml:22`、`backend/app/persistence/*.py` |
 | 数据库 | MySQL 8.0（测试用 SQLite 内存） | `docker-compose.yml:3`、`backend/tests/conftest.py` |
 | 异步队列 | RabbitMQ + Celery | `docker-compose.yml:30`、`messaging/celery_app.py` |
 | 缓存/限流/PubSub | Redis 7 | `docker-compose.yml:50`、`utils/exam_cache.py`、`utils/realtime.py`、`middleware/rate_limit.py` |
@@ -57,27 +57,27 @@ SKYOJ/
 
 ## 3. 后端分层
 
-后端严格遵循 `AGENTS.md` 规定的 `api / domain / models / repositories / services / clients / tasks / messaging / middleware / utils` 分层，并新增了 `api/schemas/`（Pydantic 校验）、`workers/`（job_recovery）、`mappers.py`（ORM ↔ domain 集中映射）。
+后端业务按 `api / services / persistence / clients` 四类职责组织，保留 `tasks / messaging / middleware / workers / utils` 等运行支持模块。参数与结果 dataclass 已合并到各 Service，ORM、Repository 与映射按上下文合并到 persistence；详细约定见 [架构文档](../architecture.md)。
 
 ### 3.1 关键路径与职责
 
 | 目录/文件 | 职责 |
 |---|---|
-| `app/main.py` | FastAPI 工厂；7 个业务异常映射 401/403/404/400/502/429；挂审计中间件 |
-| `app/api/` | HTTP 路由（11 个模块：auth/dataset/debug/exam/llm/plagiarism/problem/search/submission/sys_dict/user） |
-| `app/api/schemas/` | 各模块的 Pydantic 模型（11 个文件） |
-| `app/domain/` | 业务参数与结果的 dataclass（`@dataclass(frozen=True)`，无 dict/None 滥用） |
-| `app/models/` | SQLAlchemy ORM 模型（13 个表） |
-| `app/mappers.py` | ORM → domain 集中映射（避免散落各处的字段拼装） |
-| `app/repositories/` | 数据访问层（12 个 repository） |
-| `app/services/` | 业务编排（20 个 service），含三个判题模式：`acm.py / oop.py / kaggle.py` |
-| `app/services/sandbox_runner.py` | Docker 沙箱抽象（判题沙箱的所有调用都走这里） |
-| `app/clients/` | 外部服务：`llm_client.py / jplag_client.py / *_storage_client.py` |
-| `app/tasks/` | Celery 任务定义（`base.py` 提供 `run_job` 统一模板） |
-| `app/workers/job_recovery.py` | 兜底：扫描过期租约、重新投递 |
-| `app/messaging/` | Celery app + 队列名 + 任务名常量 |
-| `app/middleware/` | `audit.py` 写操作审计 + `rate_limit.py` Redis 限流 |
-| `app/utils/` | `realtime.py / exam_cache.py / auth_tools.py / api_response.py / sys_dict.py / time.py / files.py / passwords.py` |
+| `app/main.py` | FastAPI 入口、业务异常映射与中间件 |
+| `app/api/` | HTTP 路由、鉴权与依赖装配 |
+| `app/api/schemas/` | Pydantic 输入/输出模型 |
+| `app/services/` | 业务参数、结果与记录快照 dataclass，以及业务编排 |
+| `app/persistence/` | 8 个业务上下文的 ORM、Repository 与映射；注册全部表与关联 |
+| `app/persistence/database.py` | Base、Session 工厂与请求会话 |
+| `app/persistence/unit_of_work.py` | 现有 Service 事务封装 |
+| `app/core/` | 配置、业务异常、时间与 JSON 边界类型 |
+| `app/services/sandbox_runner.py` | Docker 沙箱抽象 |
+| `app/clients/` | LLM、JPlag 与文件存储等外部调用 |
+| `app/tasks/` | Celery 任务定义与 `run_job` 统一执行模板 |
+| `app/workers/job_recovery.py` | 过期租约回收与重新投递 |
+| `app/messaging/` | Celery app、队列名、任务名常量 |
+| `app/middleware/` | 审计与限流 |
+| `app/utils/` | 实时推送、缓存、认证、文件与密码辅助函数 |
 
 ### 3.2 队列与任务
 
@@ -106,7 +106,7 @@ SKYOJ/
 ### 3.4 判题路径
 
 - `api/submission.py:submit_code()` → 限流 10/60s → 写 submission 行 → `AsyncJobService.enqueue_judge_submission`
-- Worker `judge_submission` → `services/judge_service.judge_submission` → 按 `problem.type` 分发：
+- Worker `judge_submission` → `services/judge.judge_submission` → 按 `problem.type` 分发：
   - `acm` → `services/acm.run_acm_judge`（ThreadPoolExecutor，每个测试点独立容器，最多 8 并发）
   - `oop` / `kaggle` → 对应 service
 - 结果写回 DB → 实时推 Redis channel `skyoj:submission:{id}` → 失效考试排行榜缓存 → Accepted 后投递查重任务

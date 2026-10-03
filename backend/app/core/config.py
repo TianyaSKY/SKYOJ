@@ -4,8 +4,8 @@ from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
-BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-PROJECT_ROOT = os.path.abspath(os.path.join(BACKEND_ROOT, ".."))
+BACKEND_ROOT = str(Path(__file__).resolve().parents[2])
+PROJECT_ROOT = str(Path(BACKEND_ROOT).parent)
 
 load_dotenv(Path(PROJECT_ROOT) / ".env", override=False)
 

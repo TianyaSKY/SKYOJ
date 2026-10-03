@@ -153,7 +153,7 @@ LLM_API_KEY / LLM_API_URL / LLM_MODEL_NAME 中任一缺失。
 ### 3.6 错题本不更新
 
 - 判题走 judge-worker，若提交记录是考试内（exam_id != -1）且教师已经导入历史数据，
-  WrongBookService.on_judge_complete() 在 judge_service 末尾执行，
+  WrongBookService.on_judge_complete() 在 judge.py 末尾执行，
   若异常不影响主流程但会记日志。
 - `docker logs skyoj-judge-worker | grep 错题本` 确认。
 

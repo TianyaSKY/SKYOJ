@@ -1,30 +1,57 @@
 # 架构与数据库迁移
 
-HTTP 写请求由 `api/schemas/` 中的 Pydantic 模型校验，并转换成领域 dataclass。Service 返回固定类型的业务结果，API 声明响应模型；文件下载、204 空响应和 SSE 显式使用 `response_model=None`。
+HTTP 写请求由 `api/schemas/` 中的 Pydantic 模型校验，并转换成业务 dataclass。Service 返回固定类型的业务结果，API 声明响应模型；文件下载、204 空响应和 SSE 显式使用 `response_model=None`。
 
 平台统计在 Repository 中使用 SQL 聚合，只将统计行传给 Service。查重查询在 Repository 内完成，Service 不再直接访问 Session 或 ORM 查询。同步 LLM 的仓储由 `api/deps.py` 注入；Worker 在任务入口装配仓储与运行器。
 
 动态系统配置、LLM JSON 和任务载荷使用明确的递归 `JsonValue` 类型。固定统计使用专用 dataclass；动态业务结果使用 `JsonObjectResult` 包装，在 HTTP 或消息边界取出 `payload`。缓存、数据库 JSON 列和外部协议仍允许字典。
 
-## 后端目录收拢（迁移中）
+## 后端目录与依赖
 
-目标保留 `api / services / persistence / clients` 四类角色。新增或迁移的模块不再新增 `domain/*.py`、`models/*.py`、`repositories/*_repository.py` 或全局 mapper；按业务上下文收拢，不改 HTTP 协议或表结构。
+业务代码按 `api / services / persistence / clients` 四类职责组织。业务参数、结果与 Service 放在同一文件；SQLAlchemy 模型、Repository 和数据库映射按业务上下文放在同一持久化文件。
 
-首个样板为数据集：
+```text
+backend/app/
+├── api/                   # HTTP、鉴权入口、Pydantic schemas 与依赖装配
+├── services/              # Params / Result / Record dataclass 与业务编排
+│   ├── problem.py
+│   ├── exam.py
+│   ├── submission.py
+│   ├── user.py
+│   ├── dataset.py
+│   └── ...
+├── persistence/
+│   ├── database.py        # Base、Session 工厂、请求会话
+│   ├── unit_of_work.py    # 现有业务事务封装
+│   ├── problem.py
+│   ├── community.py       # 题解、评论、点赞、收藏、标签
+│   ├── exam.py
+│   ├── submission.py      # 提交、调试运行、查重报告
+│   ├── user.py            # 用户、错题本、搜索历史
+│   ├── dataset.py
+│   ├── jobs.py            # 异步任务与 AI 草稿
+│   └── system.py          # 系统字典与审计日志
+├── clients/               # LLM、文件存储、JPlag 等外部调用
+├── core/                  # config、errors、time、JSON 边界类型
+├── messaging/
+├── tasks/
+├── workers/
+└── middleware/
+```
 
-- `services/dataset.py`：业务参数、结果 dataclass 与 `DatasetService`。
-- `persistence/dataset.py`：`Dataset` ORM、`DatasetRepository` 与数据库映射。
-- `api/dataset.py`、`api/deps.py` 和 File Worker 使用新路径。
+旧的 `domain/`、`models/`、`repositories/`、全局 `mappers.py` 和 `*_service.py` 兼容入口均已删除。新增代码直接使用以上路径；HTTP 协议和数据库表结构保持原有约定，无需新增数据库迁移。
 
-数据集仓储的 `get_by_id/create/mark_ready/mark_failed` 返回不可变 `DatasetRecord` 快照；`list_all` 返回 `DatasetListItem` 列表。Service 不持有 ORM，也不调用 ORM mapper。更新状态后必须使用仓储返回的新快照；直接修改旧快照不会写入数据库。`delete` 接收快照并按其 ID 删除记录。事务继续由现有 Service/UoW 管理。
+Repository 返回明确的 dataclass 快照，包含必要的关联信息，不把 ORM 对象或 Session 传给 Service。公开展示结果由相应 persistence 模块投影，列表、权限检查与 Worker 状态机使用业务类型。快照脱离 Session 后仍可读取；修改快照不会自动写入数据库，必须调用仓储的更新方法。数据集快照为不可变类型；题目、考试和社区的编辑流程使用可修改快照并显式保存。提交判题 JSON 与查重匹配块在快照中复制，避免共享 ORM 的可变 JSON 值。
 
-原有 `domain/dataset.py`、`models/dataset.py`、`repositories/dataset_repository.py`、`services/dataset_service.py` 和全局数据集 mapper 入口只保留兼容导出，类型和 ORM 表注册不会重复。兼容层仅保障旧导入路径，仓储结果已改为上述快照契约。
+`api/deps.py` 为 Service 显式注入所需仓储与 Client，包含题目标签查询所需的社区仓储。社区、错题本服务不再接收 Session；异步任务服务不再提供 `from_session` 工厂，API 与 Worker 使用 `AsyncJobService(AsyncJobRepository(db))` 装配。判题模式由 Worker 传入会话，不再隐式创建额外会话。
 
-其余业务模块尚未迁移。后续逐个收拢 user、problem、submission，再处理 exam 与 community；全部调用方迁移并验证后删除兼容层。数据库连接模块、公共错误和事务方案在后续阶段统一处理。
+`persistence/__init__.py` 统一注册全部 ORM 表与字符串关联。API、Worker、Alembic 与种子脚本均使用同一注册入口；持久化层在构造业务快照时按需导入 Service 中的 dataclass，避免注册表时反向装配业务服务。
 
 ## 事务
 
-Repository 仅执行数据访问和 `flush()`，不调用 `commit()` 或 `rollback()`。Service 通过仓储的 `unit_of_work` 控制业务事务；跨仓储写入使用 `unit_of_work.transaction()`，成功统一提交，异常立即回滚。
+Repository 仅执行数据访问、`flush()` 和必要的 `refresh()`，不调用 `commit()` 或 `rollback()`。Service 通过仓储的 `unit_of_work` 控制业务事务；跨仓储写入使用 `unit_of_work.transaction()`，成功统一提交，异常立即回滚。
+
+请求使用同一个 Session，失败由 `persistence/database.py` 回滚并关闭；成功写入继续由现有 Service/UoW 显式提交。没有改成“请求结束统一 commit”，因为任务发布必须发生在记录提交之后。社区的点赞、收藏、评论和计数更新处于同一业务事务；错题本复习标记先校验归属，再更新。
 
 任务创建记录必须提交后再发布到 RabbitMQ；重试和租约恢复也先持久化状态再发布消息。当前创建提交、草稿、数据集仍保留“先提交业务记录，再创建并发布任务”的原有语义。消息投递失败会撤销任务记录，但业务记录可能已存在；这并非完整的业务记录与消息原子提交，后续若需要这一保证，应引入持久 Outbox。
 
@@ -55,7 +82,7 @@ npm --prefix frontend run test:unit
 npm --prefix frontend run build
 ```
 
-`test_architecture_contracts.py` 检查仓储事务调用、已整改服务的数据库泄漏、Service 公共字典结果及 HTTP 响应模型。任务 JSON 解析被明确视为序列化边界。
+`test_architecture_contracts.py` 检查新目录下的仓储事务调用、Service 的数据库泄漏、公共结果类型、HTTP 响应模型、旧包清理和完整表注册。`test_persistence_boundaries.py` 验证快照及其关联中没有 ORM、脱离 Session 后仍可使用、社区计数与关联写入共同回滚、标签审批更新、错题本访问控制、重复查重更新及请求失败回滚。任务 JSON 解析和缓存序列化属于明确的字典边界。
 
 前端 `auth/problem/exam` Zod 校验对应后端字段长度、枚举和范围；时间先后关系同时由前端改善体验、后端 Service 权威检查。
 
@@ -91,4 +118,8 @@ CI=true npm run test:e2e
 
 失败会真实导致 CI 失败，并上传报告、截图和 trace。此环境覆盖页面与真实 API、数据库交互；Celery 使用内存 broker，未启动判题执行器或外部 LLM，不代表 Docker 判题全链路验证。部分历史用例的断言仍较弱，需要逐步增强，不能把通过数量等同于完整业务覆盖。
 
-判题执行器和社区/错题本仍保留部分历史 Session 装配方式；本次分层检查针对已整改服务，不代表整个仓库已完成所有架构迁移。
+测试夹具使用外层事务与独立保存点，使业务 commit/rollback 不会破坏测试种子或泄漏到下一用例；专门的事务回归使用独立数据库验证真实提交和回滚。
+
+## 本次收拢验证（2026-10-03）
+
+后端 172 项 pytest、前端 31 项单元测试、前端构建、源码编译与 Compose 配置检查通过。与收拢前提交 `7567447` 对比，20 个 ORM 类定义和完整 OpenAPI（65 个 HTTP 路径及全部 schemas）一致。API、全部任务入口、恢复 Worker 与 Celery 注册装配通过；数据库迁移回归覆盖空库、旧库、重复升级和错误传播。未执行真实 MySQL、RabbitMQ、Docker 判题、外部 LLM/JPlag 或完整浏览器端到端链路。

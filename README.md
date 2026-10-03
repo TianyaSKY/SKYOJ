@@ -66,7 +66,12 @@
 ```text
 SKYOJ/
 ├── backend/                # FastAPI 后端业务逻辑
-│   └── app/                # API 接口与模型定义
+│   └── app/
+│       ├── api/            # HTTP 路由与 Pydantic schemas
+│       ├── services/       # 业务 dataclass 与服务
+│       ├── persistence/    # 按业务上下文收拢模型、仓储与映射
+│       ├── clients/        # 外部服务与文件存储
+│       └── core/           # 配置、错误与公共类型
 ├── frontend/               # Vue3 前端源代码
 ├── docker/                 # 全部 Docker 配置（唯一目录）
 │   ├── backend/            # 后端容器 Dockerfile
