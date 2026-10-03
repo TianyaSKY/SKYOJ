@@ -123,7 +123,7 @@
               <el-icon><Refresh /></el-icon>刷新题目状态
             </el-button>
             <el-divider />
-            <el-button class="action-btn" type="danger" plain @click="handleExitExam">
+            <el-button class="action-btn" type="danger" plain :loading="exiting" :disabled="exiting || exitConfirming" @click="handleExitExam">
               <el-icon><SwitchButton /></el-icon>退出考试模式
             </el-button>
           </div>
@@ -151,6 +151,7 @@
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {exitExam, getExamDetail, getMyExamStatus} from '@/api/exam'
+import {useUserStore} from '@/stores/user'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {
   DataAnalysis,
@@ -167,6 +168,7 @@ import { useNow } from '@/composables/useNow'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const examId = route.params.id
 
 const exam = ref({
@@ -183,6 +185,8 @@ const now = useNow()
 const timing = computed(() => getExamTiming(exam.value, now.value))
 const remainingTime = computed(() => timing.value.remainingSeconds)
 let disposed = false
+const exiting = ref(false)
+const exitConfirming = ref(false)
 
 const customColors = [
   { color: '#f56c6c', percentage: 20 },
@@ -251,35 +255,52 @@ watch(() => timing.value.phase, phase => {
   if (phase === 'ended' && !disposed) handleExamEnd()
 })
 
-const handleExamEnd = async () => {
+const handleExamEnd = () => {
+  const token = localStorage.getItem('token')
   ElMessageBox.alert('考试已结束，系统将自动退出考试模式。', '提示', {
     confirmButtonText: '确定',
-    callback: async () => {
-      await performExit()
+    callback: async () => { await performExit(token) }
+  })
+}
+
+const handleExitExam = async () => {
+  if (disposed || exiting.value || exitConfirming.value) return
+  const token = localStorage.getItem('token')
+  exitConfirming.value = true
+  try {
+    await ElMessageBox.confirm('确定要退出考试吗？退出后将无法继续在考试模式下提交。', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await performExit(token)
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close' && !disposed) {
+      console.error('退出考试确认失败', error)
+      ElMessage.error('退出考试确认失败')
     }
-  })
+  } finally {
+    if (!disposed) exitConfirming.value = false
+  }
 }
 
-const handleExitExam = () => {
-  ElMessageBox.confirm('确定要退出考试吗？退出后将无法继续在考试模式下提交。', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    await performExit()
-  })
-}
-
-const performExit = async () => {
+const performExit = async (expectedToken = localStorage.getItem('token')) => {
+  const isCurrentSession = () => !disposed && localStorage.getItem('token') === expectedToken
+  if (exiting.value || !isCurrentSession()) return
+  exiting.value = true
   try {
     const res = await exitExam()
+    if (!isCurrentSession()) return
     if (res.token) {
-      localStorage.setItem('token', res.token)
+      userStore.setToken(res.token)
+      expectedToken = res.token
     }
     ElMessage.success('已退出考试')
-    router.push('/exam')
+    await router.push('/exam')
   } catch (error) {
-    ElMessage.error('退出考试失败')
+    if (isCurrentSession()) ElMessage.error('退出考试失败')
+  } finally {
+    if (!disposed) exiting.value = false
   }
 }
 

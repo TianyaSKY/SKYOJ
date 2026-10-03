@@ -87,6 +87,7 @@
 <script setup>
 import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {enterExam, getExamList} from '@/api/exam'
+import {useUserStore} from '@/stores/user'
 import {ElMessage} from 'element-plus'
 import {useRouter} from 'vue-router'
 import {Calendar, Clock, Timer} from '@element-plus/icons-vue'
@@ -102,6 +103,7 @@ const now = useNow()
 const loading = ref(false)
 const allExams = ref([])
 const router = useRouter()
+const userStore = useUserStore()
 
 // 进入请求串行执行，密码弹窗在请求完成前保持所属考试不变。
 const entering = ref(false)
@@ -161,12 +163,15 @@ const handlePasswordClose = (done) => {
 const requestEntry = async (examId, password, passwordAttempt) => {
   entering.value = true
   submittingPassword.value = passwordAttempt
-  const originalToken = localStorage.getItem('token')
-  const isCurrentSession = () => !disposed && localStorage.getItem('token') === originalToken
+  let expectedToken = localStorage.getItem('token')
+  const isCurrentSession = () => !disposed && localStorage.getItem('token') === expectedToken
   try {
     const res = await enterExam(examId, password)
     if (!isCurrentSession()) return
-    if (res.token) localStorage.setItem('token', res.token)
+    if (res.token) {
+      userStore.setToken(res.token)
+      expectedToken = res.token
+    }
     passwordDialogVisible.value = false
     await router.push(`/exam/${examId}`)
   } catch (error) {

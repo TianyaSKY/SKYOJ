@@ -23,15 +23,20 @@ export const useUserStore = defineStore('user', () => {
     const token = ref(localStorage.getItem('token') || '')
     const user = ref(readCachedUser())
 
+    // 登录和考试会话切换共用更新入口，保持响应式状态与请求缓存一致。
+    const setToken = (value) => {
+        token.value = value
+        localStorage.setItem('token', value)
+    }
+
     const login = async (loginForm) => {
         try {
             const res = await request.post('/auth/login', loginForm, {
                 skipAuthErrorHandler: true
             })
             if (res.token && res.user) {
-                token.value = res.token
+                setToken(res.token)
                 user.value = res.user
-                localStorage.setItem('token', res.token)
                 localStorage.setItem('user', JSON.stringify(res.user))
                 return true
             }
@@ -53,5 +58,5 @@ export const useUserStore = defineStore('user', () => {
         localStorage.removeItem('user')
     }
 
-    return {token, user, login, logout}
+    return {token, user, setToken, login, logout}
 })

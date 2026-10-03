@@ -90,6 +90,15 @@ describe('useUserStore', () => {
     expect(store.token).toBe('')
   })
 
+  it('会话令牌更新同步缓存并保留用户资料', () => {
+    const store = useUserStore()
+    store.user = { id: 1, role: 'student' }
+    store.setToken('exam-token')
+    expect(store.token).toBe('exam-token')
+    expect(localStorage.getItem('token')).toBe('exam-token')
+    expect(store.user).toEqual({ id: 1, role: 'student' })
+  })
+
   it('logout 清除 token 和 user', () => {
     const store = useUserStore()
 

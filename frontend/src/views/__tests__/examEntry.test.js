@@ -1,3 +1,6 @@
+import { useUserStore } from '@/stores/user'
+vi.mock('@/utils/request', () => ({ default: { post: vi.fn() } }))
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
@@ -26,6 +29,7 @@ async function openPassword(vm) {
   vm.passwordInput = 'secret'
 }
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.resetAllMocks(); localStorage.clear(); localStorage.setItem('token', 'original')
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
   vi.setSystemTime(new Date('2026-06-15T10:30:00Z'))
@@ -39,7 +43,7 @@ it('重复点击同一或其他考试只发送一次进入请求，保留原考�
   expect(enterExam).toHaveBeenCalledExactlyOnceWith(1, '')
   expect(vm.currentExamId).toBe(1); expect(vm.entering).toBe(true)
   response.resolve({ token: 'exam-one' }); await pending
-  expect(localStorage.getItem('token')).toBe('exam-one'); expect(push).toHaveBeenCalledExactlyOnceWith('/exam/1')
+  expect(localStorage.getItem('token')).toBe('exam-one'); expect(useUserStore().token).toBe('exam-one'); expect(push).toHaveBeenCalledExactlyOnceWith('/exam/1')
   expect(vm.entering).toBe(false)
 })
 it('密码弹窗保持原考试，提交期间禁止重复提交和关闭', async () => {

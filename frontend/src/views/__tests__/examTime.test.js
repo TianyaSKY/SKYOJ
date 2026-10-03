@@ -1,3 +1,5 @@
+vi.mock('@/utils/request', () => ({ default: { post: vi.fn() } }))
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import dayjs from 'dayjs'
@@ -18,6 +20,7 @@ function mountPage(component) {
   return wrapper.vm
 }
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.resetAllMocks()
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
   vi.setSystemTime(new Date('2026-06-15T10:00:00Z'))
