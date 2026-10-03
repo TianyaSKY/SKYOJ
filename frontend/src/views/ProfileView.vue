@@ -35,7 +35,7 @@
 
     <template v-if="isPracticeMode || isTeacher">
       <!-- Wrong Book Card -->
-      <el-card class="wrongbook-card mb-4" shadow="hover">
+      <el-card v-if="showWrongBook" class="wrongbook-card mb-4" shadow="hover">
         <template #header>
           <div class="card-header">
             <h3 class="header-title">
@@ -73,7 +73,8 @@
               <el-button
                 :type="scope.row.reviewed ? 'warning' : 'default'"
                 size="small"
-                :disabled="scope.row.accepted"
+                :disabled="scope.row.accepted || pendingReviews.has(scope.row.id)"
+                :loading="pendingReviews.has(scope.row.id)"
                 @click="toggleReview(scope.row)"
               >
                 {{ scope.row.reviewed ? '已复习' : '标记复习' }}
@@ -88,11 +89,15 @@
             </template>
           </el-table-column>
         </el-table>
-        <div v-if="wbStats.total > wbItems.length" class="wrongbook-more">
-          <el-link type="primary" :underline="false" @click="$router.push('/profile')">
-            查看全部 {{ wbStats.total }} 条错题 →
-          </el-link>
-        </div>
+        <el-pagination
+          v-if="wbTotal > wbPageSize"
+          :current-page="wbPage"
+          :page-size="wbPageSize"
+          :total="wbTotal"
+          :disabled="wbLoading"
+          layout="prev, pager, next"
+          @current-change="fetchWrongBook"
+        />
         <el-empty v-if="wbStats.total === 0 && !wbLoading" description="暂无错题记录，继续加油！" />
       </el-card>
 
@@ -187,7 +192,7 @@
 </template>
 
 <script setup>
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {computed, onBeforeUnmount, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {useUserStore} from '@/stores/user'
 import {useSysStore} from '@/stores/sys'
@@ -211,6 +216,13 @@ const isCurrentProfile = version => !disposed && version === profileVersion
 const wbItems = ref([])
 const wbStats = ref({ total: 0, unresolved: 0, reviewed: 0, accepted: 0 })
 const wbLoading = ref(false)
+const wbPage = ref(1)
+const wbPageSize = 10
+const wbTotal = ref(0)
+const pendingReviews = ref(new Set())
+let wbScopeVersion = 0
+let wbRequestVersion = 0
+const isCurrentWrongBook = version => !disposed && version === wbScopeVersion
 
 const userId = computed(() => route.params.id)
 const userAvatar = computed(() => {
@@ -219,7 +231,8 @@ const userAvatar = computed(() => {
 })
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 const isPracticeMode = computed(() => sysStore.practice !== false && sysStore.practice !== 'False')
-const isCurrentUser = computed(() => !userId.value || parseInt(userId.value) === userStore.user?.id)
+const isCurrentUser = computed(() => !userId.value || Number(userId.value) === userStore.user?.id)
+const showWrongBook = computed(() => Boolean(userStore.user?.id) && isCurrentUser.value && (isPracticeMode.value || isTeacher.value))
 
 const getStatusType = (status) => {
   if (!status) return 'info'
@@ -246,32 +259,48 @@ const formatDate = (isoString) => {
   return new Date(isoString).toLocaleDateString()
 }
 
-const fetchWrongBook = async () => {
+const fetchWrongBook = async (pageNo = wbPage.value) => {
+  if (!showWrongBook.value) return
+  const scope = wbScopeVersion
+  const requestId = ++wbRequestVersion
+  const isCurrent = () => isCurrentWrongBook(scope) && requestId === wbRequestVersion
   wbLoading.value = true
   try {
     const [statsRes, listRes] = await Promise.all([
       request({ url: '/wrong-book/stats', method: 'get' }),
-      request({ url: '/wrong-book/', method: 'get', params: { page: 1, page_size: 10 } }),
+      request({ url: '/wrong-book/', method: 'get', params: { page: pageNo, page_size: wbPageSize } }),
     ])
+    if (!isCurrent()) return
+    const lastPage = Math.max(1, Math.ceil((listRes.total || 0) / wbPageSize))
+    if (pageNo > lastPage) return await fetchWrongBook(lastPage)
+    wbPage.value = pageNo
+    wbTotal.value = listRes.total || 0
     wbStats.value = statsRes
     wbItems.value = listRes.items || []
-  } catch {
-    // 非登录用户无权限
+  } catch (error) {
+    if (isCurrent()) ElMessage.error(error.message || '加载错题本失败')
   } finally {
-    wbLoading.value = false
+    if (isCurrent()) wbLoading.value = false
   }
 }
 
 const toggleReview = async (item) => {
+  if (!showWrongBook.value || item.accepted || pendingReviews.value.has(item.id)) return
+  const scope = wbScopeVersion
+  pendingReviews.value.add(item.id)
+  const wasReviewed = Boolean(item.reviewed)
   try {
     const res = await request({
       url: `/wrong-book/${item.id}/toggle-review`,
       method: 'post',
     })
+    if (!isCurrentWrongBook(scope)) return
     item.reviewed = res.reviewed
-    wbStats.value.reviewed += item.reviewed ? 1 : -1
-  } catch {
-    ElMessage.error('操作失败')
+    wbStats.value.reviewed = Math.max(0, wbStats.value.reviewed + Number(res.reviewed) - Number(wasReviewed))
+  } catch (error) {
+    if (isCurrentWrongBook(scope)) ElMessage.error(error.message || '操作失败')
+  } finally {
+    if (isCurrentWrongBook(scope)) pendingReviews.value.delete(item.id)
   }
 }
 
@@ -340,9 +369,16 @@ const fetchData = async () => {
 watch([userId, () => userStore.user?.id, isPracticeMode, isTeacher], fetchData, { immediate: true })
 onBeforeUnmount(() => { disposed = true; profileVersion += 1 })
 
-onMounted(() => {
+watch([userId, () => userStore.user?.id, showWrongBook], () => {
+  wbScopeVersion += 1
+  wbItems.value = []
+  wbStats.value = { total: 0, unresolved: 0, reviewed: 0, accepted: 0 }
+  wbPage.value = 1
+  wbTotal.value = 0
+  wbLoading.value = false
+  pendingReviews.value.clear()
   fetchWrongBook()
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
