@@ -2,7 +2,7 @@
  * 用户 Store 单元测试
  * 测试登录、登出、状态管理等
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useUserStore } from '@/stores/user'
 
@@ -26,6 +26,27 @@ describe('useUserStore', () => {
   beforeEach(() => {
     localStorage.clear()
     setActivePinia(createPinia())
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each(['{broken', '[]', '"teacher"', '42', 'true', ''])('无效用户缓存 %s 不阻断初始化', cached => {
+    localStorage.setItem('token', 'existing-token')
+    localStorage.setItem('user', cached)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const store = useUserStore()
+
+    expect(store.user).toBeNull()
+    expect(store.token).toBe('existing-token')
+    expect(localStorage.getItem('token')).toBe('existing-token')
+    expect(localStorage.getItem('user')).toBeNull()
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('缓存中的 null 表示无用户资料', () => {
+    localStorage.setItem('user', 'null')
+    expect(useUserStore().user).toBeNull()
   })
 
   it('初始化时应从 localStorage 读取 token', () => {

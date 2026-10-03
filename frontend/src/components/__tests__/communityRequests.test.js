@@ -1,6 +1,7 @@
 // 使用真实 Axios 实例验证组件请求经过 baseURL 拼接后的地址。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 vi.mock('@/router', () => ({ default: {} }))
 vi.mock('element-plus', () => ({
@@ -12,6 +13,7 @@ import request from '@/utils/request'
 import TagPanel from '../TagPanel.vue'
 import SolutionPanel from '../SolutionPanel.vue'
 import { ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const originalAdapter = request.defaults.adapter
 let urls
@@ -28,6 +30,7 @@ const mountOptions = {
 
 beforeEach(() => {
   localStorage.clear()
+  setActivePinia(createPinia())
   urls = []
   calls = []
   ElMessageBox.confirm.mockResolvedValue('confirm')
@@ -108,5 +111,34 @@ describe('社区组件的 API 请求路径', () => {
     expect(calls).toContainEqual(['post', '/api/problems/solutions/7/comments'])
     expect(calls).toContainEqual(['delete', '/api/problems/comments/8'])
     expect(urls.every(url => !url.startsWith('/api/api/'))).toBe(true)
+  })
+
+  it('教师登出后标签面板及时撤销教师状态', async () => {
+    const store = useUserStore()
+    store.user = {id: 1, role: 'teacher'}
+    wrapper = shallowMount(TagPanel, mountOptions)
+    await flushPromises()
+    expect(wrapper.vm.isTeacher).toBe(true)
+
+    store.logout()
+    await flushPromises()
+    expect(wrapper.vm.isTeacher).toBe(false)
+  })
+
+  it('登出和切换用户时题解面板同步角色与作者身份', async () => {
+    const store = useUserStore()
+    store.user = {id: 1, role: 'teacher'}
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    expect(wrapper.vm.isTeacher).toBe(true)
+    expect(wrapper.vm.userInfo.id).toBe(1)
+
+    store.logout()
+    await flushPromises()
+    expect(wrapper.vm.isTeacher).toBe(false)
+    expect(wrapper.vm.userInfo.id).toBeUndefined()
+    store.user = {id: 2, role: 'student'}
+    await flushPromises()
+    expect(wrapper.vm.userInfo.id).toBe(2)
   })
 })

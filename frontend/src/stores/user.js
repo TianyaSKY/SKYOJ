@@ -3,9 +3,25 @@ import {ref} from 'vue'
 import request from '@/utils/request'
 import {ElMessage} from 'element-plus'
 
+function readCachedUser() {
+    const cached = localStorage.getItem('user')
+    if (cached === null) return null
+    try {
+        const value = JSON.parse(cached)
+        if (value === null || (typeof value === 'object' && !Array.isArray(value))) {
+            return value
+        }
+    } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error
+    }
+    console.warn('本地用户缓存无效，已重置用户资料')
+    localStorage.removeItem('user')
+    return null
+}
+
 export const useUserStore = defineStore('user', () => {
     const token = ref(localStorage.getItem('token') || '')
-    const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+    const user = ref(readCachedUser())
 
     const login = async (loginForm) => {
         try {

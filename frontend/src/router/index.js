@@ -179,7 +179,7 @@ router.beforeEach(async (to, from, next) => {
         await sysStore.fetchSysInfo()
     }
 
-    const user = userStore.user || JSON.parse(localStorage.getItem('user') || '{}')
+    const user = userStore.user || {}
     const isTeacher = user.role === 'teacher'
     const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
 

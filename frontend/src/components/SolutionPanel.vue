@@ -15,6 +15,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { useUserStore } from '@/stores/user'
 import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
@@ -39,10 +40,9 @@ const comments = ref([])
 const commentsTotal = ref(0)
 const newComment = ref('')
 
-const userInfo = (() => {
-  try { return JSON.parse(localStorage.getItem('user') || '{}') } catch { return {} }
-})()
-const isTeacher = computed(() => userInfo.role === 'teacher')
+const userStore = useUserStore()
+const userInfo = computed(() => userStore.user || {})
+const isTeacher = computed(() => userInfo.value.role === 'teacher')
 
 async function load () {
   loading.value = true

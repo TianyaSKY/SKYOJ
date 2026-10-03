@@ -10,6 +10,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   problemId: { type: Number, required: true }
@@ -22,10 +23,8 @@ const attachDialogVisible = ref(false)
 const selectedTagId = ref(null)
 const approved = ref(false)
 
-const userInfo = (() => {
-  try { return JSON.parse(localStorage.getItem('user') || '{}') } catch { return {} }
-})()
-const isTeacher = computed(() => userInfo.role === 'teacher')
+const userStore = useUserStore()
+const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 async function load () {
   loading.value = true
