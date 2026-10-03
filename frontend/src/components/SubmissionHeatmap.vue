@@ -40,44 +40,50 @@ const props = defineProps({
   }
 })
 
-const totalSubmissions = computed(() => props.submissions.length)
+const dateKey = date =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
-const weeks = computed(() => {
-  const endDate = new Date()
-  const startDate = new Date()
-  startDate.setFullYear(endDate.getFullYear() - 1)
-  // Adjust to the start of the week (Sunday)
-  startDate.setDate(startDate.getDate() - startDate.getDay())
-
-  const submissionCounts = {}
-  props.submissions.forEach(sub => {
-    const date = new Date(sub.created_at).toISOString().split('T')[0]
-    submissionCounts[date] = (submissionCounts[date] || 0) + 1
-  })
-
-  const weeksArr = []
-  let currentDay = new Date(startDate)
-
-  while (currentDay <= endDate || currentDay.getDay() !== 0) {
-    const weekIndex = Math.floor(daysBetween(startDate, currentDay) / 7)
-    if (!weeksArr[weekIndex]) weeksArr[weekIndex] = []
-
-    const dateStr = currentDay.toISOString().split('T')[0]
-    weeksArr[weekIndex].push({
-      date: dateStr,
-      count: submissionCounts[dateStr] || 0
-    })
-
-    currentDay.setDate(currentDay.getDate() + 1)
+const activity = computed(() => {
+  const now = new Date()
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const start = new Date(end)
+  start.setFullYear(end.getFullYear() - 1)
+  // 闰年的 2 月 29 日对应上一年的 2 月最后一天。
+  if (start.getMonth() !== end.getMonth()) start.setDate(0)
+  const firstDate = dateKey(start), lastDate = dateKey(end)
+  const counts = new Map()
+  let total = 0
+  for (const submission of props.submissions) {
+    const value = submission.created_at
+    if (typeof value !== 'string' || !value.trim()) continue
+    // 后端无时区时间沿用 UTC 约定，带时区时间保留原有偏移。
+    const timestamp = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`
+    const date = new Date(timestamp)
+    if (Number.isNaN(date.getTime()) || date > now) continue
+    const key = dateKey(date)
+    if (key < firstDate || key > lastDate) continue
+    counts.set(key, (counts.get(key) || 0) + 1)
+    total += 1
   }
 
-  return weeksArr
+  const current = new Date(start)
+  current.setDate(current.getDate() - current.getDay())
+  const weeks = []
+  let dayIndex = 0
+  // 每次递增日历日期，用序号分周，不依赖夏令时下每天的毫秒数。
+  while (current <= end || current.getDay() !== 0) {
+    const weekIndex = Math.floor(dayIndex / 7)
+    if (!weeks[weekIndex]) weeks[weekIndex] = []
+    const key = dateKey(current)
+    weeks[weekIndex].push({ date: key, count: counts.get(key) || 0 })
+    current.setDate(current.getDate() + 1)
+    dayIndex += 1
+  }
+  return { weeks, total }
 })
 
-function daysBetween(start, end) {
-  const diffTime = Math.abs(end - start)
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24))
-}
+const totalSubmissions = computed(() => activity.value.total)
+const weeks = computed(() => activity.value.weeks)
 
 const getColorClass = (count) => {
   if (count === 0) return 'level-0'
