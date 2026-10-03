@@ -43,6 +43,58 @@ afterEach(() => {
 })
 
 describe('websocket 自动重连', () => {
+  it.each([1008, 4001, 4003, 4004])('服务端终止码 %s 不重复重连', async (code) => {
+    const { createSubmissionWS } = await import('@/utils/websocket')
+    const ws = createSubmissionWS(1, 't')
+    ws.connect()
+    const first = FakeWebSocket.lastInstance
+    first.triggerServerClose(code)
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(FakeWebSocket.lastInstance).toBe(first)
+    ws.close()
+  })
+
+  it('消息回调异常不会将同一条 JSON 再作为文本发送', async () => {
+    const { createSubmissionWS } = await import('@/utils/websocket')
+    const onMessage = vi.fn(() => { throw new Error('回调失败') })
+    const ws = createSubmissionWS(1, 't', { onMessage })
+    ws.connect()
+    expect(() => FakeWebSocket.lastInstance.onmessage({ data: '{"status":"Accepted"}' })).toThrow('回调失败')
+    expect(onMessage).toHaveBeenCalledTimes(1)
+    ws.close()
+  })
+
+  it('重复 connect 不创建并行连接，主动关闭后忽略迟到消息', async () => {
+    const { createSubmissionWS } = await import('@/utils/websocket')
+    const onMessage = vi.fn()
+    const ws = createSubmissionWS(1, 't', { onMessage })
+    ws.connect()
+    const first = FakeWebSocket.lastInstance
+    ws.connect()
+    expect(FakeWebSocket.lastInstance).toBe(first)
+    ws.close()
+    first.onmessage({ data: '{"status":"Accepted"}' })
+    expect(onMessage).not.toHaveBeenCalled()
+  })
+
+  it('重连后旧连接的消息与关闭事件不影响当前连接', async () => {
+    const { createSubmissionWS } = await import('@/utils/websocket')
+    const onMessage = vi.fn(), onReconnect = vi.fn()
+    const ws = createSubmissionWS(1, 't', { onMessage, onReconnect })
+    ws.connect()
+    const first = FakeWebSocket.lastInstance
+    first.triggerServerClose(1006)
+    await vi.advanceTimersByTimeAsync(1000)
+    const second = FakeWebSocket.lastInstance
+    first.onmessage({ data: '{"status":"Accepted"}' })
+    first.triggerServerClose(1006)
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(onMessage).not.toHaveBeenCalled()
+    expect(onReconnect).toHaveBeenCalledTimes(1)
+    expect(FakeWebSocket.lastInstance).toBe(second)
+    ws.close()
+  })
+
   it('主动 close() 后不会触发重连调度', async () => {
     const { createSubmissionWS } = await import('@/utils/websocket')
     const ws = createSubmissionWS(42, 'tok', {})

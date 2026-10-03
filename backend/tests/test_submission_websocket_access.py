@@ -30,8 +30,8 @@ def test_student_cannot_subscribe_to_another_users_submission(
     record = SubmissionRepository(db_session).create(teacher_user.id, sample_problem.id, None, 'python', 'code')
     token = encode_auth_token(student_user.id, 'student')
     with pytest.raises(WebSocketDisconnect) as error:
-        with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}'):
-            pass
+        with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}') as websocket:
+            websocket.receive_text()
     assert error.value.code == 4003
     redis_subscription[0].pubsub.assert_not_called()
 
@@ -55,8 +55,8 @@ def test_missing_submission_is_rejected_before_redis(
 ):
     token = encode_auth_token(student_user.id, 'student')
     with pytest.raises(WebSocketDisconnect) as error:
-        with client.websocket_connect(f'/api/submissions/ws/999999?token={token}'):
-            pass
+        with client.websocket_connect(f'/api/submissions/ws/999999?token={token}') as websocket:
+            websocket.receive_text()
     assert error.value.code == 4004
     redis_subscription[0].pubsub.assert_not_called()
 
@@ -98,8 +98,8 @@ def test_result_completed_during_subscription_is_delivered_from_database(
 def test_token_for_nonexistent_user_is_rejected_before_redis(client, redis_subscription):
     token = encode_auth_token(999999, 'teacher')
     with pytest.raises(WebSocketDisconnect) as error:
-        with client.websocket_connect(f'/api/submissions/ws/1?token={token}'):
-            pass
+        with client.websocket_connect(f'/api/submissions/ws/1?token={token}') as websocket:
+            websocket.receive_text()
     assert error.value.code == 4001
     redis_subscription[0].pubsub.assert_not_called()
 
@@ -110,8 +110,8 @@ def test_token_role_cannot_override_current_database_role(
     record = SubmissionRepository(db_session).create(teacher_user.id, sample_problem.id, None, 'python', 'code')
     token = encode_auth_token(student_user.id, 'teacher')
     with pytest.raises(WebSocketDisconnect) as error:
-        with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}'):
-            pass
+        with client.websocket_connect(f'/api/submissions/ws/{record.id}?token={token}') as websocket:
+            websocket.receive_text()
     assert error.value.code == 4003
     redis_subscription[0].pubsub.assert_not_called()
 
@@ -125,7 +125,7 @@ def test_invalid_authentication_is_rejected_before_redis(
         'exp': datetime.now(timezone.utc) - timedelta(minutes=1),
     }, SECRET_KEY, algorithm='HS256')
     with pytest.raises(WebSocketDisconnect) as error:
-        with client.websocket_connect(f'/api/submissions/ws/1?token={token}'):
-            pass
+        with client.websocket_connect(f'/api/submissions/ws/1?token={token}') as websocket:
+            websocket.receive_text()
     assert error.value.code == 4001
     redis_subscription[0].pubsub.assert_not_called()

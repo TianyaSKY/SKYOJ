@@ -22,9 +22,9 @@
  *   ws.close()
  */
 
-const WS_READY_TIMEOUT_MS = 5000
 const RECONNECT_INITIAL_DELAY_MS = 1000
 const RECONNECT_MAX_DELAY_MS = 30000
+const TERMINAL_CLOSE_CODES = new Set([1000, 1001, 1008, 4001, 4003, 4004])
 
 export function createSubmissionWS(submissionId, token, {
   onMessage,
@@ -52,7 +52,7 @@ export function createSubmissionWS(submissionId, token, {
   }
 
   function scheduleReconnect() {
-    if (closed) return
+    if (closed || reconnectTimer !== null) return
     const delay = Math.min(
       RECONNECT_MAX_DELAY_MS,
       RECONNECT_INITIAL_DELAY_MS * 2 ** reconnectAttempt
@@ -66,7 +66,7 @@ export function createSubmissionWS(submissionId, token, {
   }
 
   function connect() {
-    if (closed) return
+    if (closed || (ws && ws.readyState < 2)) return
     clearReconnect()
     const url = buildUrl()
     try {
@@ -76,39 +76,44 @@ export function createSubmissionWS(submissionId, token, {
       scheduleReconnect()
       return
     }
+    const socket = ws
 
-    ws.onopen = () => {
+    socket.onopen = () => {
+      if (closed || ws !== socket) return
       // 连接建立：成功拿到一次消息就重置重连计数，下次提交走干净的连接。
       reconnectAttempt = 0
     }
 
-    ws.onmessage = (event) => {
+    socket.onmessage = (event) => {
+      if (closed || ws !== socket) return
+      let data = event.data
       try {
-        const data = JSON.parse(event.data)
-        onMessage?.(data)
+        data = JSON.parse(event.data)
       } catch {
         // 非 JSON 直接透传
-        onMessage?.(event.data)
       }
+      // 回调异常不属于 JSON 解析失败，同一条消息只分发一次。
+      onMessage?.(data)
     }
 
-    ws.onerror = (event) => {
+    socket.onerror = (event) => {
+      if (closed || ws !== socket) return
       onError?.(event)
     }
 
-    ws.onclose = (event) => {
+    socket.onclose = (event) => {
       // 主动 close() 时 closed=true，不重连、不回调 onClose（避免误以为服务端关闭）。
-      if (closed) {
+      if (closed || ws !== socket) {
         return
       }
-      onClose?.(event)
-      // 正常关闭（服务端判题结束主动断开 code=1000）无需重连。
-      // 服务端未声明关闭 → 触发重连。1000 是正常关闭，1001 是端点离开，
-      // 1005/1006 通常是网络抖动或服务端异常。
-      if (event.code === 1000 || event.code === 1001) {
-        return
+      ws = null
+      // 已完成、无效身份、无权访问和记录不存在均不能靠重连恢复。
+      if (TERMINAL_CLOSE_CODES.has(event.code)) closed = true
+      try {
+        onClose?.(event)
+      } finally {
+        scheduleReconnect()
       }
-      scheduleReconnect()
     }
   }
 

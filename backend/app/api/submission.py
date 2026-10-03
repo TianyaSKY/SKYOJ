@@ -50,6 +50,9 @@ async def submission_websocket(
     鉴权：token 放在 query 参数中，按当前用户身份校验提交归属；教师可订阅全部提交。
     推送消息：{"status": "...", "score": 100.0, "output_log": "..."}
     """
+    # 完成握手后发送关闭码，浏览器才能区分权限拒绝与可重试的网络断线。
+    # 身份及归属校验完成前不发送结果或连接 Redis。
+    await ws.accept()
     try:
         auth = await run_in_threadpool(get_current_auth, authorization=token, db=db)
     except HTTPException:
@@ -85,7 +88,6 @@ async def submission_websocket(
         return service.get_submission(submission_id, auth.user.id, auth.user.role)
 
     try:
-        await ws.accept()
         if await send_completed(detail):
             return
         client = await run_in_threadpool(redis_client.get_client)
