@@ -217,3 +217,23 @@ def test_solution_validation_preserves_markdown_and_optional_updates():
     assert created.content == content
     assert UpdateSolutionRequest(content=content).content == content
     assert UpdateSolutionRequest(title=None, content=None).content is None
+
+def test_solution_creation_requires_existing_problem(
+    client, db_session, student_token, sample_problem
+):
+    from app.persistence.community import ProblemSolution
+
+    problem_id = sample_problem.id
+    headers = {"Authorization": f"Bearer {student_token}"}
+    body = {"title": "题解", "content": "正文"}
+    rejected = client.post(
+        "/api/problems/999999/solutions", headers=headers, json=body,
+    )
+    assert rejected.status_code == 404
+    assert db_session.query(ProblemSolution).count() == 0
+    accepted = client.post(
+        f"/api/problems/{problem_id}/solutions", headers=headers, json=body,
+    )
+    assert accepted.status_code == 201
+    assert accepted.json()["problem_id"] == problem_id
+    assert db_session.query(ProblemSolution).count() == 1

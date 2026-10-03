@@ -172,6 +172,8 @@ class SolutionService:
 
     def create(self, params: CreateSolutionParams) -> SolutionDetail:
         with self._uow.transaction():
+            if self._repo.get_problem_exists(params.problem_id) is None:
+                raise ResourceNotFoundError("题目不存在")
             solution = self._repo.create_solution(
                 problem_id=params.problem_id,
                 author_id=params.author_id,
