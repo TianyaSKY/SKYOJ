@@ -87,10 +87,14 @@ import {ElMessage} from 'element-plus'
 import {useRouter} from 'vue-router'
 import {Calendar, Clock, Timer} from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { parseServerDate } from '@/utils/date'
+import { getExamTiming } from '@/utils/examTime'
+import { useNow } from '@/composables/useNow'
 import duration from 'dayjs/plugin/duration'
 
 dayjs.extend(duration)
 
+const now = useNow()
 const loading = ref(false)
 const allExams = ref([])
 const router = useRouter()
@@ -114,17 +118,13 @@ const fetchExams = async () => {
 }
 
 const getExamStatus = (exam) => {
-  const now = dayjs()
-  const start = dayjs(exam.start_time)
-  const end = dayjs(exam.end_time)
-
-  if (now.isBefore(start)) {
-    return {text: '未开始', type: 'info'}
-  } else if (now.isAfter(end)) {
-    return {text: '已结束', type: 'danger'}
-  } else {
-    return {text: '进行中', type: 'success'}
-  }
+  const phase = getExamTiming(exam, now.value).phase
+  return {
+    upcoming: {text: '未开始', type: 'info'},
+    ongoing: {text: '进行中', type: 'success'},
+    ended: {text: '已结束', type: 'danger'},
+    unknown: {text: '时间无效', type: 'info'},
+  }[phase]
 }
 
 const filteredExams = computed(() => {
@@ -136,11 +136,12 @@ const filteredExams = computed(() => {
 })
 
 const formatTime = (time) => {
-  return dayjs(time).format('YYYY-MM-DD HH:mm')
+  const date = parseServerDate(time)
+  return date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'
 }
 
 const getDuration = (start, end) => {
-  const diff = dayjs(end).diff(dayjs(start))
+  const diff = (parseServerDate(end)?.getTime() ?? 0) - (parseServerDate(start)?.getTime() ?? 0)
   const dur = dayjs.duration(diff)
   const hours = Math.floor(dur.asHours())
   const minutes = dur.minutes()

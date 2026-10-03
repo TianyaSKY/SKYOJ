@@ -117,7 +117,6 @@
                 range-separator="至"
                 start-placeholder="开始时间"
                 end-placeholder="结束时间"
-                value-format="YYYY-MM-DD HH:mm:ss"
                 style="width: 100%"
                 @change="handleTimeChange"
               />
@@ -210,7 +209,11 @@ import {
   View
 } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { parseServerDate } from '@/utils/date'
+import { getExamTiming } from '@/utils/examTime'
+import { useNow } from '@/composables/useNow'
 
+const now = useNow()
 const exams = ref([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -264,23 +267,24 @@ const fetchProblems = async () => {
 }
 
 const getExamStatus = (exam) => {
-  const now = dayjs()
-  const start = dayjs(exam.start_time)
-  const end = dayjs(exam.end_time)
-
-  if (now.isBefore(start)) return {label: '未开始', type: 'info'}
-  if (now.isAfter(end)) return {label: '已结束', type: 'danger'}
-  return {label: '进行中', type: 'success'}
+  const phase = getExamTiming(exam, now.value).phase
+  return {
+    upcoming: {label: '未开始', type: 'info'},
+    ongoing: {label: '进行中', type: 'success'},
+    ended: {label: '已结束', type: 'danger'},
+    unknown: {label: '时间无效', type: 'info'},
+  }[phase]
 }
 
 const formatTimeShort = (time) => {
-  return dayjs(time).format('MM-DD HH:mm')
+  const date = parseServerDate(time)
+  return date ? dayjs(date).format('MM-DD HH:mm') : '-'
 }
 
 const handleTimeChange = (val) => {
   if (val) {
-    form.value.start_time = val[0]
-    form.value.end_time = val[1]
+    form.value.start_time = val[0].toISOString()
+    form.value.end_time = val[1].toISOString()
   } else {
     form.value.start_time = ''
     form.value.end_time = ''
@@ -318,7 +322,9 @@ const handleEdit = async (row) => {
   try {
     const detail = await getExamDetail(row.id)
     form.value = {...detail}
-    timeRange.value = [detail.start_time, detail.end_time]
+    timeRange.value = [parseServerDate(detail.start_time), parseServerDate(detail.end_time)]
+    form.value.start_time = timeRange.value[0]?.toISOString() || ''
+    form.value.end_time = timeRange.value[1]?.toISOString() || ''
 
     if (detail.problems && Array.isArray(detail.problems)) {
       selectedProblemIds.value = detail.problems.map(p => p.problem_id || p.id)

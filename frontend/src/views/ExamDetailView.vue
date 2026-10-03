@@ -148,7 +148,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {exitExam, getExamDetail, getMyExamStatus} from '@/api/exam'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -161,6 +161,9 @@ import {
   Trophy
 } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { parseServerDate } from '@/utils/date'
+import { getExamTiming } from '@/utils/examTime'
+import { useNow } from '@/composables/useNow'
 
 const route = useRoute()
 const router = useRouter()
@@ -176,8 +179,10 @@ const exam = ref({
 
 const problemStatus = ref([])
 const statusLoading = ref(false)
-const remainingTime = ref(0)
-let timer = null
+const now = useNow()
+const timing = computed(() => getExamTiming(exam.value, now.value))
+const remainingTime = computed(() => timing.value.remainingSeconds)
+let disposed = false
 
 const customColors = [
   { color: '#f56c6c', percentage: 20 },
@@ -190,10 +195,11 @@ const customColors = [
 const fetchExamData = async () => {
   try {
     const data = await getExamDetail(examId)
+    if (disposed) return
     exam.value = data
-    startTimer()
     fetchStatus()
   } catch (error) {
+    if (disposed) return
     ElMessage.error('获取考试详情失败')
     router.push('/exam')
   }
@@ -241,29 +247,9 @@ const getStatusLabel = (status) => {
   return map[status] || status
 }
 
-const startTimer = () => {
-  updateRemainingTime()
-  timer = setInterval(updateRemainingTime, 1000)
-}
-
-const updateRemainingTime = () => {
-  const now = dayjs()
-  const end = dayjs(exam.value.end_time)
-  const start = dayjs(exam.value.start_time)
-
-  if (now.isBefore(start)) {
-    remainingTime.value = start.diff(now, 'second')
-  } else if (now.isBefore(end)) {
-    remainingTime.value = end.diff(now, 'second')
-  } else {
-    remainingTime.value = 0
-    if (timer) {
-      clearInterval(timer)
-      timer = null
-      handleExamEnd()
-    }
-  }
-}
+watch(() => timing.value.phase, phase => {
+  if (phase === 'ended' && !disposed) handleExamEnd()
+})
 
 const handleExamEnd = async () => {
   ElMessageBox.alert('考试已结束，系统将自动退出考试模式。', '提示', {
@@ -309,21 +295,17 @@ const remainingTimeStr = computed(() => {
 })
 
 const timerStatus = computed(() => {
-  const now = dayjs()
-  const start = dayjs(exam.value.start_time)
-  const end = dayjs(exam.value.end_time)
-
-  if (now.isBefore(start)) {
-    return {label: '距离开始', type: 'info'}
-  } else if (now.isBefore(end)) {
-    return {label: '剩余时间', type: 'danger'}
-  } else {
-    return {label: '已结束', type: 'info'}
-  }
+  return {
+    upcoming: {label: '距离开始', type: 'info'},
+    ongoing: {label: '剩余时间', type: 'danger'},
+    ended: {label: '已结束', type: 'info'},
+    unknown: {label: '加载中', type: 'info'},
+  }[timing.value.phase]
 })
 
 const formatTime = (time) => {
-  return time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
+  const date = parseServerDate(time)
+  return date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'
 }
 
 const goToProblem = (problemId) => {
@@ -342,7 +324,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  disposed = true
 })
 </script>
 
