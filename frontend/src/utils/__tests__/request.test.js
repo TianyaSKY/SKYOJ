@@ -25,6 +25,45 @@ beforeEach(() => {
 afterEach(() => flushPromises())
 
 describe('request.js 响应拦截器 - 错误信封解析', () => {
+  async function rejectedRequest(data, extra = {}) {
+    const original = request.defaults.adapter
+    request.defaults.adapter = () => Promise.reject({
+      message: 'Request failed', response: { status: 422, data }, ...extra,
+    })
+    try {
+      return await request.get('/invalid').catch(error => error)
+    } finally {
+      request.defaults.adapter = original
+    }
+  }
+
+  it('使用后端 message 字段显示具体错误', async () => {
+    const error = await rejectedRequest({ code: 'INVALID_STATE', message: '考试尚未开始' })
+    expect(error.message).toBe('考试尚未开始')
+  })
+
+  it('将字段校验数组转为可读字符串，保留原始报文', async () => {
+    const data = { detail: [
+      { loc: ['body', 'title'], msg: 'Field required', input: 'private input' },
+      { loc: ['query', 'page'], msg: 'Must be greater than 0' },
+    ] }
+    const error = await rejectedRequest(data)
+    expect(error.message).toBe('title: Field required；page: Must be greater than 0')
+    expect(error.backend).toEqual(data)
+    expect(error.message).not.toContain('private input')
+  })
+
+  it('支持旧版嵌套错误消息，忽略没有可读消息的对象', async () => {
+    expect((await rejectedRequest({ detail: { message: '参数格式无效' } })).message).toBe('参数格式无效')
+    expect((await rejectedRequest({ error: { unknown: true } })).message).toBe('Request failed')
+  })
+
+  it('后端未返回错误码时保留网络或取消请求的原始代码', async () => {
+    const error = await rejectedRequest(undefined, { code: 'ERR_CANCELED', message: 'canceled', response: undefined })
+    expect(error.code).toBe('ERR_CANCELED')
+    expect(error.message).toBe('canceled')
+  })
+
   it('把 401 + AUTH_REQUIRED envelope 的 code 挂到 error 上', async () => {
     // 通过替换 request 内部的 axios adapter 拦截 _request 调用。
     const inner = request.defaults

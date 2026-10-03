@@ -8,6 +8,27 @@ const tokenErrorCodes = new Set([
 ])
 let isHandlingAuthError = false
 
+// 只提取可读消息，保留字段路径；不把校验错误中的 input 等原始数据拼进提示。
+function readableMessage(value, depth = 0) {
+    if (typeof value === 'string') return value.trim()
+    if (!value || typeof value !== 'object' || depth >= 4) return ''
+    if (Array.isArray(value)) {
+        return value.map(item => readableMessage(item, depth + 1)).filter(Boolean).join('；')
+    }
+    if (typeof value.msg === 'string' && Array.isArray(value.loc)) {
+        const location = ['body', 'query', 'path', 'header', 'cookie'].includes(value.loc[0])
+            ? value.loc.slice(1) : value.loc
+        const field = location.filter(part => typeof part === 'string' || typeof part === 'number').join('.')
+        const message = value.msg.trim()
+        return message ? (field ? `${field}: ${message}` : message) : ''
+    }
+    for (const key of ['error', 'detail', 'message', 'msg']) {
+        const message = readableMessage(value[key], depth + 1)
+        if (message) return message
+    }
+    return ''
+}
+
 const service = axios.create({
     baseURL: '/api',
     timeout: 30000
@@ -37,7 +58,8 @@ service.interceptors.response.use(
         // 兼容老接口（只有 {error} 或 {detail}），把 code 也补到错误对象上方便调用方判断。
         const data = error.response?.data || {}
         const code = data.code
-        const message = data.error || data.detail || error.message || '请求失败'
+        const message = readableMessage(data.error) || readableMessage(data.detail)
+            || readableMessage(data.message) || readableMessage(error.message) || '请求失败'
 
         // 401 登录态失效：弹窗让用户重新登录。
         // 触发条件：后端返回 AUTH_REQUIRED / AUTH_TOKEN_EXPIRED / AUTH_INVALID_TOKEN，
@@ -70,7 +92,7 @@ service.interceptors.response.use(
 
         // 把后端报文挂到错误对象上，方便上层做更精细的提示（例如展示 retry_after）。
         error.backend = data
-        error.code = code
+        if (code) error.code = code
         error.message = message
         return Promise.reject(error)
     }
