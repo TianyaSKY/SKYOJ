@@ -2,21 +2,24 @@
 
 from typing import BinaryIO
 
-from loguru import logger
-
 from app.clients.dataset_storage_client import DatasetStorageClient
 from app.domain.dataset import (
     CreateDatasetParams,
-    DatasetDownload,
     DatasetDetail,
+    DatasetDownload,
     DatasetListItem,
     PaginatedDatasets,
     UploadDatasetParams,
 )
-from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.domain.errors import (
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
 from app.mappers import from_dataset_detail_orm, from_dataset_orm
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.async_job_service import AsyncJobService
+from loguru import logger
 
 
 class DatasetService:
@@ -36,7 +39,9 @@ class DatasetService:
         self, page: int | None = None, page_size: int | None = None
     ) -> list[DatasetListItem] | PaginatedDatasets:
         """查询数据集列表。"""
-        datasets, total = self._dataset_repository.list_all(page=page, page_size=page_size)
+        datasets, total = self._dataset_repository.list_all(
+            page=page, page_size=page_size
+        )
         items = [from_dataset_orm(dataset) for dataset in datasets]
         if page is None or page_size is None:
             return items
@@ -65,6 +70,7 @@ class DatasetService:
                 temp_path=temporary_path,
                 status="pending",
             )
+            self._dataset_repository.unit_of_work.commit()
             self._job_service.enqueue_finalize_dataset(dataset.id)
         except Exception:
             if temporary_path:
@@ -106,6 +112,7 @@ class DatasetService:
             if callable(remove_staged):
                 remove_staged(dataset.temp_path)
         self._dataset_repository.delete(dataset)
+        self._dataset_repository.unit_of_work.commit()
 
     def dataset_file_exists(self, dataset_id: int) -> DatasetDetail:
         """确认数据集及其文件均存在。"""
@@ -148,10 +155,15 @@ class DatasetService:
                 file_size=self._format_file_size(byte_size),
                 file_hash=file_hash,
             )
-            logger.info("数据集文件落盘完成 dataset_id={} sha256={}", dataset.id, file_hash)
+            self._dataset_repository.unit_of_work.commit()
+            logger.info(
+                "数据集文件落盘完成 dataset_id={} sha256={}", dataset.id, file_hash
+            )
             return from_dataset_detail_orm(dataset)
         except Exception as exc:
+            self._dataset_repository.unit_of_work.rollback()
             self._dataset_repository.mark_failed(dataset_id, str(exc))
+            self._dataset_repository.unit_of_work.commit()
             raise
 
     def _require_dataset(self, dataset_id: int):

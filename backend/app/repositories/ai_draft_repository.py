@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.ai_draft import AiDraft
+from app.unit_of_work import UnitOfWork
 
 
 class AiDraftRepository:
@@ -15,6 +16,7 @@ class AiDraftRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def create(
         self,
@@ -36,7 +38,7 @@ class AiDraftRepository:
             request_payload=json.dumps(request_payload, ensure_ascii=False),
         )
         self._db.add(draft)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(draft)
         return draft
 
@@ -58,9 +60,7 @@ class AiDraftRepository:
             query = query.filter(AiDraft.status == status)
         if task_type:
             query = query.filter(AiDraft.task_type == task_type)
-        return (
-            query.order_by(AiDraft.id.desc()).limit(max(1, min(limit, 200))).all()
-        )
+        return query.order_by(AiDraft.id.desc()).limit(max(1, min(limit, 200))).all()
 
     def mark_running(self, draft_id: int) -> Optional[AiDraft]:
         """将任务标记为运行中。"""
@@ -69,7 +69,7 @@ class AiDraftRepository:
             return None
         draft.status = "running"
         draft.updated_at = datetime.utcnow()
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(draft)
         return draft
 
@@ -90,7 +90,7 @@ class AiDraftRepository:
         if title:
             draft.title = title
         draft.updated_at = datetime.utcnow()
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(draft)
         return draft
 
@@ -102,7 +102,7 @@ class AiDraftRepository:
         draft.status = "failed"
         draft.error_message = error_message[:2000]
         draft.updated_at = datetime.utcnow()
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(draft)
         return draft
 
@@ -113,14 +113,14 @@ class AiDraftRepository:
             return None
         draft.consumed_at = datetime.utcnow()
         draft.updated_at = datetime.utcnow()
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(draft)
         return draft
 
     def delete(self, draft: AiDraft) -> None:
         """删除草稿。"""
         self._db.delete(draft)
-        self._db.commit()
+        self._db.flush()
 
     def count_stats(self, user_id: int) -> dict[str, int]:
         """统计用户草稿各状态数量。"""

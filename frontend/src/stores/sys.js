@@ -7,6 +7,7 @@ export const useSysStore = defineStore('sys', () => {
     const practice = ref(true)
     const info = ref('')
     const warning = ref(false)
+    const loaded = ref(false)
 
     const fetchSysInfo = async () => {
         try {
@@ -19,11 +20,12 @@ export const useSysStore = defineStore('sys', () => {
                 if (res.practice !== undefined) practice.value = res.practice
                 if (res.info) info.value = res.info
                 if (res.warning !== undefined) warning.value = res.warning
+                loaded.value = true
             }
         } catch (error) {
             console.error('Failed to fetch system info:', error)
         }
     }
 
-    return {title, practice, info, warning, fetchSysInfo}
+    return {title, practice, info, warning, loaded, fetchSysInfo}
 })

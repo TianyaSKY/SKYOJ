@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
-
 from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.domain.submission import SubmitParams
 from app.domain.user import UploadAvatarParams
@@ -14,6 +14,7 @@ class FakeSubmissionRepository:
     """用于验证提交服务的内存仓储。"""
 
     def __init__(self) -> None:
+        self.unit_of_work = MagicMock()
         self.problem = SimpleNamespace(id=7, type="acm")
         self.created = []
 
@@ -22,7 +23,6 @@ class FakeSubmissionRepository:
 
     def get_active_exam(self, exam_id: int, now: datetime):
         return SimpleNamespace(id=exam_id) if exam_id == 5 else None
-
 
     def get_exam_problem(self, exam_id: int, problem_id: int):
         if exam_id == 5 and problem_id == 7:
@@ -83,7 +83,8 @@ def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
             is_file_upload=True,
             filename="answer.csv",
             file_content=b"id,value\n1,2\n",
-        )
+        ),
+        requester_role="student",
     )
 
     assert result.submission_id == 1
@@ -96,7 +97,7 @@ def test_submission_service_rejects_unknown_problem() -> None:
     service = SubmissionService(FakeSubmissionRepository(), FakeJobService())
 
     with pytest.raises(ResourceNotFoundError):
-        service.submit(SubmitParams(1, 99, "code", "python"))
+        service.submit(SubmitParams(1, 99, "code", "python"), requester_role="student")
 
 
 def test_submission_service_rejects_exam_submit_without_session() -> None:
@@ -104,7 +105,8 @@ def test_submission_service_rejects_exam_submit_without_session() -> None:
 
     with pytest.raises(PermissionDeniedError):
         service.submit(
-            SubmitParams(1, 7, "code", "python", exam_id=5, session_exam_id=-1)
+            SubmitParams(1, 7, "code", "python", exam_id=5, session_exam_id=-1),
+            requester_role="student",
         )
 
 
@@ -121,10 +123,12 @@ def test_submission_service_uses_active_exam_session_when_body_omits_id() -> Non
             code="print(7)",
             exam_id=-1,
             session_exam_id=5,
-        )
+        ),
+        requester_role="student",
     )
 
     assert result.exam_id == 5
+
 
 def test_user_service_blocks_student_listing_other_submissions() -> None:
     service = UserService(FakeUserRepository(), FakeAvatarStorage())
@@ -140,7 +144,10 @@ class FakeUserRepository:
     """用于验证用户服务的内存仓储。"""
 
     def __init__(self) -> None:
-        self.user = SimpleNamespace(id=1, username="teacher", role="teacher", avatar=None)
+        self.unit_of_work = MagicMock()
+        self.user = SimpleNamespace(
+            id=1, username="teacher", role="teacher", avatar=None
+        )
 
     def list_all(self):
         return [self.user]

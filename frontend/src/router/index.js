@@ -161,6 +161,10 @@ const router = createRouter({
             name: 'doc-teacher-manual',
             component: () => import('../views/docs/TeacherManualView.vue'),
             meta: {requiresAuth: true, role: 'teacher'}
+        },
+        {
+            path: '/:pathMatch(.*)*',
+            redirect: {name: 'home'},
         }
     ],
 })
@@ -171,13 +175,19 @@ router.beforeEach(async (to, from, next) => {
     const token = localStorage.getItem('token')
 
     // Ensure sys info is loaded to check practice mode
-    if (sysStore.practice === undefined) {
+    if (!sysStore.loaded) {
         await sysStore.fetchSysInfo()
     }
 
     const user = userStore.user || JSON.parse(localStorage.getItem('user') || '{}')
     const isTeacher = user.role === 'teacher'
     const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
+
+    // 先处理身份校验，再应用练习/考试模式，避免未登录请求绕到首页。
+    if (to.meta.requiresAuth && !token) {
+        next({name: 'login', query: {redirect: to.fullPath}})
+        return
+    }
 
     if (isTeacher && to.name === 'problem-detail') {
         next({name: 'problem-admin-preview', params: {id: to.params.id}})
@@ -216,11 +226,6 @@ router.beforeEach(async (to, from, next) => {
                 return
             }
         }
-    }
-
-    if (to.meta.requiresAuth && !token) {
-        next({name: 'login', query: {redirect: to.fullPath}})
-        return
     }
 
     // Check role permission

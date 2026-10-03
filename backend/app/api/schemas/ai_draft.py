@@ -55,3 +55,60 @@ class ExecuteTestGenerationBody(BaseModel):
     code: str = Field(min_length=1)
     type: Optional[str] = Field(default=None, max_length=32)
     language: str = Field(default="python", min_length=1, max_length=32)
+
+
+from datetime import datetime
+
+from pydantic import JsonValue
+
+
+class SubmitDraftResponse(BaseModel):
+    draft_id: int
+    status: str
+    task_type: str
+    title: str
+    message: str
+
+
+class ExecuteGenerationResponse(BaseModel):
+    message: str
+    draft_id: int
+    status: str
+
+
+class DraftSummaryResponse(BaseModel):
+    id: int
+    task_type: str
+    status: str
+    title: str
+    problem_id: int | None
+    error_message: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    consumed_at: datetime | None
+
+
+class DraftDetailResponse(DraftSummaryResponse):
+    request_payload: dict[str, JsonValue]
+    result_payload: dict[str, JsonValue]
+
+
+class DraftListResponse(BaseModel):
+    drafts: list[DraftSummaryResponse]
+
+
+class DraftStatsResponse(BaseModel):
+    total: int
+    pending: int
+    running: int
+    success: int
+    failed: int
+    unconsumed_success: int
+    in_progress: int
+
+
+class ApplyDraftResponse(BaseModel):
+    message: str
+    problem_id: int
+    draft_id: int
+    title: str

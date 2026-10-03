@@ -1,7 +1,8 @@
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
-
+from app.domain.auth import LoginParams, RegisterParams
 from app.domain.errors import (
     AuthenticationError,
     InvalidStateError,
@@ -11,19 +12,20 @@ from app.domain.errors import (
 from app.domain.problem import (
     CreateProblemParams,
     PaginatedProblems,
-    TestCaseSummary as ProblemTestCaseSummary,
     UpdateProblemParams,
 )
-from app.domain.auth import LoginParams, RegisterParams
+from app.domain.problem import (
+    TestCaseSummary as ProblemTestCaseSummary,
+)
 from app.services.auth_service import AuthService
 from app.services.problem_service import ProblemService
-
 
 
 class FakeProblemRepository:
     """用于验证题目服务的内存仓储。"""
 
     def __init__(self) -> None:
+        self.unit_of_work = MagicMock()
         self.items = []
         self.next_id = 1
         # master 的标签过滤会无条件构造 ProblemCommunityRepository(_db)
@@ -158,7 +160,7 @@ def test_problem_service_create_update_and_paginate() -> None:
             content="题目内容",
             language="python",
             problem_type="acm",
-        )
+        ),
     )
     service.create_problem(
         "teacher",
@@ -167,7 +169,7 @@ def test_problem_service_create_update_and_paginate() -> None:
             content="另一个题目",
             language="cpp",
             problem_type="oop",
-        )
+        ),
     )
 
     updated = service.update_problem(
@@ -196,7 +198,9 @@ def test_auth_service_registers_public_student_and_logs_in() -> None:
     service = AuthService(
         user_repository=repository,
         password_hasher=lambda password: f"hashed:{password}",
-        password_checker=lambda password_hash, password: password_hash == f"hashed:{password}",
+        password_checker=lambda password_hash, password: (
+            password_hash == f"hashed:{password}"
+        ),
         token_encoder=lambda user_id, role: f"token:{user_id}:{role}",
     )
 
@@ -228,6 +232,7 @@ class FakeUserRepository:
     """用于验证认证服务的内存仓储。"""
 
     def __init__(self) -> None:
+        self.unit_of_work = MagicMock()
         self.items = []
 
     def get_by_username(self, username: str):

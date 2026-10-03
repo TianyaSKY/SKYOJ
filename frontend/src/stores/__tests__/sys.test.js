@@ -1,65 +1,50 @@
-/**
- * 系统 Store 单元测试
- * 测试系统配置、运行模式等
- */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
-import { useSysStore } from '@/stores/sys'
+/** 系统配置 Store 的真实接口与降级行为。 */
+import {describe, it, expect, beforeEach, vi} from 'vitest'
+import {setActivePinia, createPinia} from 'pinia'
+import {useSysStore} from '@/stores/sys'
+import {getSysInfo} from '@/api/sys'
 
-// Mock request
-vi.mock('@/utils/request', () => ({
-  default: {
-    get: vi.fn(),
-  },
-}))
+vi.mock('@/api/sys', () => ({getSysInfo: vi.fn()}))
 
 describe('useSysStore', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     localStorage.clear()
     setActivePinia(createPinia())
   })
 
-  it('初始化时 practice 为 undefined', () => {
+  it('默认允许练习并且无警告', () => {
     const store = useSysStore()
-    expect(store.practice).toBeUndefined()
+    expect(store.practice).toBe(true)
+    expect(store.warning).toBe(false)
+    expect(store.loaded).toBe(false)
   })
 
-  it('从 localStorage 读取 practice 配置', () => {
-    localStorage.setItem('practice', 'true')
-    const store = useSysStore()
-    // store 可能在初始化时不读取 localStorage，需要 fetchSysInfo
-    expect(store.practice).toBeUndefined() // 取决于实现
-  })
-
-  it('fetchSysInfo 获取系统配置', async () => {
-    const request = vi.mocked(await import('@/utils/request')).default
-    request.get.mockResolvedValue({
-      title: 'SKYOJ',
-      practice: true,
-      examMode: false,
-    })
-
+  it('获取系统配置并更新文档标题', async () => {
+    getSysInfo.mockResolvedValue({title: '课堂 OJ', practice: false, warning: true, info: '通知'})
     const store = useSysStore()
     await store.fetchSysInfo()
-
-    expect(store.title).toBe('SKYOJ')
-    expect(store.practice).toBe(true)
-    expect(store.examMode).toBe(false)
+    expect(getSysInfo).toHaveBeenCalledOnce()
+    expect(store.title).toBe('课堂 OJ')
+    expect(document.title).toBe('课堂 OJ')
+    expect(store.practice).toBe(false)
+    expect(store.warning).toBe(true)
+    expect(store.info).toBe('通知')
+    expect(store.loaded).toBe(true)
   })
 
-  it('fetchSysInfo 失败处理', async () => {
-    const request = vi.mocked(await import('@/utils/request')).default
-    request.get.mockRejectedValue(new Error('Network error'))
-
-    const store = useSysStore()
-    await store.fetchSysInfo()
-
-    // 验证错误处理 (取决于实现)
-  })
-
-  it('设置练习模式', () => {
-    const store = useSysStore()
-    store.setPractice(true)
-    expect(store.practice).toBe(true)
+  it('网络失败时保留当前配置并记录错误', async () => {
+    const error = new Error('Network error')
+    getSysInfo.mockRejectedValue(error)
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const store = useSysStore()
+      await store.fetchSysInfo()
+      expect(store.practice).toBe(true)
+      expect(store.loaded).toBe(false)
+      expect(logged).toHaveBeenCalledWith('Failed to fetch system info:', error)
+    } finally {
+      logged.mockRestore()
+    }
   })
 })

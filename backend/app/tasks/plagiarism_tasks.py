@@ -4,13 +4,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.clients.jplag_client import JPlagClient
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import SCAN_PLAGIARISM_TASK
-from app.services.plagiarism_service import PlagiarismService
-from app.tasks.base import run_job
 from app.repositories.plagiarism_repository import PlagiarismRepository
 from app.repositories.submission_repository import SubmissionRepository
-from app.clients.jplag_client import JPlagClient
+from app.services.plagiarism_service import PlagiarismService
+from app.tasks.base import run_job
 
 
 @celery_app.task(name=SCAN_PLAGIARISM_TASK, ignore_result=True)
@@ -31,4 +31,4 @@ def _handle_scan(db: Session, payload: dict[str, Any]) -> None:
         submission_repo=SubmissionRepository(db),
         jplag_client=JPlagClient(),
     )
-    service.run_scan(db=db, problem_id=problem_id, min_similarity=min_similarity)
+    service.run_scan(problem_id=problem_id, min_similarity=min_similarity)

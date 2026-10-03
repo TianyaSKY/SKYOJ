@@ -11,6 +11,18 @@ import {
   clearStorage,
 } from './fixtures/index.js'
 
+async function enterCode(page, code) {
+  // Monaco 的隐藏 IME textarea 不可点击；通过实际编辑区域输入。
+  const editor = page.locator('.editor-wrapper .monaco-editor .view-lines').first()
+  await expect(editor).toBeVisible()
+  await editor.click()
+  // Monaco 按 UA 判定快捷键；设备模拟的 UA 可能与运行测试的主机不同。
+  const modifier = await page.evaluate(() => navigator.userAgent.includes('Macintosh') ? 'Meta' : 'Control')
+  await page.keyboard.press(`${modifier}+A`)
+  await page.keyboard.insertText(code)
+  await expect(editor).toContainText(code)
+}
+
 test.describe('题目模块 - 题目列表', () => {
   test.beforeEach(async ({ page }) => {
     await clearStorage(page)
@@ -158,12 +170,7 @@ test.describe('题目模块 - 代码提交', () => {
     await page.waitForTimeout(3000)
 
     // 查找编辑器
-    const editor = page.locator('.monaco-editor textarea, .monaco-editor .inputarea').first()
-    if (await editor.isVisible()) {
-      await editor.click()
-      await page.keyboard.type('#include <bits/stdc++.h>\nint main() { return 0; }')
-      await page.waitForTimeout(500)
-    }
+    await enterCode(page, 'print(3)')
   })
 
   test('提交按钮点击后触发提交', async ({ page }) => {
@@ -172,23 +179,21 @@ test.describe('题目模块 - 代码提交', () => {
     await page.waitForTimeout(3000)
 
     // 输入代码
-    const editor = page.locator('.monaco-editor textarea, .monaco-editor .inputarea').first()
-    if (await editor.isVisible()) {
-      await editor.click()
-      await page.keyboard.type('print("Hello")')
-      await page.waitForTimeout(500)
-    }
+    await enterCode(page, 'print(3)')
 
     // 点击提交
-    const submitBtn = page.locator('button:has-text("提交"), button:has-text("Submit")').first()
-    if (await submitBtn.isVisible() && await submitBtn.isEnabled()) {
-      await submitBtn.click()
-      await page.waitForTimeout(2000)
-
-      // 验证出现加载状态或成功提示
-      const loadingOrResult = page.locator('.el-loading-spinner, .el-message--success, [class*="result"]').first()
-      // 允许出现任何一种状态
-    }
+    const responsePromise = page.waitForResponse(response =>
+      response.url().includes('/api/submissions') && response.request().method() === 'POST')
+    await page.getByRole('button', {name: '提交代码', exact: true}).click()
+    const response = await responsePromise
+    expect(response.ok()).toBeTruthy()
+    const result = await response.json()
+    expect(result.submission_id).toBeGreaterThan(0)
+    const saved = await page.request.get(`${FRONTEND}/api/submissions/${result.submission_id}`, {
+      headers: {Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('token'))}`},
+    })
+    expect(saved.ok()).toBeTruthy()
+    expect((await saved.json()).code).toBe('print(3)')
   })
 
   test('提交后可以查看提交详情', async ({ page }) => {

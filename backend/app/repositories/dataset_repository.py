@@ -5,6 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.dataset import Dataset
+from app.unit_of_work import UnitOfWork
 
 
 class DatasetRepository:
@@ -12,6 +13,7 @@ class DatasetRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, dataset_id: int) -> Optional[Dataset]:
         """按主键查询数据集。"""
@@ -49,16 +51,18 @@ class DatasetRepository:
             uploader_id=uploader_id,
         )
         self._db.add(dataset)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(dataset)
         return dataset
 
     def delete(self, dataset: Dataset) -> None:
         """删除数据集记录。"""
         self._db.delete(dataset)
-        self._db.commit()
+        self._db.flush()
 
-    def mark_ready(self, dataset_id: int, *, file_size: str, file_hash: str) -> Optional[Dataset]:
+    def mark_ready(
+        self, dataset_id: int, *, file_size: str, file_hash: str
+    ) -> Optional[Dataset]:
         """文件落盘后将数据集标记为可用。"""
         dataset = self.get_by_id(dataset_id)
         if dataset is None:
@@ -68,7 +72,7 @@ class DatasetRepository:
         dataset.file_hash = file_hash
         dataset.temp_path = None
         dataset.error_message = None
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(dataset)
         return dataset
 
@@ -79,6 +83,6 @@ class DatasetRepository:
             return None
         dataset.status = "failed"
         dataset.error_message = error_message[:2000]
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(dataset)
         return dataset

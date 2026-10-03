@@ -325,6 +325,7 @@
 </template>
 
 <script setup>
+import {createProblemSchema, updateProblemSchema} from '@/schemas/problem'
 import {computed, onMounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {
@@ -551,13 +552,19 @@ const handleDelete = async (id) => {
 }
 
 const handleSubmit = async () => {
+  const parsed = (isEdit.value ? updateProblemSchema : createProblemSchema).safeParse(form.value)
+  if (!parsed.success) {
+    ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
+    return
+  }
+
   submitting.value = true
   try {
     if (isEdit.value) {
-      await updateProblem(currentProblemId.value, form.value)
+      await updateProblem(currentProblemId.value, parsed.data)
       ElMessage.success('更新成功')
     } else {
-      await createProblem(form.value)
+      await createProblem(parsed.data)
       ElMessage.success('新增成功')
     }
     dialogVisible.value = false

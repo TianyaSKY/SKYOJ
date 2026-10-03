@@ -11,6 +11,12 @@ from fastapi import (
 from fastapi.responses import FileResponse
 
 from app.api.deps import get_dataset_service
+from app.api.schemas.common import MessageResponse
+from app.api.schemas.dataset import (
+    DatasetResponse,
+    PaginatedDatasetsResponse,
+    UploadDatasetResponse,
+)
 from app.domain.dataset import PaginatedDatasets, UploadDatasetParams
 from app.services.dataset_service import DatasetService
 from app.utils.auth_tools import AuthContext, get_current_auth
@@ -18,7 +24,7 @@ from app.utils.auth_tools import AuthContext, get_current_auth
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=list[DatasetResponse] | PaginatedDatasetsResponse)
 def get_datasets(
     page: Optional[int] = Query(default=None, ge=1),
     page_size: Optional[int] = Query(default=None, ge=1, le=100),
@@ -37,7 +43,7 @@ def get_datasets(
     return [_dataset_to_response(dataset) for dataset in result]
 
 
-@router.post("", status_code=202)
+@router.post("", status_code=202, response_model=UploadDatasetResponse)
 async def upload_dataset(
     file: UploadFile = File(...),
     name: Optional[str] = Form(default=None),
@@ -60,7 +66,7 @@ async def upload_dataset(
     return {"message": "Upload started", "dataset": _dataset_to_response(dataset)}
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=MessageResponse)
 def delete_dataset(
     id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -70,7 +76,7 @@ def delete_dataset(
     return {"message": "Dataset deleted successfully"}
 
 
-@router.get("/{id}/download")
+@router.get("/{id}/download", response_model=None)
 def download_dataset(
     id: int,
     auth: AuthContext = Depends(get_current_auth),

@@ -1,19 +1,36 @@
 """考试领域业务服务。"""
 
 import hashlib
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.config import SECRET_KEY
-from app.domain.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
-from app.utils.time import utcnow
+from app.domain.errors import (
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
 from app.domain.exam import (
-    AddExamProblemParams, CreateExamParams, EnterExamParams, ExamDetail, ExamListItem,
-    ExamProblemStatus, ExamScoreRow, MonitorEntry, MonitorProblemInfo,
-    MonitorResult, MonitorSubmissionInfo, RankEntry, RankProblemInfo, RankProblemStats,
-    RankResult, UpdateExamParams,
+    AddExamProblemParams,
+    CreateExamParams,
+    EnterExamParams,
+    ExamDetail,
+    ExamListItem,
+    ExamProblemStatus,
+    ExamScoreRow,
+    MonitorEntry,
+    MonitorProblemInfo,
+    MonitorResult,
+    MonitorSubmissionInfo,
+    RankEntry,
+    RankProblemInfo,
+    RankProblemStats,
+    RankResult,
+    UpdateExamParams,
 )
 from app.mappers import from_exam_detail_orm, from_exam_orm
 from app.repositories.exam_repository import ExamRepository
+from app.utils.time import utcnow
+from loguru import logger
 
 
 class ExamService:
@@ -36,6 +53,7 @@ class ExamService:
             is_visible=params.is_visible,
             created_by=params.created_by,
         )
+        self._repository.unit_of_work.commit()
         return from_exam_detail_orm(exam, [])
 
     def list_exams(self, requester_role: str) -> list[ExamListItem]:
@@ -62,7 +80,11 @@ class ExamService:
         return from_exam_detail_orm(exam, self._repository.list_problems(exam_id))
 
     def enter_exam(
-        self, requester_role: str, user_id: int, current_exam_id: int, params: EnterExamParams
+        self,
+        requester_role: str,
+        user_id: int,
+        current_exam_id: int,
+        params: EnterExamParams,
     ) -> int:
         del user_id
         exam = self._require_exam(params.exam_id)
@@ -72,7 +94,11 @@ class ExamService:
             raise PermissionDeniedError("考试尚未开始")
         if now > exam.end_time:
             raise PermissionDeniedError("考试已结束")
-        if current_exam_id != exam.id and exam.password and self._hash_password(params.password) != exam.password:
+        if (
+            current_exam_id != exam.id
+            and exam.password
+            and self._hash_password(params.password) != exam.password
+        ):
             raise PermissionDeniedError("考试密码错误")
         return exam.id
 
@@ -88,13 +114,27 @@ class ExamService:
         items = []
         for item in problems:
             last = latest.get((user_id, item.problem_id))
-            items.append(ExamProblemStatus(item.problem_id, item.display_id, item.problem.title, item.score, last.status if last else "Not Attempted", last.score if last else 0, last.created_at if last else None))
+            items.append(
+                ExamProblemStatus(
+                    item.problem_id,
+                    item.display_id,
+                    item.problem.title,
+                    item.score,
+                    last.status if last else "Not Attempted",
+                    last.score if last else 0,
+                    last.created_at if last else None,
+                )
+            )
         return items
 
-    def update_exam(self, requester_role: str, exam_id: int, params: UpdateExamParams) -> ExamDetail:
+    def update_exam(
+        self, requester_role: str, exam_id: int, params: UpdateExamParams
+    ) -> ExamDetail:
         self._require_teacher(requester_role)
         exam = self._require_exam(exam_id)
-        start_time = params.start_time if params.start_time is not None else exam.start_time
+        start_time = (
+            params.start_time if params.start_time is not None else exam.start_time
+        )
         end_time = params.end_time if params.end_time is not None else exam.end_time
         self._validate_times(start_time, end_time)
         for field, value in (
@@ -110,23 +150,34 @@ class ExamService:
                 setattr(exam, field, value)
         if params.password is not None:
             exam.password = self._hash_password(params.password)
-        return from_exam_detail_orm(self._repository.update(exam), self._repository.list_problems(exam_id))
+        self._repository.update(exam)
+        self._repository.unit_of_work.commit()
+        return from_exam_detail_orm(exam, self._repository.list_problems(exam_id))
 
     def delete_exam(self, requester_role: str, exam_id: int) -> None:
         self._require_teacher(requester_role)
         self._repository.delete(self._require_exam(exam_id))
+        self._repository.unit_of_work.commit()
 
-    def add_problem(self, requester_role: str, exam_id: int, params: AddExamProblemParams) -> None:
+    def add_problem(
+        self, requester_role: str, exam_id: int, params: AddExamProblemParams
+    ) -> None:
         self._require_teacher(requester_role)
         self._require_exam(exam_id)
-        self._repository.add_problem(exam_id, params.problem_id, params.display_id, params.score)
+        self._repository.add_problem(
+            exam_id, params.problem_id, params.display_id, params.score
+        )
+        self._repository.unit_of_work.commit()
 
-    def remove_problem(self, requester_role: str, exam_id: int, problem_id: int) -> None:
+    def remove_problem(
+        self, requester_role: str, exam_id: int, problem_id: int
+    ) -> None:
         self._require_teacher(requester_role)
         item = self._repository.get_exam_problem(exam_id, problem_id)
         if item is None:
             raise ResourceNotFoundError("考试题目不存在")
         self._repository.delete_exam_problem(item)
+        self._repository.unit_of_work.commit()
 
     def monitor(self, requester_role: str, exam_id: int) -> MonitorResult:
         self._require_teacher(requester_role)
@@ -144,12 +195,24 @@ class ExamService:
             submissions, total = {}, 0.0
             for item in problems:
                 last = latest.get((user_id, item.problem_id))
-                info = MonitorSubmissionInfo(last.id if last else None, last.status if last else "Not Attempted", last.score if last else 0, last.created_at.isoformat() if last else None)
+                info = MonitorSubmissionInfo(
+                    last.id if last else None,
+                    last.status if last else "Not Attempted",
+                    last.score if last else 0,
+                    last.created_at.isoformat() if last else None,
+                )
                 submissions[item.problem_id] = info
                 total += info.score
             users.append(MonitorEntry(user.id, user.username, total, submissions))
         users.sort(key=lambda item: item.total_score, reverse=True)
-        return MonitorResult(exam.title, [MonitorProblemInfo(item.problem_id, item.display_id, item.score) for item in problems], users)
+        return MonitorResult(
+            exam.title,
+            [
+                MonitorProblemInfo(item.problem_id, item.display_id, item.score)
+                for item in problems
+            ],
+            users,
+        )
 
     def rank(
         self,
@@ -169,6 +232,7 @@ class ExamService:
           封榜期间所有未 Accepted 提交在 scoreboard 上显示为 '?'。
         """
         from app.utils.exam_cache import get_rank_cache, set_rank_cache
+
         exam = self._require_exam(exam_id)
         self._assert_exam_discoverable(requester_role, exam, session_exam_id)
         if self._should_hide_problems(requester_role, exam, session_exam_id):
@@ -186,9 +250,15 @@ class ExamService:
         view_time = now
         if as_of is not None:
             try:
-                from dateutil.parser import parse as parse_dt
-                view_time = parse_dt(as_of)
-            except Exception:
+                view_time = datetime.fromisoformat(as_of)
+                if view_time.tzinfo is not None:
+                    view_time = view_time.astimezone(UTC).replace(tzinfo=None)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "排行榜回溯时间无效，使用当前时间 exam_id={} as_of={}",
+                    exam_id,
+                    as_of,
+                )
                 view_time = now
         # freeze_minutes: 如果当前视口时间 > (end_time - freeze_minutes)，
         # 则视为处于封榜期，failed_attempts 不计入 scoreboard。
@@ -207,7 +277,8 @@ class ExamService:
                 ranks[submission.user_id] = RankEntry(
                     submission.user_id,
                     submission.user.username,
-                    0, 0,
+                    0,
+                    0,
                     {pid: RankProblemStats(False, 0, 0) for pid in problem_ids},
                 )
             entry = ranks[submission.user_id]
@@ -222,15 +293,20 @@ class ExamService:
                     elapsed,
                 )
                 ranks[submission.user_id] = RankEntry(
-                    entry.user_id, entry.username,
+                    entry.user_id,
+                    entry.username,
                     entry.solved + 1,
-                    entry.penalty + elapsed + (stats.failed_attempts if not in_freeze else 0) * 1200,
+                    entry.penalty
+                    + elapsed
+                    + (stats.failed_attempts if not in_freeze else 0) * 1200,
                     entry.problems,
                 )
             elif submission.status not in {"Pending", "Compile Error"}:
                 entry.problems[submission.problem_id] = RankProblemStats(
                     False,
-                    stats.failed_attempts + 1 if not in_freeze else stats.failed_attempts,
+                    stats.failed_attempts + 1
+                    if not in_freeze
+                    else stats.failed_attempts,
                     0,
                 )
 
@@ -243,7 +319,9 @@ class ExamService:
             set_rank_cache(exam_id, result.to_dict())
         return result
 
-    def score_rows(self, requester_role: str, exam_id: int) -> tuple[ExamDetail, list[ExamScoreRow]]:
+    def score_rows(
+        self, requester_role: str, exam_id: int
+    ) -> tuple[ExamDetail, list[ExamScoreRow]]:
         self._require_teacher(requester_role)
         detail = self.get_detail(exam_id, requester_role, -1)
         problem_ids = [problem.problem_id for problem in detail.problems]
@@ -297,4 +375,8 @@ class ExamService:
 
     @staticmethod
     def _hash_password(password: str | None) -> str | None:
-        return hashlib.sha256((password + SECRET_KEY).encode()).hexdigest() if password else None
+        return (
+            hashlib.sha256((password + SECRET_KEY).encode()).hexdigest()
+            if password
+            else None
+        )

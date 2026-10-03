@@ -60,6 +60,7 @@
 </template>
 
 <script setup>
+import {loginSchema} from '@/schemas/auth'
 import {reactive, ref} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
@@ -82,7 +83,7 @@ const loginRules = reactive({
   username: [{required: true, message: 'Please enter your username', trigger: 'blur'}],
   password: [
     {required: true, message: 'Please enter your password', trigger: 'blur'},
-    {min: 6, message: 'Password must be at least 6 characters long', trigger: 'blur'},
+    {max: 128, message: 'Password must be at most 128 characters long', trigger: 'blur'},
   ],
 })
 
@@ -90,11 +91,16 @@ const handleLogin = async () => {
   if (!loginFormRef.value) return
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
+      const parsed = loginSchema.safeParse(loginForm)
+      if (!parsed.success) {
+        ElMessage.error(parsed.error.issues[0]?.message || '请检查输入')
+        return
+      }
+
       loading.value = true
       try {
         await userStore.login({
-          username: loginForm.username,
-          password: loginForm.password
+          ...parsed.data
         })
         ElMessage.success('Login successful!')
         const redirect = route.query.redirect

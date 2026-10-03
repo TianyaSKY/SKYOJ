@@ -196,9 +196,11 @@ docker compose up -d mysql rabbitmq
 ```bash
 # 终端 1：后端 API（密码必须是 docker compose 启动时 MYSQL_PASSWORD 的实际值）
 cd backend
-DATABASE_URL=mysql+pymysql://skyoj:replace_with_strong_app_password@127.0.0.1:3306/oj_db \
+export DATABASE_URL=mysql+pymysql://skyoj:replace_with_strong_app_password@127.0.0.1:3306/oj_db \
 SECRET_KEY=hajimiyounanbeiluduoxixigahaayoudingdongji \
-CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672// \
+CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672//
+# API 与 Worker 启动前执行迁移
+uv run alembic -c alembic.ini upgrade head
 uv run python run.py
 ```
 
@@ -231,6 +233,8 @@ uv run python -m app.workers.job_recovery
 cd frontend
 npm run dev
 ```
+
+数据库结构升级已移到 Alembic；Docker Compose 的 `migrate` 服务成功后才会启动 API 和 Worker。迁移方式、事务约定及验证范围见 [架构与数据库迁移](docs/architecture.md)。
 
 ### 运行测试
 

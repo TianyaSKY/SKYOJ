@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.exam import Exam, ExamProblem
 from app.models.submission import Submission
 from app.models.user import User
+from app.unit_of_work import UnitOfWork
 
 
 class ExamRepository:
@@ -15,11 +16,12 @@ class ExamRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def create(self, **values) -> Exam:
         exam = Exam(**values)
         self._db.add(exam)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(exam)
         return exam
 
@@ -28,16 +30,18 @@ class ExamRepository:
 
     def list_visible_for(self, role: str) -> list[Exam]:
         query = self._db.query(Exam)
-        return query.all() if role == "teacher" else query.filter_by(is_visible=True).all()
+        return (
+            query.all() if role == "teacher" else query.filter_by(is_visible=True).all()
+        )
 
     def update(self, exam: Exam) -> Exam:
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(exam)
         return exam
 
     def delete(self, exam: Exam) -> None:
         self._db.delete(exam)
-        self._db.commit()
+        self._db.flush()
 
     def list_problems(self, exam_id: int, ordered: bool = False) -> list[ExamProblem]:
         query = self._db.query(ExamProblem).filter_by(exam_id=exam_id)
@@ -45,19 +49,27 @@ class ExamRepository:
             query = query.order_by(ExamProblem.display_id)
         return query.options(joinedload(ExamProblem.problem)).all()
 
-    def add_problem(self, exam_id: int, problem_id: int, display_id: str | None, score: int) -> ExamProblem:
-        item = ExamProblem(exam_id=exam_id, problem_id=problem_id, display_id=display_id, score=score)
+    def add_problem(
+        self, exam_id: int, problem_id: int, display_id: str | None, score: int
+    ) -> ExamProblem:
+        item = ExamProblem(
+            exam_id=exam_id, problem_id=problem_id, display_id=display_id, score=score
+        )
         self._db.add(item)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(item)
         return item
 
     def get_exam_problem(self, exam_id: int, problem_id: int):
-        return self._db.query(ExamProblem).filter_by(exam_id=exam_id, problem_id=problem_id).first()
+        return (
+            self._db.query(ExamProblem)
+            .filter_by(exam_id=exam_id, problem_id=problem_id)
+            .first()
+        )
 
     def delete_exam_problem(self, item: ExamProblem) -> None:
         self._db.delete(item)
-        self._db.commit()
+        self._db.flush()
 
     def count_problems(self, exam_id: int) -> int:
         return self._db.query(ExamProblem).filter_by(exam_id=exam_id).count()
@@ -66,16 +78,33 @@ class ExamRepository:
         return self._db.query(Submission).filter_by(exam_id=exam_id).count()
 
     def get_latest_submission(self, exam_id: int, user_id: int, problem_id: int):
-        return self._db.query(Submission).filter_by(exam_id=exam_id, user_id=user_id, problem_id=problem_id).order_by(Submission.created_at.desc()).first()
+        return (
+            self._db.query(Submission)
+            .filter_by(exam_id=exam_id, user_id=user_id, problem_id=problem_id)
+            .order_by(Submission.created_at.desc())
+            .first()
+        )
 
-    def list_submissions(self, exam_id: int, problem_ids: list[int] | None = None) -> list[Submission]:
+    def list_submissions(
+        self, exam_id: int, problem_ids: list[int] | None = None
+    ) -> list[Submission]:
         query = self._db.query(Submission).filter(Submission.exam_id == exam_id)
         if problem_ids is not None:
             query = query.filter(Submission.problem_id.in_(problem_ids))
-        return query.options(selectinload(Submission.user)).order_by(Submission.created_at.asc()).all()
+        return (
+            query.options(selectinload(Submission.user))
+            .order_by(Submission.created_at.asc())
+            .all()
+        )
 
     def list_submission_user_ids(self, exam_id: int) -> list[int]:
-        return [value[0] for value in self._db.query(Submission.user_id).filter(Submission.exam_id == exam_id).distinct().all()]
+        return [
+            value[0]
+            for value in self._db.query(Submission.user_id)
+            .filter(Submission.exam_id == exam_id)
+            .distinct()
+            .all()
+        ]
 
     def list_latest_submissions(
         self,
@@ -97,7 +126,10 @@ class ExamRepository:
 
     def list_users(self, user_ids: list[int]) -> dict[int, User]:
         """一次查询取用户，返回 id→User 字典。"""
-        return {user.id: user for user in self._db.query(User).filter(User.id.in_(user_ids)).all()}
+        return {
+            user.id: user
+            for user in self._db.query(User).filter(User.id.in_(user_ids)).all()
+        }
 
     def count_problems_batch(self, exam_ids: list[int]) -> dict[int, int]:
         """GROUP BY exam_id 统计题目数。"""

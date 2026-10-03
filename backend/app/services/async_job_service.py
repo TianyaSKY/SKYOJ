@@ -2,15 +2,12 @@
 
 from datetime import datetime, timedelta
 
-from loguru import logger
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 from app.domain.async_job import (
+    LEASE_SECONDS,
     AsyncJobResult,
     CreateAsyncJobParams,
-    LEASE_SECONDS,
 )
+from app.domain.json import JsonValue
 from app.mappers import from_async_job_orm
 from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
 from app.messaging.task_names import (
@@ -23,6 +20,9 @@ from app.messaging.task_names import (
 )
 from app.repositories.async_job_repository import AsyncJobRepository
 from app.utils.time import utcnow
+from loguru import logger
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 class AsyncJobService:
@@ -53,8 +53,9 @@ class AsyncJobService:
                 max_attempts=params.max_attempts,
                 available_at=available_at,
             )
+            self._repository.unit_of_work.commit()
         except IntegrityError:
-            self._repository.rollback()
+            self._repository.unit_of_work.rollback()
             if not params.dedupe_key:
                 raise
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
@@ -72,6 +73,7 @@ class AsyncJobService:
         except Exception as exc:
             # 投递失败即撤销任务记录，客户端可重试（dedupe 键不复用僵尸任务）
             self._repository.delete(job)
+            self._repository.unit_of_work.commit()
             logger.exception("发布异步任务失败 job_id={} queue={}", job.id, job.queue)
             raise
         return from_async_job_orm(job)
@@ -161,11 +163,13 @@ class AsyncJobService:
             now=now,
             lease_until=now + timedelta(seconds=max(1, lease_seconds)),
         )
+        self._repository.unit_of_work.commit()
         return from_async_job_orm(job) if job is not None else None
 
     def complete_job(self, job_id: int) -> AsyncJobResult | None:
         """标记任务成功。"""
         job = self._repository.mark_succeeded(job_id, now=utcnow())
+        self._repository.unit_of_work.commit()
         return from_async_job_orm(job) if job is not None else None
 
     def fail_job(
@@ -189,6 +193,7 @@ class AsyncJobService:
             now=now,
             retry_at=retry_at,
         )
+        self._repository.unit_of_work.commit()
         if failed is not None:
             logger.warning(
                 "异步任务失败 job_id={} retry={} status={} error={}",
@@ -212,6 +217,7 @@ class AsyncJobService:
     def recover_expired_jobs(self, *, limit: int = 100) -> int:
         """恢复过期租约任务并重新投递。"""
         jobs = self._repository.recover_expired(now=utcnow(), limit=limit)
+        self._repository.unit_of_work.commit()
         for job in jobs:
             try:
                 self._publish(job)
@@ -227,7 +233,7 @@ class AsyncJobService:
         return LEASE_SECONDS.get(task_name, 10 * 60)
 
     @staticmethod
-    def parse_payload(raw: str) -> dict:
+    def parse_payload(raw: str) -> dict[str, JsonValue]:
         """解析任务 JSON 参数。"""
         return AsyncJobRepository.parse_payload(raw)
 

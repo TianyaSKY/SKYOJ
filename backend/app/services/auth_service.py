@@ -40,12 +40,15 @@ class AuthService:
             password_hash=self._password_hasher(params.password),
             role="student",
         )
+        self._user_repository.unit_of_work.commit()
         return RegisterResult(user_id=user.id, username=user.username)
 
     def login(self, params: LoginParams) -> LoginResult:
         """校验凭据并签发访问令牌。"""
         user = self._user_repository.get_by_username(params.username)
-        if user is None or not self._password_checker(user.password_hash, params.password):
+        if user is None or not self._password_checker(
+            user.password_hash, params.password
+        ):
             raise AuthenticationError("用户名或密码错误")
 
         token = self._token_encoder(user.id, user.role)

@@ -26,14 +26,14 @@ test.describe('认证流程', () => {
     await expect(page).toHaveTitle(/./)
     // 验证表单元素存在
     await expect(page.locator('input[type="text"], input[type="email"]')).toBeVisible()
-    await expect(page.locator('input[type="password"]')).toBeVisible()
+    await expect(page.locator('input[type="password"]').first()).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toBeVisible()
   })
 
   test('注册页正确加载', async ({ page }) => {
     await page.goto(`${FRONTEND}/register`)
     await expect(page.locator('input[type="text"], input[type="email"]')).toBeVisible()
-    await expect(page.locator('input[type="password"]')).toBeVisible()
+    await expect(page.locator('input[type="password"]').first()).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toBeVisible()
   })
 
@@ -99,34 +99,37 @@ test.describe('认证流程', () => {
 
     // 填写注册表单 (根据实际表单结构调整)
     const usernameInput = page.locator('input[type="text"]').first()
-    const emailInput = page.locator('input[type="email"]').first()
-    const passwordInput = page.locator('input[type="password"]')
+    const passwordInput = page.locator('input[type="password"]').nth(0)
+    const confirmInput = page.locator('input[type="password"]').nth(1)
     const submitBtn = page.locator('button[type="submit"]')
 
     await usernameInput.fill(uniqueUsername)
-    await emailInput.fill(`${uniqueUsername}@test.com`)
     await passwordInput.fill('Test123456')
+    await confirmInput.fill('Test123456')
     await submitBtn.click()
 
     // 等待注册成功跳转或成功提示
     await page.waitForTimeout(2000)
     // 成功后会跳转到登录页或自动登录
-    const url = page.url()
-    expect(url.includes('/login') || url.includes('/') || await page.evaluate(() => localStorage.getItem('token'))).toBeTruthy()
+    await expect(page).toHaveURL(/\/login/)
+    const response = await page.request.post(`${FRONTEND}/api/auth/login`, {
+      data: {username: uniqueUsername, password: 'Test123456'},
+    })
+    expect(response.ok()).toBeTruthy()
   })
 
   test('注册失败 - 用户名已存在', async ({ page }) => {
     await page.goto(`${FRONTEND}/register`)
 
     const usernameInput = page.locator('input[type="text"]').first()
-    const emailInput = page.locator('input[type="email"]').first()
-    const passwordInput = page.locator('input[type="password"]')
+    const passwordInput = page.locator('input[type="password"]').nth(0)
+    const confirmInput = page.locator('input[type="password"]').nth(1)
     const submitBtn = page.locator('button[type="submit"]')
 
     // 使用已存在的用户名
     await usernameInput.fill(testUsers.student.username)
-    await emailInput.fill('another@test.com')
     await passwordInput.fill('Test123456')
+    await confirmInput.fill('Test123456')
     await submitBtn.click()
 
     // 等待响应
@@ -134,28 +137,27 @@ test.describe('认证流程', () => {
     // 应该显示错误或仍在注册页
     const url = page.url()
     expect(url.includes('/register')).toBeTruthy()
+    await expect(page.locator('.el-message--error')).toBeVisible()
   })
 
   test('注册表单验证 - 密码过短', async ({ page }) => {
     await page.goto(`${FRONTEND}/register`)
 
     const usernameInput = page.locator('input[type="text"]').first()
-    const emailInput = page.locator('input[type="email"]').first()
-    const passwordInput = page.locator('input[type="password"]')
+    const passwordInput = page.locator('input[type="password"]').nth(0)
+    const confirmInput = page.locator('input[type="password"]').nth(1)
     const submitBtn = page.locator('button[type="submit"]')
 
     await usernameInput.fill(generateUniqueUsername('testuser'))
-    await emailInput.fill('test@test.com')
     await passwordInput.fill('123') // 密码过短
+    await confirmInput.fill('123')
     await submitBtn.click()
 
     // 应该显示验证错误或阻止提交
     await page.waitForTimeout(1000)
     // 检查是否有错误提示
     const errorMsg = page.locator('.el-form-item__error, .el-message--error, [role="alert"]')
-    if (await errorMsg.count() > 0) {
-      await expect(errorMsg.first()).toBeVisible()
-    }
+    await expect(errorMsg.first()).toBeVisible()
   })
 })
 

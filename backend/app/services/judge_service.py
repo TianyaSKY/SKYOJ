@@ -3,12 +3,11 @@
 import os
 import time as time_module
 
-from loguru import logger
-
 from app.repositories.submission_repository import SubmissionRepository
 from app.services.acm import run_acm_judge
 from app.services.kaggle import run_kaggle_judge
 from app.services.oop import run_oop_judge
+from loguru import logger
 
 
 def judge_submission(submission_id: int, db) -> None:
@@ -56,10 +55,13 @@ def judge_submission(submission_id: int, db) -> None:
         duration = time_module.perf_counter() - judge_start
         try:
             from app.utils.metrics import judge_duration, submissions_total
+
             judge_duration.labels(problem_type=problem_type).observe(duration)
-            submissions_total.labels(problem_type=problem_type, status=final_status).inc()
+            submissions_total.labels(
+                problem_type=problem_type, status=final_status
+            ).inc()
         except Exception:
-            pass
+            logger.exception("记录判题指标失败 submission_id={}", submission_id)
 
     repository.update_result(
         submission_id,
@@ -74,6 +76,7 @@ def judge_submission(submission_id: int, db) -> None:
     if submission is not None:
         try:
             from app.services.wrong_book_service import WrongBookService
+
             wb = WrongBookService(db)
             wb.on_judge_complete(
                 user_id=submission.user_id,
@@ -82,7 +85,9 @@ def judge_submission(submission_id: int, db) -> None:
                 status=final_status,
             )
         except Exception as exc:
-            logger.warning("错题本更新失败 submission_id={} error={}", submission_id, exc)
+            logger.warning(
+                "错题本更新失败 submission_id={} error={}", submission_id, exc
+            )
 
     _publish_realtime_result(submission_id, final_status, final_score, final_log)
 
@@ -93,10 +98,13 @@ def judge_submission(submission_id: int, db) -> None:
         _enqueue_plagiarism_scan(db, problem_id)
 
 
-def _publish_realtime_result(submission_id: int, status: str, score: float, output_log: str) -> None:
+def _publish_realtime_result(
+    submission_id: int, status: str, score: float, output_log: str
+) -> None:
     """判题完成后发布实时通知。失败静默，不影响主流程。"""
     try:
         from app.utils.realtime import publish_submission_result
+
         publish_submission_result(submission_id, status, score, output_log)
     except Exception as exc:
         logger.warning("实时推送失败 submission_id={} error={}", submission_id, exc)
@@ -106,6 +114,7 @@ def _invalidate_exam_cache(exam_id: int) -> None:
     """考试中提交判题后，失效排行榜缓存以保证下一位用户看到最新结果。"""
     try:
         from app.utils.exam_cache import invalidate_rank_cache
+
         invalidate_rank_cache(exam_id)
     except Exception as exc:
         logger.warning("失效考试缓存失败 exam_id={} error={}", exam_id, exc)

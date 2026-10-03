@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
+from app.domain.json import JsonValue
 
 # 任务类型
 TASK_PROBLEM_GENERATION = "problem_generation"
@@ -24,6 +25,7 @@ class SubmitProblemGenerationParams:
     user_id: int
     background: str
     difficulty: str
+    requester_role: str
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,7 @@ class SubmitTestScriptGenerationParams:
     user_id: int
     problem_id: int
     direction: str
+    requester_role: str
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,7 @@ class SubmitTestDataExecutionParams:
     code: str
     problem_type: str
     language: str
+    requester_role: str
     source_draft_id: Optional[int] = None
 
 
@@ -81,8 +85,8 @@ class AiDraftDetail:
     status: str
     title: str
     problem_id: Optional[int]
-    request_payload: dict[str, Any]
-    result_payload: dict[str, Any]
+    request_payload: dict[str, JsonValue]
+    result_payload: dict[str, JsonValue]
     error_message: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]

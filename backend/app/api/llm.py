@@ -3,18 +3,26 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from pydantic import JsonValue
 
 from app.api.deps import get_ai_draft_service, get_llm_facade_service
 from app.api.schemas.ai_draft import (
+    ApplyDraftResponse,
     AskLlmBody,
     AskLlmSSEBody,
+    DraftDetailResponse,
+    DraftListResponse,
+    DraftStatsResponse,
+    ExecuteGenerationResponse,
     ExecuteTestDataDraftBody,
     ExecuteTestGenerationBody,
     GenerateProblemDraftBody,
     GenerateTestScriptDraftBody,
+    SubmitDraftResponse,
 )
+from app.api.schemas.common import MessageResponse
 from app.domain.ai_draft import (
     SubmitProblemGenerationParams,
     SubmitTestDataExecutionParams,
@@ -28,11 +36,6 @@ from app.utils.auth_tools import AuthContext, get_current_auth
 router = APIRouter()
 
 
-def _require_teacher(auth: AuthContext) -> None:
-    if auth.user.role != "teacher":
-        raise HTTPException(status_code=403, detail={"error": "Permission denied"})
-
-
 def _dt_iso(value: Optional[datetime]) -> Optional[str]:
     if value is None:
         return None
@@ -44,24 +47,24 @@ def _dt_iso(value: Optional[datetime]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/ask")
+@router.post("/ask", response_model=dict[str, JsonValue])
 def call_llm(
     body: AskLlmBody,
     auth: AuthContext = Depends(get_current_auth),
     service: LlmFacadeService = Depends(get_llm_facade_service),
 ):
-    _require_teacher(auth)
     return service.ask(
         AskLlmParams(
             system_setting=body.system_setting,
+            requester_role=auth.user.role,
             prompt=body.prompt,
             output_format=body.output_format,
             context_submission_id=body.context_submission_id,
         )
-    )
+    ).payload
 
 
-@router.post("/ask/stream")
+@router.post("/ask/stream", response_model=None)
 def call_llm_stream(
     body: AskLlmSSEBody,
     auth: AuthContext = Depends(get_current_auth),
@@ -75,9 +78,9 @@ def call_llm_stream(
       event: done   data:             （结束时）
       event: error  data: <错误信息>  （出错时）
     """
-    _require_teacher(auth)
     params = AskLlmParams(
         system_setting=body.system_setting,
+        requester_role=auth.user.role,
         prompt=body.prompt,
         output_format=body.output_format,
         context_submission_id=body.context_submission_id,
@@ -97,17 +100,19 @@ def call_llm_stream(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/drafts/problem-generation", status_code=202)
+@router.post(
+    "/drafts/problem-generation", status_code=202, response_model=SubmitDraftResponse
+)
 def submit_problem_generation(
     body: GenerateProblemDraftBody,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """异步 AI 出题：立即返回草稿 ID，结果写入草稿箱。"""
-    _require_teacher(auth)
     result = service.submit_problem_generation(
         SubmitProblemGenerationParams(
             user_id=auth.user.id,
+            requester_role=auth.user.role,
             background=body.background,
             difficulty=body.difficulty,
         )
@@ -122,17 +127,21 @@ def submit_problem_generation(
     }
 
 
-@router.post("/drafts/test-script-generation", status_code=202)
+@router.post(
+    "/drafts/test-script-generation",
+    status_code=202,
+    response_model=SubmitDraftResponse,
+)
 def submit_test_script_generation(
     body: GenerateTestScriptDraftBody,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """异步生成测例/评估脚本。"""
-    _require_teacher(auth)
     result = service.submit_test_script_generation(
         SubmitTestScriptGenerationParams(
             user_id=auth.user.id,
+            requester_role=auth.user.role,
             problem_id=body.problem_id,
             direction=body.direction,
         )
@@ -147,17 +156,19 @@ def submit_test_script_generation(
     }
 
 
-@router.post("/drafts/test-data-execution", status_code=202)
+@router.post(
+    "/drafts/test-data-execution", status_code=202, response_model=SubmitDraftResponse
+)
 def submit_test_data_execution(
     body: ExecuteTestDataDraftBody,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """异步执行测例生成或保存非 ACM 脚本。"""
-    _require_teacher(auth)
     result = service.submit_test_data_execution(
         SubmitTestDataExecutionParams(
             user_id=auth.user.id,
+            requester_role=auth.user.role,
             problem_id=body.problem_id,
             code=body.code,
             problem_type=body.type,
@@ -180,17 +191,21 @@ def submit_test_data_execution(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/execute-test-generation", status_code=202)
+@router.post(
+    "/execute-test-generation",
+    status_code=202,
+    response_model=ExecuteGenerationResponse,
+)
 def execute_test_generation(
     body: ExecuteTestGenerationBody,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """兼容旧接口。"""
-    _require_teacher(auth)
     result = service.submit_test_data_execution(
         SubmitTestDataExecutionParams(
             user_id=auth.user.id,
+            requester_role=auth.user.role,
             problem_id=body.problem_id,
             code=body.code,
             problem_type=body.type or "acm",
@@ -209,7 +224,7 @@ def execute_test_generation(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/drafts")
+@router.get("/drafts", response_model=DraftListResponse)
 def list_drafts(
     status: Optional[str] = Query(default=None),
     task_type: Optional[str] = Query(default=None),
@@ -218,12 +233,12 @@ def list_drafts(
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """列出当前教师的草稿箱任务。"""
-    _require_teacher(auth)
     items = service.list_drafts(
         auth.user.id,
         status=status,
         task_type=task_type,
         limit=limit,
+        requester_role=auth.user.role,
     )
 
     return {
@@ -244,14 +259,13 @@ def list_drafts(
     }
 
 
-@router.get("/drafts/stats")
+@router.get("/drafts/stats", response_model=DraftStatsResponse)
 def draft_stats(
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """草稿箱统计（角标用）。"""
-    _require_teacher(auth)
-    stats = service.get_stats(auth.user.id)
+    stats = service.get_stats(auth.user.id, requester_role=auth.user.role)
 
     return {
         "total": stats.total,
@@ -264,15 +278,14 @@ def draft_stats(
     }
 
 
-@router.get("/drafts/{draft_id}")
+@router.get("/drafts/{draft_id}", response_model=DraftDetailResponse)
 def get_draft(
     draft_id: int,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """草稿详情。"""
-    _require_teacher(auth)
-    item = service.get_draft(auth.user.id, draft_id)
+    item = service.get_draft(auth.user.id, draft_id, requester_role=auth.user.role)
 
     return {
         "id": item.id,
@@ -289,27 +302,27 @@ def get_draft(
     }
 
 
-@router.delete("/drafts/{draft_id}")
+@router.delete("/drafts/{draft_id}", response_model=MessageResponse)
 def delete_draft(
     draft_id: int,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """删除草稿。"""
-    _require_teacher(auth)
-    service.delete_draft(auth.user.id, draft_id)
+    service.delete_draft(auth.user.id, draft_id, requester_role=auth.user.role)
     return {"message": "草稿已删除"}
 
 
-@router.post("/drafts/{draft_id}/apply")
+@router.post("/drafts/{draft_id}/apply", response_model=ApplyDraftResponse)
 def apply_problem_draft(
     draft_id: int,
     auth: AuthContext = Depends(get_current_auth),
     service: AiDraftService = Depends(get_ai_draft_service),
 ):
     """将成功的出题草稿创建为正式题目。"""
-    _require_teacher(auth)
-    result = service.apply_problem_draft(auth.user.id, draft_id)
+    result = service.apply_problem_draft(
+        auth.user.id, draft_id, requester_role=auth.user.role
+    )
 
     return {
         "message": "题目创建成功",

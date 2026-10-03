@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import get_auth_service
-from app.api.schemas.auth import LoginBody, RegisterBody
+from app.api.schemas.auth import LoginBody, LoginResponse, RegisterBody
+from app.api.schemas.common import MessageResponse
 from app.domain.auth import LoginParams, RegisterParams
 from app.middleware.rate_limit import client_ip_from_request, enforce
 from app.services.auth_service import AuthService
@@ -9,7 +10,7 @@ from app.services.auth_service import AuthService
 router = APIRouter()
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, response_model=MessageResponse)
 def register(
     body: RegisterBody,
     request: Request,
@@ -26,7 +27,7 @@ def register(
     return {"message": "User registered successfully"}
 
 
-@router.post("/login")
+@router.post("/login", response_model=LoginResponse)
 def login(
     body: LoginBody,
     request: Request,

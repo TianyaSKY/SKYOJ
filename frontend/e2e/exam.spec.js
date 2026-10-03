@@ -11,6 +11,13 @@ import {
   clearStorage,
 } from './fixtures/index.js'
 
+// 按页面隔离考试模式，避免并行用例修改全局系统配置互相影响。
+test.beforeEach(async ({page}) => {
+  await page.route('**/api/sys/info', route => route.fulfill({
+    json: {title: 'SKYOJ', practice: false, warning: false, info: ''},
+  }))
+})
+
 test.describe('竞赛模块 - 考试列表', () => {
   test.beforeEach(async ({ page }) => {
     await clearStorage(page)
@@ -44,18 +51,11 @@ test.describe('竞赛模块 - 考试列表', () => {
     await page.waitForTimeout(3000)
 
     // 查找考试卡片
-    const examCard = page.locator('.exam-card, .contest-item, [class*="exam"]').first()
-    if (await examCard.isVisible()) {
-      // 验证考试名称
-      const title = examCard.locator('[class*="title"], h3, h4').first()
-      await expect(title).toBeVisible()
-
-      // 验证时间信息
-      const time = examCard.locator('text=/\\d{4}/').first()
-      if (await time.isVisible()) {
-        await expect(time).toBeVisible()
-      }
-    }
+    const examCard = page.locator('.exam-card').filter({hasText: testExams[0].title})
+    await expect(examCard).toBeVisible()
+    await expect(examCard.locator('.exam-title')).toHaveText(testExams[0].title)
+    await expect(examCard.locator('.exam-meta')).toContainText('开始:')
+    await expect(examCard.locator('.exam-meta')).toContainText('结束:')
   })
 
   test('已结束的考试标记', async ({ page }) => {
@@ -107,9 +107,8 @@ test.describe('竞赛模块 - 考试详情', () => {
     await page.waitForTimeout(2000)
 
     // 查找倒计时
-    const timer = page.locator('[class*="timer"], [class*="countdown"], text=/\\d{2}:\\d{2}:\\d{2}/').first()
-    // 倒计时可能不存在或已过期
-    expect(await timer.count()).toBeGreaterThanOrEqual(0)
+    const timer = page.locator('.timer-value')
+    await expect(timer).toHaveText(/\d{2}:\d{2}:\d{2}/)
   })
 
   test('考试题目列表显示', async ({ page }) => {

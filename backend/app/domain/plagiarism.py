@@ -1,7 +1,7 @@
 """查重相关业务参数与结果。"""
 
 from dataclasses import dataclass
-from typing import Optional
+from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -33,3 +33,24 @@ class PlagiarismResult:
     problem_id: int
     total_pairs: int
     high_risk_pairs: list[SimilarityPair]
+
+
+@dataclass(frozen=True)
+class PlagiarismReportItem:
+    id: int
+    submission_a_id: int
+    submission_b_id: int
+    username_a: str
+    username_b: str
+    similarity_score: float
+    matched_blocks: list[MatchedBlock]
+    status: str
+    created_at: datetime | None
+
+
+@dataclass(frozen=True)
+class PaginatedPlagiarismReports:
+    total: int
+    page: int
+    page_size: int
+    reports: list[PlagiarismReportItem]

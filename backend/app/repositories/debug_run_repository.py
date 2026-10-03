@@ -6,6 +6,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.debug_run import DebugRun
+from app.repositories.submission_repository import SubmissionRepository
+from app.unit_of_work import UnitOfWork
 from app.utils.time import utcnow
 
 
@@ -14,6 +16,7 @@ class DebugRunRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def create(
         self,
@@ -34,7 +37,7 @@ class DebugRunRepository:
             status="Pending",
         )
         self._db.add(row)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(row)
         return row
 
@@ -75,7 +78,13 @@ class DebugRunRepository:
         if memory_used_kb is not None:
             values["memory_used_kb"] = memory_used_kb
         self._db.query(DebugRun).filter(DebugRun.id == debug_run_id).update(values)
-        self._db.commit()
+        self._db.flush()
+
+    def get_problem(self, problem_id: int):
+        return SubmissionRepository(self._db).get_problem(problem_id)
+
+    def get_active_exam(self, exam_id: int, now: datetime):
+        return SubmissionRepository(self._db).get_active_exam(exam_id, now)
 
 
 __all__ = ["DebugRunRepository"]

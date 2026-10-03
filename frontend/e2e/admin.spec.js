@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test'
 import {
   testUsers,
+  testExams,
   testProblems,
   FRONTEND,
   setAuthState,
@@ -256,7 +257,7 @@ test.describe('教师管理 - 考试监控', () => {
   })
 
   test('考试监控页面正确加载', async ({ page }) => {
-    const examId = testProblems[0].id
+    const examId = testExams[0].id
     await page.goto(`${FRONTEND}/admin/exams/${examId}/monitor`)
     await page.waitForTimeout(3000)
 

@@ -33,7 +33,9 @@ class UserService:
             raise ValueError("未选择头像文件")
         user = self._require_user(params.user_id)
         avatar = self._avatar_storage_client.save(params.filename, params.content)
-        return from_user_orm(self._user_repository.update_avatar(user, avatar))
+        updated = from_user_orm(self._user_repository.update_avatar(user, avatar))
+        self._user_repository.unit_of_work.commit()
+        return updated
 
     def get_avatar_path(self, filename: str) -> str:
         """获取头像文件的安全路径。"""
@@ -46,7 +48,10 @@ class UserService:
         if requester_role != "teacher" and requester_id != user_id:
             raise PermissionDeniedError("无权查看该用户的提交记录")
         self._require_user(user_id)
-        return [from_user_submission_orm(item) for item in self._user_repository.list_submissions(user_id)]
+        return [
+            from_user_submission_orm(item)
+            for item in self._user_repository.list_submissions(user_id)
+        ]
 
     def _require_user(self, user_id: int):
         user = self._user_repository.get_by_id(user_id)

@@ -19,3 +19,15 @@ class LoginBody(BaseModel):
 
     username: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=1, max_length=128)
+
+
+class AuthUserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+
+
+class LoginResponse(BaseModel):
+    message: str
+    token: str
+    user: AuthUserResponse

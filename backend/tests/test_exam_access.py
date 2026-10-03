@@ -2,9 +2,9 @@
 
 from datetime import timedelta
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
-
 from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.domain.exam import EnterExamParams
 from app.services.exam_service import ExamService
@@ -15,6 +15,7 @@ class FakeExamRepository:
     """用于验证考试访问控制的内存仓储。"""
 
     def __init__(self, exam, problems=None) -> None:
+        self.unit_of_work = MagicMock()
         self.exam = exam
         self.problems = problems or []
 
@@ -76,7 +77,9 @@ def test_hidden_exam_is_not_discoverable_to_students() -> None:
 
 def test_password_exam_hides_problems_until_entered() -> None:
     hashed = ExamService._hash_password("secret")
-    service = ExamService(FakeExamRepository(_exam(visible=True, password=hashed), [_problem()]))
+    service = ExamService(
+        FakeExamRepository(_exam(visible=True, password=hashed), [_problem()])
+    )
 
     preview = service.get_detail(8, "student", -1)
     assert preview.problems == []

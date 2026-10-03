@@ -7,7 +7,7 @@
  */
 import { test, expect } from '@playwright/test'
 
-const FRONTEND = 'http://localhost:80'
+const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:80'
 
 test.describe('SKYOJ E2E - 前端可达', () => {
   test('首页加载,可见导航或登录入口', async ({ page }) => {
@@ -30,10 +30,10 @@ test.describe('SKYOJ E2E - 前端可达', () => {
 })
 
 test.describe('SKYOJ E2E - 后端 API 反代', () => {
-  test('nginx 反代 /api/../healthz 透传 backend 200', async ({ request }) => {
-    const resp = await request.get(`${FRONTEND}/api/../healthz`)
-    // nginx 可能拒绝路径穿越,但通常会 back 200 文本。
-    expect([200, 400, 404]).toContain(resp.status())
+  test('前端反代健康检查返回后端状态', async ({ request }) => {
+    const resp = await request.get(`${FRONTEND}/healthz`)
+    expect(resp.status()).toBe(200)
+    expect(await resp.json()).toEqual({status: 'ok'})
   })
 
   test('直接通过前端反代 /api/problems/ 返回 401 (未登录)', async ({ request }) => {

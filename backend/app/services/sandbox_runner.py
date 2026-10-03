@@ -158,8 +158,8 @@ class SandboxRunner:
             logger.warning("停止沙箱容器失败: {}", exc)
         try:
             container.remove(force=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("移除沙箱容器失败: {}", exc)
 
     def __enter__(self) -> "SandboxRunner":
         return self

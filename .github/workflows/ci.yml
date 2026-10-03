@@ -112,6 +112,15 @@ jobs:
     name: Frontend E2E tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      CI: true
+      E2E_BASE_URL: http://127.0.0.1:4173
+      E2E_API_URL: http://127.0.0.1:5015
+      DATABASE_URL: sqlite:////tmp/skyoj-e2e.sqlite
+      SECRET_KEY: ci-e2e-secret-key-for-github-actions
+      CELERY_BROKER_URL: memory://
+      REDIS_URL: ""
+      UPLOAD_FOLDER: /tmp/skyoj-e2e-uploads
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -127,6 +136,16 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare isolated E2E database
+        run: |
+          uv sync --frozen
+          uv run alembic -c backend/alembic.ini upgrade head
+          uv run python backend/scripts/seed_e2e.py
+
       - name: Install Playwright browsers
         working-directory: frontend
         run: npx playwright install --with-deps
@@ -137,13 +156,14 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend
-        env:
-          CI: true
-          E2E_BASE_URL: http://localhost:80
-        run: |
-          # Start preview server in background
-          npm run preview -- --port 80 &
-          SERVER_PID=$!
-          sleep 5
-          npm run test:e2e || true
-          kill $SERVER_PID 2>/dev/null || true
+        run: npm run test:e2e
+
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7

@@ -3,9 +3,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from app.domain.plagiarism import MatchedBlock, SimilarityPair
 from app.clients.jplag_client import JPlagClient
+from app.domain.plagiarism import MatchedBlock, SimilarityPair
 
 
 class TestJPlagClient:
@@ -63,7 +62,9 @@ class TestJPlagClient:
 
         client = JPlagClient()
         with patch("app.clients.jplag_client.time.sleep"):
-            with patch("app.clients.jplag_client.JPlagClient._poll_result") as mock_poll:
+            with patch(
+                "app.clients.jplag_client.JPlagClient._poll_result"
+            ) as mock_poll:
                 mock_poll.return_value = []
                 client.compare(
                     [{"id": 1, "code": "x = 1"}, {"id": 2, "code": "x = 2"}],
@@ -102,7 +103,8 @@ class TestPlagiarismService:
                 plagiarism_repo=mock_plagiarism_repo,
                 submission_repo=mock_submission_repo,
             )
-            job_id = service.trigger_scan(MagicMock(), problem_id=5)
+            service._job_service = mock_job_service
+            job_id = service.trigger_scan(problem_id=5)
 
         assert job_id == 42
         mock_job_service.enqueue.assert_called_once()
@@ -122,8 +124,10 @@ class TestPlagiarismService:
                 score=0.85,
                 matched_blocks=[
                     MatchedBlock(
-                        start_a=1, end_a=5,
-                        start_b=3, end_b=7,
+                        start_a=1,
+                        end_a=5,
+                        start_b=3,
+                        end_b=7,
                         code_a="for i in range(n):",
                         code_b="for j in range(n):",
                     )
@@ -147,7 +151,7 @@ class TestPlagiarismService:
             language="python",
         )
         mock_sub_b.user = MagicMock(username="bob")
-        mock_db.query.return_value.filter.return_value.options.return_value.all.return_value = [
+        mock_submission_repo.list_accepted_for_plagiarism.return_value = [
             mock_sub_a,
             mock_sub_b,
         ]
@@ -164,7 +168,6 @@ class TestPlagiarismService:
             return_value="main.py",
         ):
             result = service.run_scan(
-                db=mock_db,
                 problem_id=1,
                 min_similarity=0.3,
             )
@@ -191,6 +194,10 @@ class TestPlagiarismService:
             )
         ]
 
+        mock_submission_repo.list_accepted_for_plagiarism.return_value = [
+            MagicMock(id=1, code_content="x=1", language="python"),
+            MagicMock(id=2, code_content="x=2", language="python"),
+        ]
         service = PlagiarismService(
             plagiarism_repo=mock_plagiarism_repo,
             submission_repo=mock_submission_repo,
@@ -203,7 +210,6 @@ class TestPlagiarismService:
             return_value="main.py",
         ):
             result = service.run_scan(
-                db=mock_db,
                 problem_id=1,
                 min_similarity=0.3,
             )
@@ -235,10 +241,11 @@ class TestPlagiarismRepository:
             )
 
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called()
+        mock_db.flush.assert_called()
+        mock_db.commit.assert_not_called()
 
-    def test_report_to_dict_includes_all_fields(self):
-        """_report_to_dict 应包含所有必要字段。"""
+    def test_report_to_item_includes_all_fields(self):
+        """_report_to_item 应包含所有必要字段。"""
         from app.services.plagiarism_service import PlagiarismService
 
         mock_report = MagicMock()
@@ -248,7 +255,16 @@ class TestPlagiarismRepository:
         mock_report.submission_a.user.username = "alice"
         mock_report.submission_b.user.username = "bob"
         mock_report.similarity_score = 0.75
-        mock_report.matched_blocks = [{"start_a": 1, "end_a": 5}]
+        mock_report.matched_blocks = [
+            {
+                "start_a": 1,
+                "end_a": 5,
+                "start_b": 1,
+                "end_b": 5,
+                "code_a": "a",
+                "code_b": "b",
+            }
+        ]
         mock_report.status = "completed"
         mock_report.created_at = None
 
@@ -256,10 +272,10 @@ class TestPlagiarismRepository:
             plagiarism_repo=MagicMock(),
             submission_repo=MagicMock(),
         )
-        result = service._report_to_dict(mock_report)
+        result = service._report_to_item(mock_report)
 
-        assert result["id"] == 1
-        assert result["username_a"] == "alice"
-        assert result["username_b"] == "bob"
-        assert result["similarity_score"] == 0.75
-        assert result["status"] == "completed"
+        assert result.id == 1
+        assert result.username_a == "alice"
+        assert result.username_b == "bob"
+        assert result.similarity_score == 0.75
+        assert result.status == "completed"
