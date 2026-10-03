@@ -42,6 +42,7 @@ const currentSolution = ref(null)
 const comments = ref([])
 const commentsTotal = ref(0)
 const newComment = ref('')
+const submittingComment = ref(false)
 let scopeVersion = 0
 let loadVersion = 0
 let commentsVersion = 0
@@ -92,6 +93,7 @@ watch(() => props.problemId, () => {
   comments.value = []
   commentsTotal.value = 0
   newComment.value = ''
+  submittingComment.value = false
   load()
 }, { immediate: true })
 watch(commentsDialog, visible => {
@@ -101,6 +103,7 @@ watch(commentsDialog, visible => {
     comments.value = []
     commentsTotal.value = 0
     newComment.value = ''
+    submittingComment.value = false
   }
 })
 watch(writeDialogVisible, visible => {
@@ -204,6 +207,7 @@ async function hideSolution (item) {
 
 async function openComments (item) {
   commentsVersion += 1
+  submittingComment.value = false
   currentSolution.value = item
   comments.value = []
   commentsTotal.value = 0
@@ -234,7 +238,7 @@ async function loadComments (pageNo = 1) {
 
 async function submitComment () {
   const item = currentSolution.value
-  if (!item) return
+  if (!item || !commentsDialog.value || submittingComment.value) return
   const scope = scopeVersion, version = commentsVersion
   const content = newComment.value
   const parsed = commentFormSchema.safeParse({content})
@@ -242,6 +246,7 @@ async function submitComment () {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查评论输入')
     return
   }
+  submittingComment.value = true
   try {
     await request({
       url: `/problems/solutions/${item.id}/comments`,
@@ -255,6 +260,8 @@ async function submitComment () {
     await loadComments()
   } catch (e) {
     if (isCurrentComments(scope, version, item)) ElMessage.error(e.message || '评论失败')
+  } finally {
+    if (isCurrentComments(scope, version, item)) submittingComment.value = false
   }
 }
 
@@ -379,7 +386,7 @@ async function deleteComment (commentId) {
     >
       <div class="comment-input">
         <el-input v-model="newComment" type="textarea" :rows="3" maxlength="1000" placeholder="说点什么…" show-word-limit />
-        <el-button type="primary" :disabled="!newComment.trim()" @click="submitComment">发送</el-button>
+        <el-button type="primary" :loading="submittingComment" :disabled="!newComment.trim() || submittingComment" @click="submitComment">发送</el-button>
       </div>
       <el-empty v-if="comments.length === 0" description="还没有评论" :image-size="80" />
       <div v-else class="comment-list">

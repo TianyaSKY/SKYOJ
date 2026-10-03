@@ -144,3 +144,43 @@ it('当前保存失败后可重试且保留题解输入', async () => {
   expect(wrapper.vm.form.title).toBe('valid title')
   expect(ElMessage.error).toHaveBeenCalledWith('save failed')
 })
+it('评论发送期间重复点击只创建一次评论', async () => {
+  const post = deferred()
+  request.mockImplementation(config => config.method === 'post' ? post.promise : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  await wrapper.vm.openComments(solution(1))
+  wrapper.vm.newComment = 'comment'
+  const first = wrapper.vm.submitComment(), second = wrapper.vm.submitComment()
+  post.resolve({}); await Promise.all([first, second])
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(1)
+  expect(wrapper.vm.currentSolution.comment_count).toBe(1)
+})
+it('旧评论请求结束不能解除新题解评论的发送锁', async () => {
+  const old = deferred(), current = deferred()
+  request.mockImplementation(config => config.method === 'post' ? (config.url.includes('/1/') ? old.promise : current.promise) : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  await wrapper.vm.openComments(solution(1))
+  wrapper.vm.newComment = 'first'
+  const first = wrapper.vm.submitComment()
+  await wrapper.vm.openComments(solution(2))
+  wrapper.vm.newComment = 'second'
+  const second = wrapper.vm.submitComment()
+  old.resolve({}); await first
+  expect(wrapper.vm.submittingComment).toBe(true)
+  current.resolve({}); await second
+  expect(wrapper.vm.submittingComment).toBe(false)
+})
+it('评论发送失败解除发送锁，允许使用保留的输入重试', async () => {
+  let fails = true
+  request.mockImplementation(config => config.method === 'post' ? (fails ? Promise.reject(new Error('send failed')) : Promise.resolve({})) : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  await wrapper.vm.openComments(solution(1))
+  wrapper.vm.newComment = 'retry this'
+  await wrapper.vm.submitComment()
+  expect(wrapper.vm.submittingComment).toBe(false)
+  expect(wrapper.vm.newComment).toBe('retry this')
+  fails = false
+  await wrapper.vm.submitComment()
+  expect(wrapper.vm.currentSolution.comment_count).toBe(1)
+  expect(wrapper.vm.newComment).toBe('')
+})
