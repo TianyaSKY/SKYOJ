@@ -273,3 +273,40 @@ def test_overlapping_reaction_toggles_are_serialized(kind, initially_active, bus
         model = ProblemSolutionLike if kind == 'like' else ProblemSolutionFavorite
         assert observer.query(model).count() == int(initially_active)
         assert (current.vote_count if kind == 'like' else current.favorite_count) == int(initially_active)
+
+
+@pytest.mark.parametrize('initially_reviewed', [False, True])
+def test_overlapping_review_toggles_preserve_both_operations(initially_reviewed, business_database):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from app.core.time import utcnow
+    from app.services.wrong_book import WrongBookService
+
+    db, engine = business_database
+    entry = WrongBook(user_id=1, problem_id=1, first_wrong_at=utcnow(), latest_wrong_at=utcnow(), reviewed=initially_reviewed)
+    db.add(entry)
+    db.commit()
+    entry_id = entry.id
+    barrier = Barrier(2)
+
+    def toggle():
+        with Session(engine) as session:
+            # 保留 ORM 对象，确保两个会话都从相同的旧状态发起操作。
+            cached = session.get(WrongBook, entry_id)
+            assert cached.reviewed == initially_reviewed
+            repository = WrongBookRepository(session)
+            original = repository.toggle_reviewed
+
+            def overlapping_toggle(identifier):
+                barrier.wait(timeout=5)
+                return original(identifier)
+
+            repository.toggle_reviewed = overlapping_toggle
+            service = WrongBookService(repository, uow=UnitOfWork(session))
+            return service.toggle_reviewed(entry_id, 1).reviewed
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        futures = [workers.submit(toggle) for _ in range(2)]
+        assert sorted(future.result(timeout=10) for future in futures) == [False, True]
+    with Session(engine) as observer:
+        assert observer.get(WrongBook, entry_id).reviewed == initially_reviewed

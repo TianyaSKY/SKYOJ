@@ -143,4 +143,6 @@ class WrongBookService:
 
                 raise PermissionDeniedError("无权修改此记录")
             row = self._repo.toggle_reviewed(entry_id)
+            if row is None:
+                raise ResourceNotFoundError("错题记录不存在")
             return ToggleReviewedResult(id=row.id, reviewed=row.reviewed)

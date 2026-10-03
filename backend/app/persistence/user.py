@@ -286,11 +286,16 @@ class WrongBookRepository:
             row.accepted = True
             self._db.flush()
 
-    def toggle_reviewed(self, entry_id: int) -> WrongBookRecord:
+    def toggle_reviewed(self, entry_id: int) -> WrongBookRecord | None:
+        """在数据库内切换复习状态，避免两个旧快照把操作合并成一次。"""
+        updated = self._db.query(WrongBook).filter(WrongBook.id == entry_id).update(
+            {WrongBook.reviewed: ~WrongBook.reviewed}, synchronize_session=False
+        )
+        if not updated:
+            return None
+        self._db.flush()
         row = self._db.get(WrongBook, entry_id)
-        if row is not None:
-            row.reviewed = not row.reviewed
-            self._db.flush()
+        self._db.refresh(row)
         return _to_wrong_book_record(row)
 
     def list_for_user(
