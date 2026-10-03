@@ -1,19 +1,21 @@
 """恢复租约过期的异步任务。"""
 
+from app.persistence.jobs import AsyncJobRepository
+
 import time
 
 from loguru import logger
 
-from app.config import JOB_RECOVERY_INTERVAL_SECONDS
-from app.database import SessionLocal
-from app.services.async_job_service import AsyncJobService
+from app.core.config import JOB_RECOVERY_INTERVAL_SECONDS
+from app.persistence.database import SessionLocal
+from app.services.async_job import AsyncJobService
 
 
 def recover_once() -> int:
     """恢复一轮过期任务。"""
     db = SessionLocal()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         return service.recover_expired_jobs(limit=100)
     finally:
         db.close()

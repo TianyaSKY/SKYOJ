@@ -16,7 +16,7 @@ class SubmitCodeBody(BaseModel):
 
 from datetime import datetime
 
-from app.domain.submission import CaseResult
+from app.services.submission import CaseResult
 
 
 class SubmitCodeResponse(BaseModel):

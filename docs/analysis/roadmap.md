@@ -61,7 +61,7 @@ ac16d3f feat(backend): 在 AsyncJob 系统注册 debug_submission 任务路由
 
 #### 1.1 题解分享 / 讨论区
 
-**新增模型**（`backend/app/models/discussion.py`）：
+**新增模型**（`backend/app/persistence/discussion.py`）：
 ```python
 class SolutionPost(Base):
     __tablename__ = "solution_posts"
@@ -119,7 +119,7 @@ class ProblemTag(Base): problem_id / tag_id  (复合主键)
 
 #### 2.1 比赛模式扩展
 
-**模型改动**（`models/exam.py`）：
+**模型改动**（`persistence/exam.py`）：
 ```python
 class Exam(Base):
     # ... 原有字段
@@ -129,7 +129,7 @@ class Exam(Base):
     late_penalty_percent = Column(Integer, default=0)
 ```
 
-**服务改动**（`services/exam_service.py:rank`）：
+**服务改动**（`services/exam.py:rank`）：
 - 增加 `as_of` 参数；`as_of < freeze_time` 时隐藏冻结期后的提交
 - 增加 `users.is_guest` 用于打星显示
 
@@ -153,7 +153,7 @@ class WrongBookEntry(Base):
     user_id / problem_id / submission_id / status(Wrong/TLE/RE) / created_at / resolved_at
 ```
 
-**触发**：在 `judge_service.judge_submission` 末尾，若 `final_status in {"Wrong Answer", "Time Limit Exceeded", "Runtime Error"}` 且非考试模式 → 自动写入。
+**触发**：在 `judge.judge_submission` 末尾，若 `final_status in {"Wrong Answer", "Time Limit Exceeded", "Runtime Error"}` 且非考试模式 → 自动写入。
 
 **前端**：`/profile` 增加"错题本" Tab + 按 tag 聚合成"复习卷"按钮。
 
@@ -185,7 +185,7 @@ class AskLlmBody:
     output_format: dict
 ```
 
-**服务**（`llm_facade_service.py:ask`）：
+**服务**（`services/llm.py:ask`）：
 - 若提供 `context_submission_id`，自动注入提交代码、错误信息、题目描述
 
 **SSE 流式**（`api/llm.py`）：
@@ -244,7 +244,7 @@ async def stream_draft(draft_id: int):
 | 风险 | 影响 | 缓解 |
 |---|---|---|
 | 单分支 `master` 直接提交 | 多人协作冲突 | 立即启用 `feat/.../fix/...` 分支策略 |
-| API 进程与 Worker 共享 `app.config` | LLM/Redis 等 env 在 Worker 也必须存在 | 已通过 `docker-compose.yml` 解决 |
+| API 进程与 Worker 共享 `app.core.config` | LLM/Redis 等 env 在 Worker 也必须存在 | 已通过 `docker-compose.yml` 解决 |
 | WebSocket 仅 Redis PubSub | 单点 / 不可水平扩展 | 已支持多 worker 连接同一 Redis，可后续加 Redis Sentinel |
 | 测试用 SQLite | 部分 MySQL 特性（JSON 列、枚举）可能不一致 | pytest 用 SQLite 是约定，需在 conftest 显式跳过这些 case |
 

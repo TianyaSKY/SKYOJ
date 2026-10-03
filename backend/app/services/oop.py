@@ -1,7 +1,7 @@
+
 import os
 import re
-
-from app.repositories.problem_repository import ProblemRepository
+from app.persistence.problem import ProblemRepository
 from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
 
 
@@ -111,20 +111,11 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python', db=No
         )
 
     if db is None:
-        from app.database import SessionLocal
-        _db = SessionLocal()
-        try:
-            problem = ProblemRepository(_db).get_by_id(problem_id)
-            if not problem:
-                return "System Error", 0, "Problem not found"
-            memory_limit = problem.memory_limit
-        finally:
-            _db.close()
-    else:
-        problem = ProblemRepository(db).get_by_id(problem_id)
-        if not problem:
-            return "System Error", 0, "Problem not found"
-        memory_limit = problem.memory_limit
+        raise RuntimeError("判题数据库会话未注入")
+    problem = ProblemRepository(db).get_by_id(problem_id)
+    if not problem:
+        return "System Error", 0, "Problem not found"
+    memory_limit = problem.memory_limit
     problem_dir = f"uploads/problems/{problem_id}"
 
     # 检查教师的测试文件是否存在

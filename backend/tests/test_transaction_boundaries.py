@@ -1,19 +1,21 @@
 """验证跨仓储的原子提交、回滚与发布前的持久化。"""
 
+from app.persistence.jobs import AsyncJobRepository
+
 import json
 from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
-from app.database import Base
-from app.domain.ai_draft import TASK_PROBLEM_GENERATION
-from app.domain.async_job import CreateAsyncJobParams
-from app.models.ai_draft import AiDraft
-from app.models.problem import Problem
-from app.repositories.ai_draft_repository import AiDraftRepository
-from app.repositories.problem_repository import ProblemRepository
-from app.services.ai_draft_service import AiDraftService
-from app.services.async_job_service import AsyncJobService
+from app.persistence.database import Base
+from app.services.ai_draft import TASK_PROBLEM_GENERATION
+from app.services.async_job import CreateAsyncJobParams
+from app.persistence.jobs import AiDraft
+from app.persistence.problem import Problem
+from app.persistence.jobs import AiDraftRepository
+from app.persistence.problem import ProblemRepository
+from app.services.ai_draft import AiDraftService
+from app.services.async_job import AsyncJobService
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -51,12 +53,12 @@ def test_apply_draft_rolls_back_problem_if_consumption_fails(monkeypatch):
 
 
 def test_enqueue_is_committed_before_publish(tmp_path, monkeypatch):
-    from app.models.async_job import AsyncJob
+    from app.persistence.jobs import AsyncJob
 
     engine = create_engine(f"sqlite:///{tmp_path / 'queue.db'}")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         published = []
 
         def publish(job):
@@ -74,7 +76,7 @@ def test_enqueue_is_committed_before_publish(tmp_path, monkeypatch):
 
 
 def test_worker_can_record_failure_after_database_flush_error(monkeypatch):
-    from app.models.async_job import AsyncJob
+    from app.persistence.jobs import AsyncJob
     from app.tasks import base
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import StaticPool
@@ -84,7 +86,7 @@ def test_worker_can_record_failure_after_database_flush_error(monkeypatch):
     sessions = sessionmaker(bind=engine)
     monkeypatch.setattr(base, "SessionLocal", sessions)
     with sessions() as seed:
-        service = AsyncJobService.from_session(seed)
+        service = AsyncJobService(AsyncJobRepository(seed))
         job = service.enqueue(
             CreateAsyncJobParams(
                 task_name="test", queue="judge", payload={}, dedupe_key="duplicate"

@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.clients.jplag_client import JPlagClient
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import SCAN_PLAGIARISM_TASK
-from app.repositories.plagiarism_repository import PlagiarismRepository
-from app.repositories.submission_repository import SubmissionRepository
-from app.services.plagiarism_service import PlagiarismService
+from app.persistence.submission import PlagiarismRepository
+from app.persistence.submission import SubmissionRepository
+from app.services.plagiarism import PlagiarismService
 from app.tasks.base import run_job
 
 

@@ -1,8 +1,8 @@
 """独立迁移入口，应用启动阶段不执行 DDL。"""
 
 from alembic import context
-from app import models  # noqa: F401
-from app.database import Base, engine
+from app import persistence  # noqa: F401
+from app.persistence.database import Base, engine
 
 
 def run_migrations() -> None:

@@ -15,13 +15,13 @@ from app.api.schemas.problem import (
     UpdateProblemBody,
     UploadTestCasesResponse,
 )
-from app.domain.problem import (
+from app.services.problem import (
     CreateProblemParams,
     PaginatedProblems,
     UpdateProblemParams,
     UploadTestCasesParams,
 )
-from app.services.problem_service import ProblemService
+from app.services.problem import ProblemService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

@@ -7,14 +7,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base
-import app.models  # noqa: F401
-from app.models.exam import Exam, ExamProblem
-from app.models.problem import Problem
-from app.models.submission import Submission
-from app.models.user import User
-from app.repositories.exam_repository import ExamRepository
-from app.services.exam_service import ExamService
+from app.persistence.database import Base
+import app.persistence  # noqa: F401
+from app.persistence.exam import Exam, ExamProblem
+from app.persistence.problem import Problem
+from app.persistence.submission import Submission
+from app.persistence.user import User
+from app.persistence.exam import ExamRepository
+from app.services.exam import ExamService
 
 T0 = datetime(2026, 1, 1, 9, 0, 0)
 
@@ -101,9 +101,9 @@ def seeded():
 def test_list_latest_submissions_returns_latest_per_pair(seeded):
     latest = seeded["repository"].list_latest_submissions(seeded["exam"].id)
 
-    assert latest[(seeded["alice"].id, seeded["p1"].id)] is seeded["ac1"]
-    assert latest[(seeded["alice"].id, seeded["p2"].id)] is seeded["ac2"]
-    assert latest[(seeded["bob"].id, seeded["p1"].id)] is seeded["wa_bob"]
+    assert latest[(seeded["alice"].id, seeded["p1"].id)].id == seeded["ac1"].id
+    assert latest[(seeded["alice"].id, seeded["p2"].id)].id == seeded["ac2"].id
+    assert latest[(seeded["bob"].id, seeded["p1"].id)].id == seeded["wa_bob"].id
     assert len(latest) == 3
 
 
@@ -114,7 +114,9 @@ def test_list_latest_submissions_respects_filters(seeded):
         problem_ids=[seeded["p1"].id],
     )
 
-    assert latest == {(seeded["bob"].id, seeded["p1"].id): seeded["wa_bob"]}
+    assert {key: row.id for key, row in latest.items()} == {
+        (seeded["bob"].id, seeded["p1"].id): seeded["wa_bob"].id
+    }
 
 
 def test_get_status_takes_latest_submission(seeded):

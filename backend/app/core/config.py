@@ -1,0 +1,68 @@
+import os
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from dotenv import load_dotenv
+
+BACKEND_ROOT = str(Path(__file__).resolve().parents[2])
+PROJECT_ROOT = str(Path(BACKEND_ROOT).parent)
+
+load_dotenv(Path(PROJECT_ROOT) / ".env", override=False)
+
+IN_DOCKER = os.path.exists("/.dockerenv")
+
+_INSECURE_SECRET_VALUES = {
+    "TianyaSKY",
+    "change-me",
+    "replace_with_random_secret",
+}
+
+
+def require_env(name: str) -> str:
+    """读取必需环境变量；缺失或为空时拒绝启动。"""
+
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise RuntimeError(f"缺少必需环境变量：{name}")
+    return value.strip()
+
+
+def require_database_url() -> str:
+    """读取数据库连接串，并禁止后端使用 MySQL root 用户。"""
+
+    value = require_env("DATABASE_URL")
+    if urlsplit(value).username == "root":
+        raise RuntimeError("DATABASE_URL 不允许使用 MySQL root 用户")
+    return value
+
+
+def require_secret_key() -> str:
+    """读取密钥并拒绝仓库中约定的默认占位值。"""
+
+    value = require_env("SECRET_KEY")
+    if value in _INSECURE_SECRET_VALUES:
+        raise RuntimeError("SECRET_KEY 仍然是默认值，请重新生成")
+    return value
+
+
+DATABASE_URL = require_database_url()
+SECRET_KEY = require_secret_key()
+
+# 本地开发时把 Docker 主机名换成 127.0.0.1；容器内保留 mysql 服务名。
+if not IN_DOCKER:
+    DATABASE_URL = DATABASE_URL.replace("@mysql:", "@127.0.0.1:")
+
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
+
+# RabbitMQ/Celery 只传递任务 ID，业务状态和任务参数保存在 MySQL。
+_DEFAULT_CELERY_BROKER_URL = (
+    "amqp://guest:guest@rabbitmq:5672//"
+    if IN_DOCKER
+    else "amqp://guest:guest@127.0.0.1:5672//"
+)
+CELERY_BROKER_URL = (
+    os.getenv("CELERY_BROKER_URL") or _DEFAULT_CELERY_BROKER_URL
+).strip()
+
+# 恢复进程使用普通阻塞循环，不使用 Celery Beat 或后台线程。
+JOB_RECOVERY_INTERVAL_SECONDS = int(os.getenv("JOB_RECOVERY_INTERVAL_SECONDS", "30"))

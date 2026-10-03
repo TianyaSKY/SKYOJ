@@ -8,8 +8,8 @@ import uuid
 
 from loguru import logger
 
-from app.config import UPLOAD_FOLDER
-from app.domain.errors import InvalidStateError
+from app.core.config import UPLOAD_FOLDER
+from app.core.errors import InvalidStateError
 from app.utils.files import secure_filename
 
 

@@ -2,23 +2,23 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.auth import LoginParams, RegisterParams
-from app.domain.errors import (
+from app.services.auth import LoginParams, RegisterParams
+from app.core.errors import (
     AuthenticationError,
     InvalidStateError,
     PermissionDeniedError,
     ResourceNotFoundError,
 )
-from app.domain.problem import (
+from app.services.problem import (
     CreateProblemParams,
     PaginatedProblems,
     UpdateProblemParams,
 )
-from app.domain.problem import (
+from app.services.problem import (
     TestCaseSummary as ProblemTestCaseSummary,
 )
-from app.services.auth_service import AuthService
-from app.services.problem_service import ProblemService
+from app.services.auth import AuthService
+from app.services.problem import ProblemService
 
 
 class FakeProblemRepository:

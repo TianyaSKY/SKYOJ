@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from app.clients.jplag_client import JPlagClient
-from app.domain.plagiarism import MatchedBlock, SimilarityPair
+from app.services.plagiarism import MatchedBlock, SimilarityPair
 
 
 class TestJPlagClient:
@@ -88,7 +88,7 @@ class TestPlagiarismService:
 
     def test_trigger_scan_creates_job(self):
         """trigger_scan 应调用 enqueue 创建 AsyncJob。"""
-        from app.services.plagiarism_service import PlagiarismService
+        from app.services.plagiarism import PlagiarismService
 
         mock_plagiarism_repo = MagicMock()
         mock_submission_repo = MagicMock()
@@ -96,7 +96,7 @@ class TestPlagiarismService:
         mock_job_service.enqueue.return_value = MagicMock(id=42)
 
         with patch(
-            "app.services.plagiarism_service.AsyncJobService.from_session",
+            "app.services.plagiarism.AsyncJobService",
             return_value=mock_job_service,
         ):
             service = PlagiarismService(
@@ -111,7 +111,7 @@ class TestPlagiarismService:
 
     def test_run_scan_writes_reports_for_high_similarity_pairs(self):
         """run_scan 应将高相似度对的报告写入数据库。"""
-        from app.services.plagiarism_service import PlagiarismService
+        from app.services.plagiarism import PlagiarismService
 
         mock_plagiarism_repo = MagicMock()
         mock_submission_repo = MagicMock()
@@ -179,7 +179,7 @@ class TestPlagiarismService:
 
     def test_run_scan_skips_low_similarity_pairs(self):
         """run_scan 应跳过低于阈值的相似对。"""
-        from app.services.plagiarism_service import PlagiarismService
+        from app.services.plagiarism import PlagiarismService
 
         mock_plagiarism_repo = MagicMock()
         mock_submission_repo = MagicMock()
@@ -223,14 +223,14 @@ class TestPlagiarismRepository:
 
     def test_upsert_inserts_new_report(self):
         """upsert 应在记录不存在时插入。"""
-        from app.repositories.plagiarism_repository import PlagiarismRepository
+        from app.persistence.submission import PlagiarismRepository
 
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.return_value = None
         mock_db.query.return_value.filter.return_value.count.return_value = 0
 
         repo = PlagiarismRepository(mock_db)
-        with patch("app.repositories.plagiarism_repository.PlagiarismReport"):
+        with patch("app.persistence.submission.PlagiarismReport"):
             result = repo.upsert_report(
                 problem_id=1,
                 sub_a=5,
@@ -246,7 +246,7 @@ class TestPlagiarismRepository:
 
     def test_report_to_item_includes_all_fields(self):
         """_report_to_item 应包含所有必要字段。"""
-        from app.services.plagiarism_service import PlagiarismService
+        from app.services.plagiarism import PlagiarismService
 
         mock_report = MagicMock()
         mock_report.id = 1

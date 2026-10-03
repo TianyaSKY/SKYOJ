@@ -7,34 +7,27 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base
-from app.domain.auth import AuthUserInfo
-from app.domain.async_job import AsyncJobResult
-from app.domain.dataset import DatasetDetail, DatasetListItem
-from app.domain.exam import ExamDetail, ExamListItem
-from app.domain.problem import ProblemDetail, ProblemListItem
-from app.domain.submission import SubmissionDetail, SubmissionListItem
-from app.domain.user import UserProfile, UserSubmissionItem
-from app.mappers import (
-    from_ai_draft_orm,
-    from_async_job_orm,
-    from_dataset_detail_orm,
-    from_dataset_orm,
-    from_exam_detail_orm,
-    from_exam_orm,
-    from_problem_orm,
-    from_submission_detail_orm,
-    from_submission_orm,
-    from_user_orm,
-    from_user_submission_orm,
-)
-from app.models.user import User
+from app.persistence.database import Base
+from app.services.auth import AuthUserInfo
+from app.services.async_job import AsyncJobResult
+from app.services.dataset import DatasetDetail, DatasetListItem
+from app.services.exam import ExamDetail, ExamListItem
+from app.services.problem import ProblemDetail, ProblemListItem
+from app.services.submission import SubmissionDetail, SubmissionListItem
+from app.services.user import UserProfile, UserSubmissionItem
+from app.persistence.jobs import to_ai_draft_result, to_async_job_result
+from app.persistence.exam import to_exam_detail, to_exam_list_item
+from app.persistence.problem import to_problem_result
+from app.persistence.submission import to_submission_detail, to_submission_list_item
+from app.persistence.user import to_user_profile, to_user_submission_item
+from app.persistence.dataset import to_dataset_detail, to_dataset_list_item
+from app.persistence.user import User
 from app.utils.auth_tools import encode_auth_token, get_current_auth
 
 NOW = datetime(2026, 1, 1, 9, 0, 0)
 
 
-def test_from_problem_orm_list_item_and_detail():
+def test_to_problem_result_list_item_and_detail():
     problem = SimpleNamespace(
         id=1,
         title="求和",
@@ -48,8 +41,8 @@ def test_from_problem_orm_list_item_and_detail():
         created_at=NOW,
     )
 
-    item = from_problem_orm(problem)
-    detail = from_problem_orm(problem, with_content=True)
+    item = to_problem_result(problem)
+    detail = to_problem_result(problem, with_content=True)
 
     assert isinstance(item, ProblemListItem)
     assert item.problem_type == "acm"  # ORM 的 type → 领域的 problem_type
@@ -59,7 +52,7 @@ def test_from_problem_orm_list_item_and_detail():
     assert detail.test_case_path == "uploads/problems/1"
 
 
-def test_from_submission_orm_uses_user_username():
+def test_to_submission_list_item_uses_user_username():
     submission = SimpleNamespace(
         id=3,
         user_id=1,
@@ -72,13 +65,13 @@ def test_from_submission_orm_uses_user_username():
         created_at=NOW,
     )
 
-    item = from_submission_orm(submission)
+    item = to_submission_list_item(submission)
 
     assert isinstance(item, SubmissionListItem)
     assert item.username == "alice"
 
 
-def test_from_submission_detail_orm_renames_code_and_log():
+def test_to_submission_detail_renames_code_and_log():
     submission = SimpleNamespace(
         id=3,
         status="Wrong Answer",
@@ -91,17 +84,17 @@ def test_from_submission_detail_orm_renames_code_and_log():
         created_at=NOW,
     )
 
-    detail = from_submission_detail_orm(submission)
+    detail = to_submission_detail(submission)
 
     assert isinstance(detail, SubmissionDetail)
     assert detail.code == "print(1)"
     assert detail.log == "case 1 failed"
 
 
-def test_from_user_orm():
+def test_to_user_profile():
     user = SimpleNamespace(id=1, username="alice", role="teacher", avatar="a.png")
 
-    profile = from_user_orm(user)
+    profile = to_user_profile(user)
 
     assert isinstance(profile, UserProfile)
     assert profile.id == 1
@@ -109,7 +102,7 @@ def test_from_user_orm():
     assert profile.avatar == "a.png"
 
 
-def test_from_user_submission_orm_uses_problem_title():
+def test_to_user_submission_item_uses_problem_title():
     submission = SimpleNamespace(
         id=5,
         problem_id=2,
@@ -121,13 +114,13 @@ def test_from_user_submission_orm_uses_problem_title():
         exam_id=None,
     )
 
-    item = from_user_submission_orm(submission)
+    item = to_user_submission_item(submission)
 
     assert isinstance(item, UserSubmissionItem)
     assert item.problem_title == "求和"
 
 
-def test_from_user_submission_orm_unknown_problem():
+def test_to_user_submission_item_unknown_problem():
     submission = SimpleNamespace(
         id=5,
         problem_id=2,
@@ -139,10 +132,10 @@ def test_from_user_submission_orm_unknown_problem():
         exam_id=None,
     )
 
-    assert from_user_submission_orm(submission).problem_title == "Unknown"
+    assert to_user_submission_item(submission).problem_title == "Unknown"
 
 
-def test_from_dataset_orm_list_and_detail():
+def test_to_dataset_list_item_list_and_detail():
     dataset = SimpleNamespace(
         id=7,
         name="iris.csv",
@@ -155,8 +148,8 @@ def test_from_dataset_orm_list_and_detail():
         status="ready",
     )
 
-    item = from_dataset_orm(dataset)
-    detail = from_dataset_detail_orm(dataset)
+    item = to_dataset_list_item(dataset)
+    detail = to_dataset_detail(dataset)
 
     assert isinstance(item, DatasetListItem)
     assert item.uploader == "alice"
@@ -166,7 +159,7 @@ def test_from_dataset_orm_list_and_detail():
     assert detail.description == ""
 
 
-def test_from_exam_orm_counts_and_password():
+def test_to_exam_list_item_counts_and_password():
     exam = SimpleNamespace(
         id=1,
         title="期中",
@@ -180,14 +173,14 @@ def test_from_exam_orm_counts_and_password():
         password="hashed",
     )
 
-    item = from_exam_orm(exam, problem_count=2, submission_count=5)
+    item = to_exam_list_item(exam, problem_count=2, submission_count=5)
 
     assert isinstance(item, ExamListItem)
     assert item.problem_count == 2
     assert item.submission_count == 5
     assert item.has_password is True
 
-def test_from_exam_detail_orm_problems_with_titles():
+def test_to_exam_detail_problems_with_titles():
     exam = SimpleNamespace(
         id=1,
         title="期中",
@@ -205,14 +198,14 @@ def test_from_exam_detail_orm_problems_with_titles():
         SimpleNamespace(problem_id=2, display_id="B", score=50, problem=SimpleNamespace(title="排序")),
     ]
 
-    detail = from_exam_detail_orm(exam, problems)
+    detail = to_exam_detail(exam, problems)
 
     assert isinstance(detail, ExamDetail)
     assert detail.has_password is False
     assert [item.title for item in detail.problems] == ["求和", "排序"]
 
 
-def test_from_ai_draft_orm_summary_and_detail():
+def test_to_ai_draft_result_summary_and_detail():
     draft = SimpleNamespace(
         id=9,
         task_type="problem_generation",
@@ -227,15 +220,15 @@ def test_from_ai_draft_orm_summary_and_detail():
         consumed_at=None,
     )
 
-    summary = from_ai_draft_orm(draft)
-    detail = from_ai_draft_orm(draft, detail=True)
+    summary = to_ai_draft_result(draft)
+    detail = to_ai_draft_result(draft, detail=True)
 
     assert summary.title == "出题中 · x"
     assert detail.request_payload == {"background": "b"}
     assert detail.result_payload == {"title": "T"}
 
 
-def test_from_async_job_orm():
+def test_to_async_job_result():
     job = SimpleNamespace(
         id=11,
         task_name="skyoj.tasks.judge_submission",
@@ -248,7 +241,7 @@ def test_from_async_job_orm():
         updated_at=NOW,
     )
 
-    result = from_async_job_orm(job)
+    result = to_async_job_result(job)
 
     assert isinstance(result, AsyncJobResult)
     assert result.status == "running"

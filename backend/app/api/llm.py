@@ -23,14 +23,14 @@ from app.api.schemas.ai_draft import (
     SubmitDraftResponse,
 )
 from app.api.schemas.common import MessageResponse
-from app.domain.ai_draft import (
+from app.services.ai_draft import (
     SubmitProblemGenerationParams,
     SubmitTestDataExecutionParams,
     SubmitTestScriptGenerationParams,
 )
-from app.domain.llm import AskLlmParams
-from app.services.ai_draft_service import AiDraftService
-from app.services.llm_facade_service import LlmFacadeService
+from app.services.llm import AskLlmParams
+from app.services.ai_draft import AiDraftService
+from app.services.llm import LlmFacadeService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

@@ -23,8 +23,8 @@ from app.api import (
     user,
     wrong_book,
 )
-from app.database import SessionLocal, engine
-from app.domain.errors import (
+from app.persistence.database import SessionLocal, engine
+from app.core.errors import (
     AuthenticationError,
     BusinessError,
     ExternalServiceError,
@@ -34,7 +34,7 @@ from app.domain.errors import (
 )
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitExceeded
-from app.models.sysdict import SysDict
+from app.persistence.system import SysDict
 from app.utils.error_codes import (
     AUTH_REQUIRED,
     BUSINESS_ERROR,

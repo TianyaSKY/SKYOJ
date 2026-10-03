@@ -20,7 +20,7 @@ from app.api.schemas.problem_community import (
     ToggleLikeResponse,
     UpdateSolutionRequest,
 )
-from app.services.problem_community_service import SolutionService, TagService
+from app.services.community import SolutionService, TagService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter(prefix="/problems", tags=["community"])
@@ -71,7 +71,7 @@ def create_solution(
     auth: AuthContext = Depends(get_current_auth),
     service: SolutionService = Depends(get_solution_service),
 ):
-    from app.domain.problem_community import CreateSolutionParams
+    from app.services.community import CreateSolutionParams
 
     detail = service.create(
         CreateSolutionParams(
@@ -102,7 +102,7 @@ def update_solution(
     auth: AuthContext = Depends(get_current_auth),
     service: SolutionService = Depends(get_solution_service),
 ):
-    from app.domain.problem_community import UpdateSolutionParams
+    from app.services.community import UpdateSolutionParams
 
     detail = service.update(
         UpdateSolutionParams(
@@ -173,7 +173,7 @@ def add_comment(
     auth: AuthContext = Depends(get_current_auth),
     service: SolutionService = Depends(get_solution_service),
 ):
-    from app.domain.problem_community import CreateCommentParams
+    from app.services.community import CreateCommentParams
 
     comment = service.add_comment(
         CreateCommentParams(
@@ -248,7 +248,7 @@ def create_tag(
     auth: AuthContext = Depends(get_current_auth),
     service: TagService = Depends(get_tag_service),
 ):
-    from app.domain.problem_community import CreateTagParams
+    from app.services.community import CreateTagParams
 
     tag = service.create(
         CreateTagParams(
@@ -282,7 +282,7 @@ def attach_tag(
     auth: AuthContext = Depends(get_current_auth),
     service: TagService = Depends(get_tag_service),
 ):
-    from app.domain.problem_community import AttachTagParams
+    from app.services.community import AttachTagParams
 
     service.attach(
         AttachTagParams(

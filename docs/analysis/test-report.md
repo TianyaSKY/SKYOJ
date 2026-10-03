@@ -7,6 +7,8 @@
 分支：feat/problem-solutions-and-tags (8 个原子提交 + 文档 1 个)
 基线：master (b253d14)
 
+目录说明：本报告保留当时的验证结果及源码路径。后端在 2026-10-03 收拢为 `services / persistence`，旧路径不再存在；当前结构与验证范围见 [架构文档](../architecture.md)。
+
 ---
 
 ## 1. 服务健康与基础

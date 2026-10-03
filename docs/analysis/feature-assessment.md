@@ -25,7 +25,7 @@
 | 项 | 状态 | 证据 |
 |---|---|---|
 | ACM/ICPC 赛制判题 | ✅ | `services/acm.py:run_acm_judge` 全过/不过制 |
-| 实时滚榜 + 罚时 | ✅ | `services/exam_service.py:rank()` 实现 ICPC 规则：solved 数 + penalty = elapsed + failed_attempts × 1200s；排序 `(-solved, penalty)` |
+| 实时滚榜 + 罚时 | ✅ | `services/exam.py:rank()` 实现 ICPC 规则：solved 数 + penalty = elapsed + failed_attempts × 1200s；排序 `(-solved, penalty)` |
 | 缓存优化 | ✅ | `utils/exam_cache.py` 60s TTL，判题完成时主动失效 |
 | 封榜（最后一小时隐藏提交） | ❌ | rank() 直接用 `list_submissions`，无时间窗口过滤参数 |
 | 打星团队 / 校外参赛者 | ❌ | `users` 表无 `is_guest / is_star / team_id` 字段 |
@@ -76,9 +76,9 @@
 
 | 项 | 状态 | 证据 |
 |---|---|---|
-| AI 出题 | ✅ | `domain/ai_prompts.PROBLEM_GENERATION_*`，异步草稿箱 |
+| AI 出题 | ✅ | `services/llm_prompts.PROBLEM_GENERATION_*`，异步草稿箱 |
 | AI 生成测例脚本 | ✅ | `TEST_SCRIPT_MODE_CONFIGS`，覆盖 acm/oop/kaggle |
-| AI 解释错误 | ❌ | `domain/llm.AskLlmParams` 只支持 system/prompt/output_format，无提交上下文 |
+| AI 解释错误 | ❌ | `services/llm.AskLlmParams` 只支持 system/prompt/output_format，无提交上下文 |
 | AI 答疑（结合题目上下文） | ❌ | 同上 |
 | AI 代码 review | ❌ | 无 |
 | SSE 流式输出 | ❌ | AI 草稿箱只能轮询 `drafts/{id}` 看 status |

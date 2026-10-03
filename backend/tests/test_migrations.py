@@ -18,7 +18,7 @@ def upgrade(connection):
 
 
 def test_empty_database_upgrade_and_repeat():
-    from app.database import Base
+    from app.persistence.database import Base
 
     with create_engine("sqlite://").begin() as connection:
         upgrade(connection)

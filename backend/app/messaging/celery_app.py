@@ -3,7 +3,7 @@
 from celery import Celery
 from kombu import Queue
 
-from app.config import CELERY_BROKER_URL
+from app.core.config import CELERY_BROKER_URL
 from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
 from app.messaging.task_names import (
     DEBUG_SUBMISSION_TASK,

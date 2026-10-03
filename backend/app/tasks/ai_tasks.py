@@ -5,14 +5,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.clients.llm_client import LlmClient
-from app.database import SessionLocal
+from app.persistence.database import SessionLocal
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import GENERATE_PROBLEM_TASK, GENERATE_TEST_SCRIPT_TASK
-from app.repositories.ai_draft_repository import AiDraftRepository
-from app.repositories.async_job_repository import AsyncJobRepository
-from app.repositories.problem_repository import ProblemRepository
-from app.services.ai_draft_service import AiDraftService
-from app.services.async_job_service import AsyncJobService
+from app.persistence.jobs import AiDraftRepository
+from app.persistence.jobs import AsyncJobRepository
+from app.persistence.problem import ProblemRepository
+from app.services.ai_draft import AiDraftService
+from app.services.async_job import AsyncJobService
 from app.tasks.base import run_job
 
 
@@ -43,7 +43,7 @@ def _build_service(db: Session) -> AiDraftService:
     return AiDraftService(
         draft_repository=AiDraftRepository(db),
         problem_repository=ProblemRepository(db),
-        job_service=AsyncJobService.from_session(db),
+        job_service=AsyncJobService(AsyncJobRepository(db)),
         llm_client=LlmClient(),
     )
 

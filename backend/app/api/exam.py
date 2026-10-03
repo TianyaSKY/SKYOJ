@@ -24,13 +24,13 @@ from app.api.schemas.exam import (
     RankResponse,
     UpdateExamBody,
 )
-from app.domain.exam import (
+from app.services.exam import (
     AddExamProblemParams,
     CreateExamParams,
     EnterExamParams,
     UpdateExamParams,
 )
-from app.services.exam_service import ExamService
+from app.services.exam import ExamService
 from app.utils.auth_tools import AuthContext, encode_auth_token, get_current_auth
 
 router = APIRouter()

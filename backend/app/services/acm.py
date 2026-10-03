@@ -3,11 +3,10 @@
 import os
 import re
 from dataclasses import dataclass
-
 from loguru import logger
-
-from app.repositories.problem_repository import ProblemRepository
+from app.persistence.problem import ProblemRepository
 from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
+
 
 def natural_sort_key(value: str) -> list[int | str]:
     """按文件名中的数字自然排序。"""
@@ -214,16 +213,7 @@ _ACM_LANG_CONFIGS = {
 def _resolve_problem(db, problem_id):
     """读取题目并返回 (memory_limit, time_limit)；题目不存在返回 None。"""
     if db is None:
-        from app.database import SessionLocal
-
-        temporary_db = SessionLocal()
-        try:
-            problem = ProblemRepository(temporary_db).get_by_id(problem_id)
-            if not problem:
-                return None
-            return problem.memory_limit, problem.time_limit
-        finally:
-            temporary_db.close()
+        raise RuntimeError("判题数据库会话未注入")
     problem = ProblemRepository(db).get_by_id(problem_id)
     if not problem:
         return None
@@ -384,23 +374,12 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         return "System Error", 0, f"Unsupported language: {language}", []
 
     if db is None:
-        from app.database import SessionLocal
-
-        temporary_db = SessionLocal()
-        try:
-            problem = ProblemRepository(temporary_db).get_by_id(problem_id)
-            if not problem:
-                return "System Error", 0, "Problem not found", []
-            memory_limit = problem.memory_limit
-            time_limit = problem.time_limit
-        finally:
-            temporary_db.close()
-    else:
-        problem = ProblemRepository(db).get_by_id(problem_id)
-        if not problem:
-            return "System Error", 0, "Problem not found", []
-        memory_limit = problem.memory_limit
-        time_limit = problem.time_limit
+        raise RuntimeError("判题数据库会话未注入")
+    problem = ProblemRepository(db).get_by_id(problem_id)
+    if not problem:
+        return "System Error", 0, "Problem not found", []
+    memory_limit = problem.memory_limit
+    time_limit = problem.time_limit
 
     test_case_dir = f"uploads/problems/{problem_id}"
     if not os.path.exists(test_case_dir):

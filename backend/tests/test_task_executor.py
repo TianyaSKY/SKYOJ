@@ -1,13 +1,15 @@
 """任务执行骨架 run_job 与 finalize_dataset 下沉测试。"""
 
+from app.persistence.jobs import AsyncJobRepository
+
 import pytest
-from app.database import Base
-from app.domain.async_job import CreateAsyncJobParams
+from app.persistence.database import Base
+from app.services.async_job import CreateAsyncJobParams
 from app.messaging.queues import JUDGE_QUEUE
 from app.messaging.task_names import JUDGE_SUBMISSION_TASK
-from app.repositories.dataset_repository import DatasetRepository
-from app.services.async_job_service import AsyncJobService
-from app.services.dataset_service import DatasetService
+from app.persistence.dataset import DatasetRepository
+from app.services.async_job import AsyncJobService
+from app.services.dataset import DatasetService
 from app.tasks import base as tasks_base
 from app.tasks.base import run_job
 from sqlalchemy import create_engine
@@ -28,7 +30,7 @@ def make_session():
 
 def seed_job(db, payload=None, max_attempts=3):
     """在独立库里创建一条待执行任务。"""
-    service = AsyncJobService.from_session(db)
+    service = AsyncJobService(AsyncJobRepository(db))
     job = service.enqueue(
         CreateAsyncJobParams(
             task_name=JUDGE_SUBMISSION_TASK,
@@ -334,11 +336,13 @@ def test_finalize_dataset_success_marks_ready():
         )
         storage = FakeStorageClient()
         service = DatasetService(
-            DatasetRepository(db), storage, AsyncJobService.from_session(db)
+            DatasetRepository(db), storage, AsyncJobService(AsyncJobRepository(db))
         )
 
-        service.finalize_dataset(dataset.id)
+        result = service.finalize_dataset(dataset.id)
 
+        assert result.status == "ready"
+        assert result.file_size == "2.00 KB"
         assert storage.calls == [
             ("finalize", "tmp/x.pending", "uploads/datasets/x.csv", dataset.id)
         ]
@@ -366,7 +370,7 @@ def test_finalize_dataset_already_ready_returns_without_finalize():
         )
         storage = FakeStorageClient(exists=True)
         service = DatasetService(
-            DatasetRepository(db), storage, AsyncJobService.from_session(db)
+            DatasetRepository(db), storage, AsyncJobService(AsyncJobRepository(db))
         )
 
         service.finalize_dataset(dataset.id)
@@ -402,7 +406,7 @@ def test_finalize_dataset_failure_marks_failed_and_raises():
         service = DatasetService(
             DatasetRepository(db),
             FailingStorageClient(),
-            AsyncJobService.from_session(db),
+            AsyncJobService(AsyncJobRepository(db)),
         )
 
         with pytest.raises(OSError, match="disk full"):

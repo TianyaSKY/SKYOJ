@@ -1,8 +1,8 @@
 """题目测试点管理 API 测试。"""
 
 from app.api.deps import get_problem_service
-from app.domain.auth import AuthUserInfo
-from app.domain.problem import (
+from app.services.auth import AuthUserInfo
+from app.services.problem import (
     TestCaseItem as ProblemTestCaseItem,
     TestCaseSummary as ProblemTestCaseSummary,
 )

@@ -17,8 +17,7 @@ from app.api.schemas.dataset import (
     PaginatedDatasetsResponse,
     UploadDatasetResponse,
 )
-from app.domain.dataset import PaginatedDatasets, UploadDatasetParams
-from app.services.dataset_service import DatasetService
+from app.services.dataset import DatasetService, PaginatedDatasets, UploadDatasetParams
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

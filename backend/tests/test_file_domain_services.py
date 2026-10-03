@@ -2,11 +2,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.dataset import UploadDatasetParams
-from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
-from app.domain.problem import UploadTestCasesParams
-from app.services.dataset_service import DatasetService
-from app.services.problem_service import ProblemService
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.services.problem import UploadTestCasesParams
+from app.services.dataset import DatasetRecord, DatasetService, UploadDatasetParams
+from app.services.problem import ProblemService
 
 
 class FakeDatasetRepository:
@@ -17,9 +16,9 @@ class FakeDatasetRepository:
         self.items = []
 
     def create(self, **values):
-        item = SimpleNamespace(
+        item = DatasetRecord(
             id=len(self.items) + 1,
-            uploader=SimpleNamespace(username="teacher"),
+            uploader="teacher",
             created_at=None,
             **values,
         )
@@ -29,7 +28,7 @@ class FakeDatasetRepository:
     def get_by_id(self, dataset_id: int):
         return next((item for item in self.items if item.id == dataset_id), None)
 
-    def list(self, page=None, page_size=None):
+    def list_all(self, page=None, page_size=None):
         return self.items, len(self.items)
 
     def delete(self, item) -> None:

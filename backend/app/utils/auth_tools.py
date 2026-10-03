@@ -1,3 +1,11 @@
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.auth import AuthUserInfo
+
 import datetime
 from dataclasses import dataclass
 from typing import Optional
@@ -7,10 +15,9 @@ from fastapi import Depends, Header, HTTPException, Request
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.config import SECRET_KEY
-from app.database import get_db
-from app.domain.auth import AuthUserInfo
-from app.models.user import User
+from app.core.config import SECRET_KEY
+from app.persistence.database import get_db
+from app.persistence.user import User
 
 
 def encode_auth_token(user_id, role, exam_id=-1):
@@ -68,6 +75,7 @@ def get_current_auth(
     db: Session = Depends(get_db),
     request: Request = None,
 ) -> AuthContext:
+    from app.services.auth import AuthUserInfo
     token = _extract_bearer(authorization)
     try:
         payload = decode_auth_token(token)

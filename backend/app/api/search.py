@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_search_service
 from app.api.schemas.problem import SearchProblemResponse
-from app.services.search_facade_service import SearchFacadeService
+from app.services.search import SearchFacadeService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

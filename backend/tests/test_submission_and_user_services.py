@@ -3,11 +3,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
-from app.domain.submission import SubmitParams
-from app.domain.user import UploadAvatarParams
-from app.services.submission_service import SubmissionService
-from app.services.user_service import UserService
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.services.submission import SubmitParams
+from app.services.user import UploadAvatarParams
+from app.services.submission import SubmissionService
+from app.services.user import UserService
 
 
 class FakeSubmissionRepository:
