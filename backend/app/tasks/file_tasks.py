@@ -8,9 +8,9 @@ from app.clients.dataset_storage_client import DatasetStorageClient
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import FINALIZE_DATASET_TASK
 from app.repositories.async_job_repository import AsyncJobRepository
-from app.repositories.dataset_repository import DatasetRepository
+from app.persistence.dataset import DatasetRepository
 from app.services.async_job_service import AsyncJobService
-from app.services.dataset_service import DatasetService
+from app.services.dataset import DatasetService
 from app.tasks.base import run_job
 
 

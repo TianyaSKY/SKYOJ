@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base
 from app.domain.auth import AuthUserInfo
 from app.domain.async_job import AsyncJobResult
-from app.domain.dataset import DatasetDetail, DatasetListItem
+from app.services.dataset import DatasetDetail, DatasetListItem
 from app.domain.exam import ExamDetail, ExamListItem
 from app.domain.problem import ProblemDetail, ProblemListItem
 from app.domain.submission import SubmissionDetail, SubmissionListItem
@@ -18,8 +18,6 @@ from app.domain.user import UserProfile, UserSubmissionItem
 from app.mappers import (
     from_ai_draft_orm,
     from_async_job_orm,
-    from_dataset_detail_orm,
-    from_dataset_orm,
     from_exam_detail_orm,
     from_exam_orm,
     from_problem_orm,
@@ -28,6 +26,7 @@ from app.mappers import (
     from_user_orm,
     from_user_submission_orm,
 )
+from app.persistence.dataset import from_dataset_detail_orm, from_dataset_orm
 from app.models.user import User
 from app.utils.auth_tools import encode_auth_token, get_current_auth
 

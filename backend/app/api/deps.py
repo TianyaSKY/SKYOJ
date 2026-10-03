@@ -11,7 +11,7 @@ from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageC
 from app.clients.submission_storage_client import SubmissionStorageClient
 from app.database import get_db
 from app.repositories.ai_draft_repository import AiDraftRepository
-from app.repositories.dataset_repository import DatasetRepository
+from app.persistence.dataset import DatasetRepository
 from app.repositories.debug_run_repository import DebugRunRepository
 from app.repositories.exam_repository import ExamRepository
 from app.repositories.plagiarism_repository import PlagiarismRepository
@@ -23,7 +23,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.ai_draft_service import AiDraftService
 from app.services.async_job_service import AsyncJobService
 from app.services.auth_service import AuthService
-from app.services.dataset_service import DatasetService
+from app.services.dataset import DatasetService
 from app.services.debug_service import DebugService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService

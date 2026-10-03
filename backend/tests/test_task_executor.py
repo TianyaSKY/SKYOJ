@@ -5,9 +5,9 @@ from app.database import Base
 from app.domain.async_job import CreateAsyncJobParams
 from app.messaging.queues import JUDGE_QUEUE
 from app.messaging.task_names import JUDGE_SUBMISSION_TASK
-from app.repositories.dataset_repository import DatasetRepository
+from app.persistence.dataset import DatasetRepository
 from app.services.async_job_service import AsyncJobService
-from app.services.dataset_service import DatasetService
+from app.services.dataset import DatasetService
 from app.tasks import base as tasks_base
 from app.tasks.base import run_job
 from sqlalchemy import create_engine
@@ -337,8 +337,10 @@ def test_finalize_dataset_success_marks_ready():
             DatasetRepository(db), storage, AsyncJobService.from_session(db)
         )
 
-        service.finalize_dataset(dataset.id)
+        result = service.finalize_dataset(dataset.id)
 
+        assert result.status == "ready"
+        assert result.file_size == "2.00 KB"
         assert storage.calls == [
             ("finalize", "tmp/x.pending", "uploads/datasets/x.csv", dataset.id)
         ]

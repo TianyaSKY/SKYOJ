@@ -6,6 +6,22 @@ HTTP 写请求由 `api/schemas/` 中的 Pydantic 模型校验，并转换成领�
 
 动态系统配置、LLM JSON 和任务载荷使用明确的递归 `JsonValue` 类型。固定统计使用专用 dataclass；动态业务结果使用 `JsonObjectResult` 包装，在 HTTP 或消息边界取出 `payload`。缓存、数据库 JSON 列和外部协议仍允许字典。
 
+## 后端目录收拢（迁移中）
+
+目标保留 `api / services / persistence / clients` 四类角色。新增或迁移的模块不再新增 `domain/*.py`、`models/*.py`、`repositories/*_repository.py` 或全局 mapper；按业务上下文收拢，不改 HTTP 协议或表结构。
+
+首个样板为数据集：
+
+- `services/dataset.py`：业务参数、结果 dataclass 与 `DatasetService`。
+- `persistence/dataset.py`：`Dataset` ORM、`DatasetRepository` 与数据库映射。
+- `api/dataset.py`、`api/deps.py` 和 File Worker 使用新路径。
+
+数据集仓储的 `get_by_id/create/mark_ready/mark_failed` 返回不可变 `DatasetRecord` 快照；`list_all` 返回 `DatasetListItem` 列表。Service 不持有 ORM，也不调用 ORM mapper。更新状态后必须使用仓储返回的新快照；直接修改旧快照不会写入数据库。`delete` 接收快照并按其 ID 删除记录。事务继续由现有 Service/UoW 管理。
+
+原有 `domain/dataset.py`、`models/dataset.py`、`repositories/dataset_repository.py`、`services/dataset_service.py` 和全局数据集 mapper 入口只保留兼容导出，类型和 ORM 表注册不会重复。兼容层仅保障旧导入路径，仓储结果已改为上述快照契约。
+
+其余业务模块尚未迁移。后续逐个收拢 user、problem、submission，再处理 exam 与 community；全部调用方迁移并验证后删除兼容层。数据库连接模块、公共错误和事务方案在后续阶段统一处理。
+
 ## 事务
 
 Repository 仅执行数据访问和 `flush()`，不调用 `commit()` 或 `rollback()`。Service 通过仓储的 `unit_of_work` 控制业务事务；跨仓储写入使用 `unit_of_work.transaction()`，成功统一提交，异常立即回滚。

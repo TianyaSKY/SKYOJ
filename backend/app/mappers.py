@@ -6,7 +6,8 @@
 
 from app.domain.ai_draft import AiDraftDetail, AiDraftSummary
 from app.domain.async_job import AsyncJobResult
-from app.domain.dataset import DatasetDetail, DatasetListItem
+# 数据集映射保留旧入口，实际实现已收拢到持久化模块。
+from app.persistence.dataset import from_dataset_detail_orm, from_dataset_orm
 from app.domain.debug_run import DebugRunDetail
 from app.domain.exam import ExamDetail, ExamListItem, ExamProblemItem
 from app.domain.problem import ProblemDetail, ProblemListItem
@@ -115,35 +116,6 @@ def from_user_submission_orm(submission) -> UserSubmissionItem:
         language=submission.language,
         created_at=submission.created_at,
         exam_id=submission.exam_id,
-    )
-
-
-def from_dataset_orm(dataset) -> DatasetListItem:
-    """数据集 ORM → 列表项。"""
-    return DatasetListItem(
-        id=dataset.id,
-        name=dataset.name,
-        description=dataset.description or "",
-        uploader=dataset.uploader.username if dataset.uploader else "Unknown",
-        file_size=dataset.file_size or "",
-        created_at=dataset.created_at,
-        status=getattr(dataset, "status", "ready") or "ready",
-        download_url=f"/api/datasets/{dataset.id}/download",
-    )
-
-
-def from_dataset_detail_orm(dataset) -> DatasetDetail:
-    """数据集 ORM → 详情。"""
-    return DatasetDetail(
-        id=dataset.id,
-        name=dataset.name,
-        description=dataset.description or "",
-        file_path=dataset.file_path,
-        file_size=dataset.file_size or "",
-        uploader_id=dataset.uploader_id,
-        uploader=dataset.uploader.username if dataset.uploader else "Unknown",
-        created_at=dataset.created_at,
-        status=getattr(dataset, "status", "ready") or "ready",
     )
 
 

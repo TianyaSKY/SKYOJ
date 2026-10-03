@@ -1,7 +1,7 @@
 from app.models.ai_draft import AiDraft
 from app.models.async_job import AsyncJob
 from app.models.audit_log import AuditLog
-from app.models.dataset import Dataset
+from app.persistence.dataset import Dataset
 from app.models.debug_run import DebugRun
 from app.models.exam import Exam, ExamProblem
 from app.models.plagiarism import PlagiarismReport

@@ -7,7 +7,7 @@ APP = Path(__file__).parents[1] / "app"
 
 
 def test_repositories_do_not_commit_or_rollback():
-    for path in (APP / "repositories").glob("*.py"):
+    for path in [*(APP / "repositories").glob("*.py"), *(APP / "persistence").glob("*.py")]:
         tree = ast.parse(path.read_text())
         forbidden = [
             node.lineno
@@ -28,6 +28,7 @@ def test_reviewed_services_do_not_reach_into_database():
         "system_service",
         "problem_service",
         "debug_service",
+        "dataset",
     ):
         tree = ast.parse((APP / "services" / f"{name}.py").read_text())
         for node in ast.walk(tree):
