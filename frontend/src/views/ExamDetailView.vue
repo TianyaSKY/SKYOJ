@@ -119,7 +119,7 @@
             <el-button class="action-btn" type="primary" @click="goToRank">
               <el-icon><Trophy /></el-icon>查看实时排名
             </el-button>
-            <el-button class="action-btn" @click="fetchStatus">
+            <el-button class="action-btn" :loading="statusLoading" :disabled="statusLoading" @click="fetchStatus">
               <el-icon><Refresh /></el-icon>刷新题目状态
             </el-button>
             <el-divider />
@@ -148,7 +148,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {computed, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {exitExam, getExamDetail, getMyExamStatus} from '@/api/exam'
 import {useUserStore} from '@/stores/user'
@@ -169,15 +169,16 @@ import { useNow } from '@/composables/useNow'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const examId = route.params.id
+const examId = computed(() => route.params.id)
 
-const exam = ref({
+const emptyExam = () => ({
   title: '加载中...',
   description: '',
   start_time: '',
   end_time: '',
   problems: []
 })
+const exam = ref(emptyExam())
 
 const problemStatus = ref([])
 const statusLoading = ref(false)
@@ -185,6 +186,9 @@ const now = useNow()
 const timing = computed(() => getExamTiming(exam.value, now.value))
 const remainingTime = computed(() => timing.value.remainingSeconds)
 let disposed = false
+let scopeVersion = 0
+let detailRequestVersion = 0
+let statusRequestVersion = 0
 const exiting = ref(false)
 const exitConfirming = ref(false)
 
@@ -197,27 +201,42 @@ const customColors = [
 ]
 
 const fetchExamData = async () => {
+  const id = examId.value
+  const scope = scopeVersion
+  const request = ++detailRequestVersion
+  const token = localStorage.getItem('token')
+  const isCurrent = () => !disposed && scope === scopeVersion && id === examId.value &&
+    request === detailRequestVersion && token === localStorage.getItem('token')
   try {
-    const data = await getExamDetail(examId)
-    if (disposed) return
+    const data = await getExamDetail(id)
+    if (!isCurrent()) return
     exam.value = data
     fetchStatus()
   } catch (error) {
-    if (disposed) return
+    if (!isCurrent()) return
     ElMessage.error('获取考试详情失败')
     router.push('/exam')
   }
 }
 
 const fetchStatus = async () => {
+  if (disposed || statusLoading.value) return
+  const scope = scopeVersion
+  const request = ++statusRequestVersion
+  const token = localStorage.getItem('token')
+  const isCurrent = () => !disposed && scope === scopeVersion && request === statusRequestVersion &&
+    token === localStorage.getItem('token')
   statusLoading.value = true
   try {
     const data = await getMyExamStatus()
-    problemStatus.value = data
+    if (isCurrent()) problemStatus.value = data
   } catch (error) {
-    console.error('Failed to fetch exam status', error)
+    if (isCurrent()) {
+      console.error('获取考试题目状态失败', error)
+      ElMessage.error('获取题目状态失败，请重试')
+    }
   } finally {
-    statusLoading.value = false
+    if (!disposed && scope === scopeVersion && request === statusRequestVersion) statusLoading.value = false
   }
 }
 
@@ -257,15 +276,17 @@ watch(() => timing.value.phase, phase => {
 
 const handleExamEnd = () => {
   const token = localStorage.getItem('token')
+  const scope = scopeVersion
   ElMessageBox.alert('考试已结束，系统将自动退出考试模式。', '提示', {
     confirmButtonText: '确定',
-    callback: async () => { await performExit(token) }
+    callback: async () => { await performExit(token, scope) }
   })
 }
 
 const handleExitExam = async () => {
   if (disposed || exiting.value || exitConfirming.value) return
   const token = localStorage.getItem('token')
+  const scope = scopeVersion
   exitConfirming.value = true
   try {
     await ElMessageBox.confirm('确定要退出考试吗？退出后将无法继续在考试模式下提交。', '提示', {
@@ -273,19 +294,19 @@ const handleExitExam = async () => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await performExit(token)
+    await performExit(token, scope)
   } catch (error) {
-    if (error !== 'cancel' && error !== 'close' && !disposed) {
+    if (error !== 'cancel' && error !== 'close' && !disposed && scope === scopeVersion) {
       console.error('退出考试确认失败', error)
       ElMessage.error('退出考试确认失败')
     }
   } finally {
-    if (!disposed) exitConfirming.value = false
+    if (!disposed && scope === scopeVersion) exitConfirming.value = false
   }
 }
 
-const performExit = async (expectedToken = localStorage.getItem('token')) => {
-  const isCurrentSession = () => !disposed && localStorage.getItem('token') === expectedToken
+const performExit = async (expectedToken = localStorage.getItem('token'), scope = scopeVersion) => {
+  const isCurrentSession = () => !disposed && scope === scopeVersion && localStorage.getItem('token') === expectedToken
   if (exiting.value || !isCurrentSession()) return
   exiting.value = true
   try {
@@ -300,7 +321,7 @@ const performExit = async (expectedToken = localStorage.getItem('token')) => {
   } catch (error) {
     if (isCurrentSession()) ElMessage.error('退出考试失败')
   } finally {
-    if (!disposed) exiting.value = false
+    if (!disposed && scope === scopeVersion) exiting.value = false
   }
 }
 
@@ -332,17 +353,23 @@ const formatTime = (time) => {
 const goToProblem = (problemId) => {
   router.push({
     path: `/problem/${problemId}`,
-    query: {exam_id: examId}
+    query: {exam_id: examId.value}
   })
 }
 
 const goToRank = () => {
-  router.push(`/exam/${examId}/rank`)
+  router.push(`/exam/${examId.value}/rank`)
 }
 
-onMounted(() => {
+watch(examId, () => {
+  scopeVersion += 1
+  exam.value = emptyExam()
+  problemStatus.value = []
+  statusLoading.value = false
+  exiting.value = false
+  exitConfirming.value = false
   fetchExamData()
-})
+}, {immediate: true, flush: 'sync'})
 
 onUnmounted(() => {
   disposed = true
