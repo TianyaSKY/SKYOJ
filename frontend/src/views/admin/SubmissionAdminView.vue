@@ -124,15 +124,31 @@ const submissions = ref([])
 
 const STORAGE_KEY = 'skyoj_submission_filter'
 
-// 从 localStorage 加载初始值
-const savedFilter = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+// 缓存损坏时清除筛选缓存，保证页面仍能加载。
+const loadSavedFilter = () => {
+  const cached = localStorage.getItem(STORAGE_KEY)
+  if (cached === null) return {}
+  try {
+    const parsed = JSON.parse(cached)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new TypeError('筛选缓存必须为对象')
+    }
+    return parsed
+  } catch {
+    console.warn('提交筛选缓存格式无效，已重置')
+    localStorage.removeItem(STORAGE_KEY)
+    return {}
+  }
+}
+const savedFilter = loadSavedFilter()
+const savedField = (key) => typeof savedFilter[key] === 'string' ? savedFilter[key] : ''
 
 const filterForm = reactive({
-  problem_id: savedFilter.problem_id || '',
-  user_id: savedFilter.user_id || '',
-  username: savedFilter.username || '',
-  exam_id: savedFilter.exam_id || '',
-  status: savedFilter.status || ''
+  problem_id: savedField('problem_id'),
+  user_id: savedField('user_id'),
+  username: savedField('username'),
+  exam_id: savedField('exam_id'),
+  status: savedField('status')
 })
 
 const pagination = reactive({
@@ -146,7 +162,10 @@ watch(filterForm, (newVal) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal))
 }, { deep: true })
 
+// 快速筛选、翻页或刷新时，只采用最新请求的响应。
+let latestRequestId = 0
 const fetchSubmissions = async () => {
+  const requestId = ++latestRequestId
   loading.value = true
   try {
     const params = {
@@ -160,6 +179,7 @@ const fetchSubmissions = async () => {
     })
 
     const res = await getSubmissions(params)
+    if (requestId !== latestRequestId) return
 
     if (res) {
       const list = res.items || res.submissions || res.data || (Array.isArray(res) ? res : [])
@@ -173,9 +193,9 @@ const fetchSubmissions = async () => {
     }
   } catch (error) {
     console.error('Fetch submissions error:', error)
-    ElMessage.error('获取提交记录失败')
+    if (requestId === latestRequestId) ElMessage.error('获取提交记录失败')
   } finally {
-    loading.value = false
+    if (requestId === latestRequestId) loading.value = false
   }
 }
 
