@@ -56,3 +56,35 @@ def test_failed_upload_does_not_leave_new_directory(tmp_path, monkeypatch):
     with pytest.raises(PermissionError, match='write denied'):
         SubmissionStorageClient(str(tmp_path)).save(1, 1, 'answer.csv', b'csv')
     assert list(tmp_path.iterdir()) == []
+
+
+def test_failed_upload_cleanup_cannot_remove_external_or_shared_files(tmp_path):
+    storage = SubmissionStorageClient(str(tmp_path / 'submissions'))
+    external = tmp_path / 'external.csv'
+    external.write_bytes(b'keep')
+    root_file = tmp_path / 'submissions' / 'shared.csv'
+    root_file.parent.mkdir()
+    root_file.write_bytes(b'keep')
+    for target in [external, root_file]:
+        storage.remove_failed_upload(str(target))
+        assert target.read_bytes() == b'keep'
+
+
+def test_cleanup_failure_logs_without_masking_original_submission_error(tmp_path, monkeypatch):
+    from app.clients import submission_storage_client
+    from types import SimpleNamespace
+
+    storage = SubmissionStorageClient(str(tmp_path))
+    repo, jobs, uow = MagicMock(), MagicMock(), MagicMock()
+    repo.get_problem.return_value = SimpleNamespace(type='kaggle', language='python')
+    repo.create.side_effect = RuntimeError('database write failed')
+    logger = MagicMock()
+    monkeypatch.setattr(submission_storage_client, 'logger', logger)
+    monkeypatch.setattr(Path, 'unlink', MagicMock(side_effect=PermissionError('cleanup denied')))
+    service = SubmissionService(repo, jobs, storage, uow=uow)
+    with pytest.raises(RuntimeError, match='database write failed'):
+        service.submit(SubmitParams(1, 1, 'upload', 'csv', is_file_upload=True,
+                       filename='answer.csv', file_content=b'current'), requester_role='student')
+    uow.rollback.assert_called_once()
+    logger.exception.assert_called_once()
+    jobs.enqueue_judge_submission.assert_not_called()

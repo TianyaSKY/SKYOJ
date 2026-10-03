@@ -187,3 +187,49 @@ def test_manual_scans_can_repeat_after_completion(business_database, monkeypatch
     jobs.complete_job(first)
     second = service.trigger_manual_scan(1, "teacher")
     assert second != first
+
+@pytest.mark.parametrize('failure_stage', ['submission', 'job', 'commit', 'broker'])
+def test_csv_attachment_follows_submission_transaction(
+    failure_stage, business_database, tmp_path, monkeypatch,
+):
+    from app.clients.submission_storage_client import SubmissionStorageClient
+
+    db, engine = business_database
+    db.get(Problem, 1).type = 'kaggle'
+    db.commit()
+    storage = SubmissionStorageClient(str(tmp_path / 'submissions'))
+    previous = Path(storage.save(1, 1, 'answer.csv', b'previous'))
+    uow = UnitOfWork(db)
+    repo = SubmissionRepository(db)
+    job_repo = AsyncJobRepository(db)
+    jobs = AsyncJobService(job_repo, uow=uow)
+    service = SubmissionService(repo, jobs, storage, uow=uow)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError(f'{failure_stage} failed')
+
+    if failure_stage == 'submission':
+        monkeypatch.setattr(repo, 'create', fail)
+    elif failure_stage == 'job':
+        monkeypatch.setattr(job_repo, 'create', fail)
+    elif failure_stage == 'commit':
+        monkeypatch.setattr(db, 'commit', fail)
+    else:
+        monkeypatch.setattr(jobs, '_publish', fail)
+    params = SubmitParams(1, 1, '__file_upload__', 'csv', is_file_upload=True,
+                          filename='answer.csv', file_content=b'current')
+    if failure_stage == 'broker':
+        result = service.submit(params, requester_role='student')
+        with Session(engine) as observer:
+            submission = observer.get(Submission, result.submission_id)
+            assert Path(submission.code_path).read_bytes() == b'current'
+            assert observer.query(AsyncJob).one().status == 'pending'
+    else:
+        with pytest.raises(RuntimeError, match=f'{failure_stage} failed'):
+            service.submit(params, requester_role='student')
+        with Session(engine) as observer:
+            assert observer.query(Submission).count() == 0
+            assert observer.query(AsyncJob).count() == 0
+        assert list((tmp_path / 'submissions').rglob('answer.csv')) == [previous]
+        assert list((tmp_path / 'submissions').iterdir()) == [previous.parent]
+    assert previous.read_bytes() == b'previous'

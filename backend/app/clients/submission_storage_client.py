@@ -52,3 +52,16 @@ class SubmissionStorageClient:
                 logger.exception("清理失败的提交附件目录失败 path={}", upload_dir)
             raise
         return path
+
+    def remove_failed_upload(self, path: str) -> None:
+        """清理尚未提交的独立附件；清理失败记录日志，不掩盖数据库异常。"""
+        try:
+            target = Path(path)
+            root = Path(self._base_dir).resolve()
+            relative = target.absolute().relative_to(Path(self._base_dir).absolute())
+            if len(relative.parts) != 2 or target.resolve().relative_to(root) != relative:
+                raise ValueError("附件路径不属于独立提交目录")
+            target.unlink(missing_ok=True)
+            target.parent.rmdir()
+        except (OSError, ValueError):
+            logger.exception("清理未提交的附件失败 path={}", path)

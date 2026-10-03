@@ -205,7 +205,11 @@ class SubmissionService:
             )
             self._job_service.enqueue_judge_submission(submission.id)
         except Exception:
-            self._uow.rollback()
+            try:
+                self._uow.rollback()
+            finally:
+                if params.is_file_upload:
+                    self._storage_client.remove_failed_upload(code)
             raise
         return SubmitResult(
             submission_id=submission.id, status="Pending", exam_id=exam_id
