@@ -62,22 +62,6 @@ services:
     networks:
       - skyoj-net
 
-  migrate:
-    build:
-      context: .
-      dockerfile: docker/backend/Dockerfile
-    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
-    volumes:
-      - ./backend:/app
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - skyoj-net
-
   backend:
     build:
       context: .
@@ -110,8 +94,6 @@ services:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
     depends_on:
-      migrate:
-        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       rabbitmq:
@@ -138,8 +120,8 @@ services:
       JOB_RECOVERY_INTERVAL_SECONDS: ${JOB_RECOVERY_INTERVAL_SECONDS:-30}
       PYTHONUNBUFFERED: "1"
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       rabbitmq:
@@ -175,8 +157,8 @@ services:
       - ./backend/uploads:/app/uploads
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       rabbitmq:
@@ -213,8 +195,8 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       rabbitmq:
@@ -249,8 +231,8 @@ services:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      backend:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       rabbitmq:

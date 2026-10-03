@@ -23,7 +23,7 @@ from app.api import (
     user,
     wrong_book,
 )
-from app.persistence.database import SessionLocal, engine
+from app.persistence.database import Base, SessionLocal, engine
 from app.core.errors import (
     AuthenticationError,
     BusinessError,
@@ -49,13 +49,15 @@ from app.utils.sys_dict import sys_dict_kv
 
 
 def init_db():
-    """检查连接并初始化默认数据，结构升级由 Alembic 独立完成。"""
+    """检查连接、创建缺失的表并初始化默认数据。"""
     retries = 5
     while retries > 0:
         try:
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
             logger.success("数据库连接成功")
+            Base.metadata.create_all(bind=engine)
+            logger.success("数据库表初始化完成")
 
             db = SessionLocal()
             try:
@@ -83,7 +85,7 @@ def init_db():
                 exc,
             )
             time.sleep(3)
-    raise RuntimeError("数据库初始化失败，请先执行 alembic upgrade head 并检查连接配置")
+    raise RuntimeError("数据库初始化失败，请检查连接配置、建表权限及已有表结构")
 
 
 @asynccontextmanager

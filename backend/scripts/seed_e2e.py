@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from loguru import logger
 from sqlalchemy import select
 
-from app.persistence.database import SessionLocal, engine
+from app.persistence.database import Base, SessionLocal, engine
 from app.persistence import Exam, ExamProblem, Problem, Submission, SysDict, User
 from app.utils.passwords import hash_password
 from app.utils.sys_dict import sys_dict_kv
@@ -21,6 +21,7 @@ def seed() -> None:
         or Path(engine.url.database or "").name != "skyoj-e2e.sqlite"
     ):
         raise RuntimeError("E2E 初始化只允许写入专用 skyoj-e2e.sqlite 数据库")
+    Base.metadata.create_all(bind=engine)
     with SessionLocal.begin() as db:
         if db.scalar(select(User.id).limit(1)) is not None:
             raise RuntimeError("E2E 数据库已有用户，请使用新的临时数据库")

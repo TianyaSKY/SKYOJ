@@ -195,7 +195,6 @@ Good for frontend/API-only work without judging tasks:
 # Terminal 1: backend API (port 5000)
 cd backend
 export DATABASE_URL=sqlite:///./skyoj.db SECRET_KEY=dev-only-secret-change-me CELERY_BROKER_URL=memory://
-uv run alembic -c alembic.ini upgrade head
 uv run python run.py
 ```
 
@@ -220,7 +219,6 @@ cd backend
 export DATABASE_URL=mysql+pymysql://skyoj:REPLACE_WITH_ACTUAL_MYSQL_PASSWORD@127.0.0.1:3306/oj_db \
 SECRET_KEY=replace_with_strong_value \
 CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672//
-uv run alembic -c alembic.ini upgrade head
 uv run python run.py
 ```
 
@@ -254,7 +252,7 @@ cd frontend
 npm run dev
 ```
 
-Database schema upgrades now run through Alembic. Docker Compose waits for the `migrate` service before starting the API and workers. See [architecture and migration notes](docs/architecture.md).
+The API creates missing tables and initializes system defaults at startup. Docker Compose workers wait for the API to become healthy. Changes to existing table columns require manual SQL. See [architecture and database initialization notes](docs/architecture.md).
 
 ### Running Tests
 

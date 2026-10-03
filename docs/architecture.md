@@ -1,4 +1,4 @@
-# 架构与数据库迁移
+# 架构与数据库初始化
 
 HTTP 写请求由 `api/schemas/` 中的 Pydantic 模型校验，并转换成业务 dataclass。Service 返回固定类型的业务结果，API 声明响应模型；文件下载、204 空响应和 SSE 显式使用 `response_model=None`。
 
@@ -45,7 +45,7 @@ Repository 返回明确的 dataclass 快照，包含必要的关联信息，不�
 
 `api/deps.py` 为 Service 显式注入所需仓储与 Client，包含题目标签查询所需的社区仓储。社区、错题本服务不再接收 Session；异步任务服务不再提供 `from_session` 工厂，API 与 Worker 使用 `AsyncJobService(AsyncJobRepository(db))` 装配。判题模式由 Worker 传入会话，不再隐式创建额外会话。
 
-`persistence/__init__.py` 统一注册全部 ORM 表与字符串关联。API、Worker、Alembic 与种子脚本均使用同一注册入口；持久化层在构造业务快照时按需导入 Service 中的 dataclass，避免注册表时反向装配业务服务。
+`persistence/__init__.py` 统一注册全部 ORM 表与字符串关联。API、Worker 与种子脚本均使用同一注册入口；持久化层在构造业务快照时按需导入 Service 中的 dataclass，避免注册表时反向装配业务服务。
 
 ## 事务
 
@@ -57,22 +57,13 @@ Repository 仅执行数据访问、`flush()` 和必要的 `refresh()`，不调�
 
 Worker 捕获执行异常后先回滚失败事务，再写入任务失败状态，避免 SQLAlchemy 会话处于失败状态而无法记录错误。
 
-## 升级数据库
+## 初始化数据库
 
-配置 `DATABASE_URL`、`SECRET_KEY` 后，从仓库根目录执行：
+配置 `DATABASE_URL`、`SECRET_KEY` 后启动 API。启动流程检查连接，通过 SQLAlchemy `Base.metadata.create_all()` 创建缺失的表，然后初始化系统默认数据；初始化失败将拒绝启动。
 
-```bash
-uv sync --frozen
-uv run alembic -c backend/alembic.ini upgrade head
-```
+Docker Compose 的 Worker 和恢复进程等待 API 健康检查通过后启动。本地启动时先等待 API 初始化完成，再启动 Worker。
 
-从 `backend/` 执行时使用 `-c alembic.ini`。本地 API 和 Worker 均须在迁移成功后启动；应用启动仅检查连接并初始化系统默认数据，不执行 DDL，初始化失败将拒绝启动。
-
-Docker Compose 包含独立 `migrate` 服务，API、Worker 和恢复进程通过 `service_completed_successfully` 等待迁移成功。
-
-初始迁移 `0001` 冻结了引入迁移时的表结构：空库创建表，旧库保留已有表和数据，补充此前启动脚本维护的 `datasets` 文件任务字段、`submissions.case_results`、`exams.contest_type/freeze_minutes` 及索引。迁移按版本执行；DDL 错误不会被忽略。
-
-既有库应先备份，并在备份副本验证升级。初始迁移只接管受支持的旧结构，不会自动修复任意字段类型或约束漂移。MySQL DDL 可能自动提交，迁移中断后应排查原因并重试，不能依赖事务恢复已执行的 DDL。初始版本禁止自动 downgrade，以免删除接管的历史表；回退应使用已验证的备份。后续结构变更须新增迁移文件，不修改已发布的版本。
+建表操作可重复执行，保留已有表和数据，不自动新增、删除或修改已有表的字段、索引及约束。已有数据库的结构变更需要备份后手动执行 SQL；项目不再维护数据库版本及迁移脚本。
 
 ## 验证与持续检查
 
@@ -95,7 +86,7 @@ cd frontend
 E2E_BASE_URL=http://127.0.0.1:4173 npm run test:e2e -- e2e/validation.spec.js --project=chromium --project=chromium-mobile
 ```
 
-CI 为完整 `frontend/e2e` 套件执行 Alembic 迁移，再用 `backend/scripts/seed_e2e.py` 填充专用临时 `skyoj-e2e.sqlite`。脚本拒绝其他数据库和已有用户的数据，不能对业务库运行。Playwright 管理 API（5015）与预览服务（4173），等待健康检查后才开始测试；认证 fixture 使用实际登录接口签发的 token。预览代理通过 `E2E_API_URL` 指向独立 API。考试模式的系统信息按浏览器页面隔离，避免并行修改全局配置互相干扰。
+CI 为完整 `frontend/e2e` 套件使用 `backend/scripts/seed_e2e.py` 创建表并填充专用临时 `skyoj-e2e.sqlite`。脚本拒绝其他数据库和已有用户的数据，不能对业务库运行。Playwright 管理 API（5015）与预览服务（4173），等待健康检查后才开始测试；认证 fixture 使用实际登录接口签发的 token。预览代理通过 `E2E_API_URL` 指向独立 API。考试模式的系统信息按浏览器页面隔离，避免并行修改全局配置互相干扰。
 
 本地复现完整 CI 浏览器套件时，在仓库根目录设置隔离环境（使用全新的临时目录）：
 
@@ -107,7 +98,6 @@ export CELERY_BROKER_URL=memory:// REDIS_URL=''
 export UPLOAD_FOLDER="$E2E_TMP/uploads"
 export E2E_BASE_URL=http://127.0.0.1:4173 E2E_API_URL=http://127.0.0.1:5015
 uv sync --frozen
-uv run alembic -c backend/alembic.ini upgrade head
 uv run python backend/scripts/seed_e2e.py
 cd frontend
 npm ci
@@ -122,4 +112,4 @@ CI=true npm run test:e2e
 
 ## 本次收拢验证（2026-10-03）
 
-后端 172 项 pytest、前端 31 项单元测试、前端构建、源码编译与 Compose 配置检查通过。与收拢前提交 `7567447` 对比，20 个 ORM 类定义和完整 OpenAPI（65 个 HTTP 路径及全部 schemas）一致。API、全部任务入口、恢复 Worker 与 Celery 注册装配通过；数据库迁移回归覆盖空库、旧库、重复升级和错误传播。未执行真实 MySQL、RabbitMQ、Docker 判题、外部 LLM/JPlag 或完整浏览器端到端链路。
+后端 172 项 pytest、前端 31 项单元测试、前端构建、源码编译与 Compose 配置检查通过。与收拢前提交 `7567447` 对比，20 个 ORM 类定义和完整 OpenAPI（65 个 HTTP 路径及全部 schemas）一致。API、全部任务入口、恢复 Worker 与 Celery 注册装配通过；上述验证为收拢完成时的记录；移除迁移机制后的启动回归覆盖空库建表、重复启动保留数据和建表失败拒绝启动。未执行真实 MySQL、RabbitMQ、Docker 判题、外部 LLM/JPlag 或完整浏览器端到端链路。

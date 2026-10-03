@@ -143,7 +143,6 @@ jobs:
       - name: Prepare isolated E2E database
         run: |
           uv sync --frozen
-          uv run alembic -c backend/alembic.ini upgrade head
           uv run python backend/scripts/seed_e2e.py
 
       - name: Install Playwright browsers

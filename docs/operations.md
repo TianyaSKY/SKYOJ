@@ -97,7 +97,7 @@ docker compose restart backend      # 仅重启后端
 
 `init_db()` 在 backend 容器启动时自动执行：
 
-- `create_tables()` — 创建全部 SQLAlchemy 模型对应的表。
+- `Base.metadata.create_all()` — 创建缺失的 ORM 表，保留已有表和数据。
 - 若 `sys_dict` 表为空，按 `app/utils/sys_dict.py` 中默认值写入。
 - 失败重试 5 次，每次间隔 3s（应对 mysql 慢启动）。
 

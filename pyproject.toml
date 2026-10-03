@@ -23,7 +23,6 @@ dependencies = [
     "urllib3>=2.7.0",
     "uvicorn[standard]>=0.52.1",
     "prometheus-client>=0.21.0",
-    "alembic>=1.13,<2",
 ]
 
 [build-system]
