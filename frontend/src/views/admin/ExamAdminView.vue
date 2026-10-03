@@ -95,9 +95,8 @@
       :title="dialogTitle"
       width="900px"
       class="exam-dialog"
-      @close="resetForm"
     >
-      <el-form ref="formRef" v-loading="dialogLoading" :model="form" label-position="top">
+      <el-form ref="formRef" v-loading="dialogLoading || submitting" :model="form" label-position="top">
         <el-row :gutter="30">
           <!-- Left Side: Basic Info -->
           <el-col :span="10">
@@ -173,7 +172,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button :loading="submitting" type="primary" size="large" @click="handleSubmit">
+          <el-button :loading="submitting" :disabled="submitting || dialogLoading" type="primary" size="large" @click="handleSubmit">
             {{ isEdit ? '保存修改' : '立即创建' }}
           </el-button>
         </div>
@@ -184,7 +183,7 @@
 
 <script setup>
 import {createExamSchema, updateExamSchema} from '@/schemas/exam'
-import {computed, onMounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {
   addExamProblem,
   createExam,
@@ -221,6 +220,10 @@ const dialogVisible = ref(false)
 const dialogLoading = ref(false)
 const isEdit = ref(false)
 const currentExamId = ref(null)
+let dialogVersion = 0
+let listVersion = 0
+let disposed = false
+const isCurrentDialog = version => !disposed && dialogVisible.value && version === dialogVersion
 
 // Problem Selection
 const allProblems = ref([])
@@ -242,19 +245,22 @@ const form = ref({
 const dialogTitle = computed(() => (isEdit.value ? '编辑考试配置' : '创建新考试'))
 
 const fetchExams = async () => {
+  const version = ++listVersion
   loading.value = true
   try {
-    exams.value = await getExamList()
+    const data = await getExamList()
+    if (!disposed && version === listVersion) exams.value = data
   } catch (error) {
-    ElMessage.error('获取考试列表失败')
+    if (!disposed && version === listVersion) ElMessage.error('获取考试列表失败')
   } finally {
-    loading.value = false
+    if (!disposed && version === listVersion) loading.value = false
   }
 }
 
 const fetchProblems = async () => {
   try {
     const data = await getProblemList()
+    if (disposed) return
     allProblems.value = data.map(p => ({
       id: p.id,
       title: p.title,
@@ -262,7 +268,7 @@ const fetchProblems = async () => {
       disabled: false
     }))
   } catch (error) {
-    ElMessage.error('获取题目列表失败')
+    if (!disposed) ElMessage.error('获取题目列表失败')
   }
 }
 
@@ -308,12 +314,18 @@ const resetForm = () => {
 }
 
 const handleCreate = () => {
+  dialogVersion += 1
+  dialogLoading.value = false
+  submitting.value = false
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
 }
 
 const handleEdit = async (row) => {
+  const version = ++dialogVersion
+  resetForm()
+  submitting.value = false
   isEdit.value = true
   currentExamId.value = row.id
   dialogVisible.value = true
@@ -321,6 +333,7 @@ const handleEdit = async (row) => {
 
   try {
     const detail = await getExamDetail(row.id)
+    if (!isCurrentDialog(version)) return
     form.value = {...detail}
     timeRange.value = [parseServerDate(detail.start_time), parseServerDate(detail.end_time)]
     form.value.start_time = timeRange.value[0]?.toISOString() || ''
@@ -333,10 +346,11 @@ const handleEdit = async (row) => {
     }
     originalProblemIds.value = [...selectedProblemIds.value]
   } catch (error) {
+    if (!isCurrentDialog(version)) return
     ElMessage.error('获取考试详情失败')
     dialogVisible.value = false
   } finally {
-    dialogLoading.value = false
+    if (isCurrentDialog(version)) dialogLoading.value = false
   }
 }
 
@@ -368,21 +382,22 @@ const handleExport = async (row) => {
 }
 
 const handleSubmit = async () => {
+  if (disposed || !dialogVisible.value || dialogLoading.value || submitting.value) return
   const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(form.value)
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
     return
   }
 
+  const version = dialogVersion
+  const editing = isEdit.value
+  const examId = currentExamId.value
+  const currentIds = new Set(selectedProblemIds.value)
+  const originalIds = new Set(originalProblemIds.value)
   submitting.value = true
   try {
-    form.value.problem_ids = selectedProblemIds.value.join(',')
-    let examId = currentExamId.value
-
-    if (isEdit.value) {
+    if (editing) {
       await updateExam(examId, parsed.data)
-      const currentIds = new Set(selectedProblemIds.value)
-      const originalIds = new Set(originalProblemIds.value)
       const toAdd = [...currentIds].filter(id => !originalIds.has(id))
       const toRemove = [...originalIds].filter(id => !currentIds.has(id))
       const promises = []
@@ -393,24 +408,35 @@ const handleSubmit = async () => {
         promises.push(removeExamProblem(examId, pid))
       }
       await Promise.all(promises)
-      ElMessage.success('更新成功')
+      if (isCurrentDialog(version)) ElMessage.success('更新成功')
     } else {
       await createExam(parsed.data)
-      ElMessage.success('创建成功')
+      if (isCurrentDialog(version)) ElMessage.success('创建成功')
     }
 
-    dialogVisible.value = false
-    fetchExams()
+    if (isCurrentDialog(version)) dialogVisible.value = false
+    if (!disposed) fetchExams()
   } catch (error) {
-    ElMessage.error('操作失败')
+    if (isCurrentDialog(version)) ElMessage.error('操作失败')
   } finally {
-    submitting.value = false
+    if (isCurrentDialog(version)) submitting.value = false
   }
 }
 
 const filterMethod = (query, item) => {
   return item.label.toLowerCase().includes(query.toLowerCase())
 }
+
+watch(dialogVisible, visible => {
+  if (!visible) {
+    dialogVersion += 1
+    dialogLoading.value = false
+    submitting.value = false
+    resetForm()
+  }
+}, {flush: 'sync'})
+
+onUnmounted(() => { disposed = true; dialogVersion += 1; listVersion += 1 })
 
 onMounted(() => {
   fetchExams()
