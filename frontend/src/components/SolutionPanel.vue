@@ -29,6 +29,8 @@ const loading = ref(false)
 const solutions = ref([])
 const pendingLikes = ref(new Set())
 const pendingFavorites = ref(new Set())
+const reactionUpdates = new Map()
+let reactionVersion = 0
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
@@ -63,6 +65,7 @@ const isTeacher = computed(() => userInfo.value.role === 'teacher')
 async function load () {
   const scope = scopeVersion
   const requestId = ++loadVersion
+  const initialReactionVersion = reactionVersion
   const isCurrent = () => isCurrentScope(scope) && requestId === loadVersion
   loading.value = true
   try {
@@ -72,7 +75,13 @@ async function load () {
       params: { page: page.value, page_size: pageSize }
     })
     if (!isCurrent()) return
-    solutions.value = resp.items || []
+    solutions.value = (resp.items || []).map(item => {
+      // 列表请求发起后完成的操作优先于该请求可能读取到的旧状态。
+      for (const update of Object.values(reactionUpdates.get(item.id) || {})) {
+        if (update.version > initialReactionVersion) Object.assign(item, update.values)
+      }
+      return item
+    })
     total.value = resp.total || 0
   } catch (e) {
     if (isCurrent()) ElMessage.error('加载题解失败：' + (e.message || '未知错误'))
@@ -88,6 +97,8 @@ watch(() => props.problemId, () => {
   solutions.value = []
   pendingLikes.value.clear()
   pendingFavorites.value.clear()
+  reactionUpdates.clear()
+  reactionVersion = 0
   total.value = 0
   writeDialogVisible.value = false
   editing.value = null
@@ -164,6 +175,16 @@ async function submitSolution () {
   }
 }
 
+function applyReactionResult (item, kind, values) {
+  const updates = reactionUpdates.get(item.id) || {}
+  updates[kind] = { version: ++reactionVersion, values }
+  reactionUpdates.set(item.id, updates)
+  // 刷新会替换卡片对象，同时更新原对象和当前列表中的对象。
+  Object.assign(item, values)
+  const current = solutions.value.find(solution => solution.id === item.id)
+  if (current) Object.assign(current, values)
+}
+
 async function toggleLike (item) {
   if (pendingLikes.value.has(item.id)) return
   const scope = scopeVersion
@@ -174,8 +195,7 @@ async function toggleLike (item) {
       method: 'post'
     })
     if (!isCurrentScope(scope)) return
-    item.vote_count = resp.vote_count
-    item.liked_by_me = resp.liked
+    applyReactionResult(item, 'like', { vote_count: resp.vote_count, liked_by_me: resp.liked })
   } catch (e) {
     if (isCurrentScope(scope)) ElMessage.error(e.message || '点赞失败')
   } finally {
@@ -193,7 +213,7 @@ async function toggleFavorite (item) {
       method: 'post'
     })
     if (!isCurrentScope(scope)) return
-    item.favorited_by_me = resp.favorited
+    applyReactionResult(item, 'favorite', { favorited_by_me: resp.favorited })
   } catch (e) {
     if (isCurrentScope(scope)) ElMessage.error(e.message || '收藏失败')
   } finally {

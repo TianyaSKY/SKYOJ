@@ -240,3 +240,37 @@ it.each([
   current.resolve({ liked: true, favorited: true, vote_count: 1 }); await second
   expect(wrapper.vm[pending].has(1)).toBe(false)
 })
+
+it.each([
+  ['toggleLike', { liked: true, vote_count: 3 }, { liked_by_me: true, vote_count: 3 }],
+  ['toggleFavorite', { favorited: true }, { favorited_by_me: true }],
+])('%s 与列表刷新交错时保留操作结果', async (method, response, expected) => {
+  for (const reactionFirst of [true, false]) {
+    wrapper?.unmount()
+    request.mockResolvedValue({ items: [{ ...solution(1), liked_by_me: false, vote_count: 0, favorited_by_me: false }], total: 1 })
+    mountPage(); await flushPromises()
+    const original = wrapper.vm.solutions[0]
+    const post = deferred(), listing = deferred()
+    request.mockImplementation(config => config.method === 'post' ? post.promise : listing.promise)
+    const mutation = wrapper.vm[method](original)
+    const refresh = wrapper.vm.load()
+    const resolveReaction = async () => { post.resolve(response); await mutation }
+    const resolveList = async () => {
+      listing.resolve({ items: [{ ...solution(1), title: 'updated', liked_by_me: false, vote_count: 0, favorited_by_me: false }], total: 1 })
+      await refresh
+    }
+    if (reactionFirst) { await resolveReaction(); await resolveList() }
+    else { await resolveList(); await resolveReaction() }
+    expect(wrapper.vm.solutions[0]).toMatchObject({ title: 'updated', ...expected })
+    expect(original).toMatchObject(expected)
+  }
+})
+it('后续发起的刷新仍可更新其他用户增加的点赞数', async () => {
+  request.mockResolvedValue({ items: [{ ...solution(1), liked_by_me: false, vote_count: 0 }], total: 1 })
+  mountPage(); await flushPromises()
+  request.mockResolvedValueOnce({ liked: true, vote_count: 1 })
+  await wrapper.vm.toggleLike(wrapper.vm.solutions[0])
+  request.mockResolvedValueOnce({ items: [{ ...solution(1), liked_by_me: true, vote_count: 5 }], total: 1 })
+  await wrapper.vm.load()
+  expect(wrapper.vm.solutions[0].vote_count).toBe(5)
+})
