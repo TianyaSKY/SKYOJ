@@ -119,9 +119,9 @@
 
       <div class="pagination-container">
         <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :disabled="!!searchQuery"
+            :current-page="currentPage"
+            :page-size="pageSize"
+            :disabled="loading || !!searchQuery"
             :page-sizes="[10, 20, 50]"
             :total="total"
             layout="total, sizes, prev, pager, next, jumper"
@@ -173,12 +173,15 @@ const getTypeTag = (type) => {
 }
 
 const handleSearch = async () => {
+  if (disposed) return
   if (!searchQuery.value) {
     searchResults.value = []
     await fetchProblems()
     return
   }
   const version = ++requestVersion
+  searchResults.value = []
+  total.value = 0
   const query = searchQuery.value
   const tag = tagFilter.value
   const type = typeFilter.value
@@ -225,29 +228,31 @@ watch(searchQuery, (newVal) => {
   }
 })
 
-const fetchProblems = async () => {
+const fetchProblems = async (page = currentPage.value, size = pageSize.value) => {
   if (disposed || searchQuery.value) return
   const version = ++requestVersion
-  const isCurrent = () => !disposed && version === requestVersion && !searchQuery.value
+  const tag = tagFilter.value, type = typeFilter.value
+  const isCurrent = () => !disposed && version === requestVersion && !searchQuery.value && tag === tagFilter.value && type === typeFilter.value
   loading.value = true
   try {
     const params = {
-      page: currentPage.value,
-      page_size: pageSize.value
+      page,
+      page_size: size
     }
-    if (typeFilter.value) params.problem_type = typeFilter.value
-    if (tagFilter.value) {
-      params.tag_id = tagFilter.value
+    if (type) params.problem_type = type
+    if (tag) {
+      params.tag_id = tag
     }
     const res = await getProblemList(params)
     if (!isCurrent()) return
-    if (res.problems) {
-      problems.value = res.problems
-      total.value = res.total
-    } else {
-      problems.value = res
-      total.value = res.length
-    }
+    const items = res.problems || res
+    const count = res.problems ? res.total : items.length
+    const lastPage = Math.max(1, Math.ceil(count / size))
+    if (page > lastPage) return await fetchProblems(lastPage, size)
+    problems.value = items
+    total.value = count
+    currentPage.value = page
+    pageSize.value = size
   } catch (error) {
     if (isCurrent()) {
       console.error(error)
@@ -268,27 +273,23 @@ const fetchTags = async () => {
 }
 
 const handleTagChange = () => {
+  problems.value = []
+  total.value = 0
   currentPage.value = 1
   if (searchQuery.value) return handleSearch()
   return fetchProblems()
 }
 
 const handleTypeChange = () => {
+  problems.value = []
+  total.value = 0
   currentPage.value = 1
   if (searchQuery.value) return handleSearch()
   return fetchProblems()
 }
 
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  currentPage.value = 1
-  fetchProblems()
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  fetchProblems()
-}
+const handleSizeChange = val => fetchProblems(1, val)
+const handleCurrentChange = val => fetchProblems(val, pageSize.value)
 
 onBeforeUnmount(() => {
   disposed = true
