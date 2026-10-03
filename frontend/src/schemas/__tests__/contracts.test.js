@@ -39,4 +39,17 @@ describe('HTTP 请求校验契约', () => {
       description: '', contest_type: 'icpc', is_visible: false,
     })
   })
+  it('局部更新题目不补入创建时的资源限制默认值', () => {
+    expect(updateProblemSchema.parse({title: '更名'})).toEqual({title: '更名'})
+    expect(updateProblemSchema.parse({})).toEqual({})
+    expect(updateProblemSchema.parse({time_limit: null, memory_limit: null})).toEqual({
+      time_limit: null, memory_limit: null,
+    })
+    expect(updateProblemSchema.parse({time_limit: 5000, memory_limit: 512})).toEqual({
+      time_limit: 5000, memory_limit: 512,
+    })
+    expect(createProblemSchema.parse(problem)).toMatchObject({
+      time_limit: 1000, memory_limit: 128, template_code: '',
+    })
+  })
 })
