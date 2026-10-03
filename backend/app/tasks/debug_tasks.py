@@ -1,5 +1,6 @@
 """Debug Worker 任务：ACM 调试运行。"""
 
+from functools import partial
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import DEBUG_SUBMISSION_TASK
 from app.repositories.debug_run_repository import DebugRunRepository
+from app.services.acm import run_acm_single_case
 from app.services.debug_service import DebugService
 from app.tasks.base import run_job
 
@@ -30,7 +32,11 @@ def _handle_run_debug(db: Session, payload: dict[str, Any]) -> None:
         debug_run_id = int(raw_id)
     except (ValueError, TypeError) as exc:
         raise ValueError(f"Invalid debug_run_id: {raw_id!r}") from exc
-    DebugService(DebugRunRepository(db), job_service=None).run_debug(debug_run_id)
+    DebugService(
+        DebugRunRepository(db),
+        job_service=None,
+        case_runner=partial(run_acm_single_case, db=db),
+    ).run_debug(debug_run_id)
 
 
 __all__ = ["run_debug"]

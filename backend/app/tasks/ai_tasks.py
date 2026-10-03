@@ -50,12 +50,14 @@ def _build_service(db: Session) -> AiDraftService:
 
 def _handle_generate_problem(db: Session, payload: dict[str, Any]) -> dict[str, Any]:
     """调用 LLM 生成题目并写入草稿箱。"""
-    return _build_service(db).generate_problem(int(payload["draft_id"]), db)
+    return _build_service(db).generate_problem(int(payload["draft_id"])).payload
 
 
-def _handle_generate_test_script(db: Session, payload: dict[str, Any]) -> dict[str, Any]:
+def _handle_generate_test_script(
+    db: Session, payload: dict[str, Any]
+) -> dict[str, Any]:
     """调用 LLM 生成 ACM/OOP/Kaggle 测试脚本。"""
-    return _build_service(db).generate_test_script(int(payload["draft_id"]), db)
+    return _build_service(db).generate_test_script(int(payload["draft_id"])).payload
 
 
 def _mark_draft_failed(payload: dict[str, Any], result) -> None:
@@ -63,6 +65,7 @@ def _mark_draft_failed(payload: dict[str, Any], result) -> None:
     db = SessionLocal()
     try:
         AiDraftRepository(db).mark_failed(int(payload["draft_id"]), str(result))
+        db.commit()
     finally:
         db.close()
 

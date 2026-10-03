@@ -4,11 +4,13 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.plagiarism import PlagiarismReport
+from app.unit_of_work import UnitOfWork
 
 
 class PlagiarismRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, report_id: int) -> PlagiarismReport | None:
         return self._db.get(PlagiarismReport, report_id)
@@ -44,7 +46,7 @@ class PlagiarismRepository:
             existing.matched_blocks = blocks
             existing.status = status
             existing.jplag_result_id = jplag_result_id
-            self._db.commit()
+            self._db.flush()
             self._db.refresh(existing)
             return existing
         report = PlagiarismReport(
@@ -57,7 +59,7 @@ class PlagiarismRepository:
             jplag_result_id=jplag_result_id,
         )
         self._db.add(report)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(report)
         return report
 
@@ -73,11 +75,7 @@ class PlagiarismRepository:
             .order_by(PlagiarismReport.similarity_score.desc())
         )
         total = query.count()
-        reports = (
-            query.offset((page - 1) * page_size)
-            .limit(page_size)
-            .all()
-        )
+        reports = query.offset((page - 1) * page_size).limit(page_size).all()
         return reports, total
 
     def get_by_submission_id(self, submission_id: int) -> list[PlagiarismReport]:

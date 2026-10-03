@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from loguru import logger
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from app.api import (
@@ -22,7 +23,7 @@ from app.api import (
     user,
     wrong_book,
 )
-from app.database import SessionLocal, create_tables
+from app.database import SessionLocal, engine
 from app.domain.errors import (
     AuthenticationError,
     BusinessError,
@@ -48,13 +49,13 @@ from app.utils.sys_dict import sys_dict_kv
 
 
 def init_db():
-    """尝试连接数据库并创建表，带有重试机制"""
+    """检查连接并初始化默认数据，结构升级由 Alembic 独立完成。"""
     retries = 5
     while retries > 0:
         try:
-            create_tables()
-            _ensure_new_columns()
-            logger.success("数据库连接成功，数据表已创建")
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+            logger.success("数据库连接成功")
 
             db = SessionLocal()
             try:
@@ -82,36 +83,7 @@ def init_db():
                 exc,
             )
             time.sleep(3)
-    logger.error("数据库多次连接失败，应用将以降级状态继续启动")
-
-
-def _ensure_new_columns():
-    """对已存在的表补充新列（ALTER TABLE IF NOT EXISTS 语义）。"""
-    from sqlalchemy import text
-    from app.database import engine
-
-    # case_results: ACM 逐点判题结果 JSON
-    _alter_if_missing("submissions", "case_results", "JSON")
-
-    # exam.contest_type / freeze_minutes
-    _alter_if_missing("exams", "contest_type", "VARCHAR(10) DEFAULT 'icpc'")
-    _alter_if_missing("exams", "freeze_minutes", "INT")
-
-    logger.info("新列同步检查完成")
-
-
-def _alter_if_missing(table: str, column: str, definition: str):
-    from sqlalchemy import text
-    from app.database import engine
-
-    with engine.connect() as conn:
-        try:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
-            conn.commit()
-            logger.success("ALTER TABLE {} ADD COLUMN {} ({})", table, column, definition)
-        except Exception:
-            conn.commit()  # 列已存在或其他非致命错误，静默略过
-            pass
+    raise RuntimeError("数据库初始化失败，请先执行 alembic upgrade head 并检查连接配置")
 
 
 @asynccontextmanager
@@ -130,9 +102,10 @@ def create_app() -> FastAPI:
     )
 
     # Prometheus HTTP 指标中间件。
+    import time as time_module
+
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request as StarletteRequest
-    import time as time_module
 
     class PrometheusMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: StarletteRequest, call_next):
@@ -261,7 +234,9 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     application.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-    application.include_router(problem.router, prefix="/api/problems", tags=["problems"])
+    application.include_router(
+        problem.router, prefix="/api/problems", tags=["problems"]
+    )
     application.include_router(
         submission.router, prefix="/api/submissions", tags=["submissions"]
     )
@@ -274,9 +249,15 @@ def create_app() -> FastAPI:
     application.include_router(exam.router, prefix="/api/exams", tags=["exams"])
     application.include_router(llm.router, prefix="/api/llm", tags=["llm"])
     application.include_router(search.router, prefix="/api/search", tags=["search"])
-    application.include_router(plagiarism.router, prefix="/api/plagiarism", tags=["plagiarism"])
-    application.include_router(problem_community.router, prefix="/api", tags=["community"])
-    application.include_router(problem_community.tags_router, prefix="/api", tags=["community"])
+    application.include_router(
+        plagiarism.router, prefix="/api/plagiarism", tags=["plagiarism"]
+    )
+    application.include_router(
+        problem_community.router, prefix="/api", tags=["community"]
+    )
+    application.include_router(
+        problem_community.tags_router, prefix="/api", tags=["community"]
+    )
     application.include_router(wrong_book.router, prefix="/api", tags=["wrong_book"])
     application.include_router(admin_analytics.router, prefix="/api", tags=["admin"])
 

@@ -5,6 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.problem import Problem
+from app.unit_of_work import UnitOfWork
 
 
 class ProblemRepository:
@@ -12,6 +13,7 @@ class ProblemRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, problem_id: int) -> Optional[Problem]:
         """按主键查询题目。"""
@@ -39,7 +41,7 @@ class ProblemRepository:
             template_code=template_code or "",
         )
         self._db.add(problem)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(problem)
         return problem
 
@@ -57,11 +59,18 @@ class ProblemRepository:
 
     def update(self, problem: Problem) -> Problem:
         """持久化题目更新。"""
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(problem)
         return problem
 
     def delete(self, problem: Problem) -> None:
         """删除指定题目。"""
         self._db.delete(problem)
-        self._db.commit()
+        self._db.flush()
+
+    def list_problem_ids_by_tag(self, tag_id: int) -> list[int]:
+        from app.repositories.problem_community_repository import (
+            ProblemCommunityRepository,
+        )
+
+        return ProblemCommunityRepository(self._db).list_problem_ids_by_tag(tag_id)

@@ -65,6 +65,7 @@
 </template>
 
 <script setup>
+import {registerSchema} from '@/schemas/auth'
 import {reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
@@ -94,7 +95,7 @@ const validatePass = (rule, value, callback) => {
 const registerRules = reactive({
   username: [
     {required: true, message: 'Please enter your username', trigger: 'blur'},
-    {min: 3, max: 20, message: 'Length should be 3 to 20', trigger: 'blur'},
+    {min: 1, max: 80, message: 'Length should be 1 to 80', trigger: 'blur'},
   ],
   password: [
     {required: true, message: 'Please enter your password', trigger: 'blur'},
@@ -109,11 +110,16 @@ const handleRegister = async () => {
   if (!registerFormRef.value) return
   await registerFormRef.value.validate(async (valid) => {
     if (valid) {
+      const parsed = registerSchema.safeParse(registerForm)
+      if (!parsed.success) {
+        ElMessage.error(parsed.error.issues[0]?.message || '请检查输入')
+        return
+      }
+
       loading.value = true
       try {
         await register({
-          username: registerForm.username,
-          password: registerForm.password,
+          ...parsed.data,
           // 公开注册由后端固定创建学生账号。
         })
         ElMessage.success('Registration successful! Please log in.')

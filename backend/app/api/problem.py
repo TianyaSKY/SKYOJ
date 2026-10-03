@@ -4,15 +4,30 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_problem_service
-from app.api.schemas.problem import CreateProblemBody, UpdateProblemBody
-from app.domain.problem import CreateProblemParams, PaginatedProblems, UpdateProblemParams, UploadTestCasesParams
+from app.api.schemas.common import MessageResponse
+from app.api.schemas.problem import (
+    CreateProblemBody,
+    CreateProblemResponse,
+    PaginatedProblemsResponse,
+    ProblemDetailResponse,
+    ProblemListResponse,
+    TestCaseSummaryResponse,
+    UpdateProblemBody,
+    UploadTestCasesResponse,
+)
+from app.domain.problem import (
+    CreateProblemParams,
+    PaginatedProblems,
+    UpdateProblemParams,
+    UploadTestCasesParams,
+)
 from app.services.problem_service import ProblemService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 
 
-@router.post("/", status_code=201)
+@router.post("/", status_code=201, response_model=CreateProblemResponse)
 def create_problem(
     body: CreateProblemBody,
     auth: AuthContext = Depends(get_current_auth),
@@ -28,7 +43,7 @@ def create_problem(
             time_limit=body.time_limit,
             memory_limit=body.memory_limit,
             template_code=body.template_code,
-        )
+        ),
     )
 
     return {
@@ -37,7 +52,7 @@ def create_problem(
     }
 
 
-@router.get("/")
+@router.get("/", response_model=list[ProblemListResponse] | PaginatedProblemsResponse)
 def get_problems(
     page: Optional[int] = Query(default=None, ge=1),
     page_size: Optional[int] = Query(default=None, ge=1, le=100),
@@ -85,7 +100,7 @@ def get_problems(
     ]
 
 
-@router.get("/{problem_id}")
+@router.get("/{problem_id}", response_model=ProblemDetailResponse)
 def get_problem(
     problem_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -105,7 +120,7 @@ def get_problem(
     }
 
 
-@router.put("/{problem_id}")
+@router.put("/{problem_id}", response_model=MessageResponse)
 def update_problem(
     problem_id: int,
     body: UpdateProblemBody,
@@ -128,7 +143,7 @@ def update_problem(
     return {"message": "Problem updated successfully"}
 
 
-@router.delete("/{problem_id}")
+@router.delete("/{problem_id}", response_model=MessageResponse)
 def delete_problem(
     problem_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -138,7 +153,7 @@ def delete_problem(
     return {"message": "Problem deleted successfully"}
 
 
-@router.post("/{problem_id}/upload_files")
+@router.post("/{problem_id}/upload_files", response_model=UploadTestCasesResponse)
 async def upload_files(
     problem_id: int,
     file: UploadFile = File(...),
@@ -149,10 +164,13 @@ async def upload_files(
         auth.user.role,
         UploadTestCasesParams(problem_id, file.filename or "", await file.read()),
     )
-    return {"message": f"Test cases for problem {problem_id} uploaded and extracted successfully.", "files": files}
+    return {
+        "message": f"Test cases for problem {problem_id} uploaded and extracted successfully.",
+        "files": files,
+    }
 
 
-@router.delete("/{problem_id}/test_cases")
+@router.delete("/{problem_id}/test_cases", response_model=MessageResponse)
 def delete_test_cases(
     problem_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -161,7 +179,8 @@ def delete_test_cases(
     service.delete_test_cases(auth.user.role, problem_id)
     return {"message": f"All test cases for problem {problem_id} deleted."}
 
-@router.get("/{problem_id}/test_cases/summary")
+
+@router.get("/{problem_id}/test_cases/summary", response_model=TestCaseSummaryResponse)
 def get_test_case_summary(
     problem_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -190,7 +209,7 @@ def get_test_case_summary(
     }
 
 
-@router.get("/{problem_id}/test_cases")
+@router.get("/{problem_id}/test_cases", response_model=None)
 def download_test_cases(
     problem_id: int,
     auth: AuthContext = Depends(get_current_auth),

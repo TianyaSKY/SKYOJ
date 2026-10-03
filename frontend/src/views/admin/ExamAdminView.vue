@@ -184,6 +184,7 @@
 </template>
 
 <script setup>
+import {createExamSchema, updateExamSchema} from '@/schemas/exam'
 import {computed, onMounted, ref} from 'vue'
 import {
   addExamProblem,
@@ -361,8 +362,9 @@ const handleExport = async (row) => {
 }
 
 const handleSubmit = async () => {
-  if (!form.value.title || !form.value.start_time) {
-    ElMessage.warning('请填写必填项')
+  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(form.value)
+  if (!parsed.success) {
+    ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
     return
   }
 
@@ -372,7 +374,7 @@ const handleSubmit = async () => {
     let examId = currentExamId.value
 
     if (isEdit.value) {
-      await updateExam(examId, form.value)
+      await updateExam(examId, parsed.data)
       const currentIds = new Set(selectedProblemIds.value)
       const originalIds = new Set(originalProblemIds.value)
       const toAdd = [...currentIds].filter(id => !originalIds.has(id))
@@ -387,7 +389,7 @@ const handleSubmit = async () => {
       await Promise.all(promises)
       ElMessage.success('更新成功')
     } else {
-      await createExam(form.value)
+      await createExam(parsed.data)
       ElMessage.success('创建成功')
     }
 

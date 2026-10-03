@@ -1,7 +1,7 @@
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
-
 from app.domain.dataset import UploadDatasetParams
 from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.domain.problem import UploadTestCasesParams
@@ -13,6 +13,7 @@ class FakeDatasetRepository:
     """用于验证数据集服务的内存仓储。"""
 
     def __init__(self) -> None:
+        self.unit_of_work = MagicMock()
         self.items = []
 
     def create(self, **values):
@@ -105,6 +106,7 @@ class FakeProblemRepository:
     """用于验证测试用例服务行为的题目仓储。"""
 
     def __init__(self) -> None:
+        self.unit_of_work = MagicMock()
         self.problem = SimpleNamespace(
             id=1,
             title="题目",

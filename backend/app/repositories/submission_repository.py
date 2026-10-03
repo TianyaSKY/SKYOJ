@@ -2,13 +2,15 @@
 
 from datetime import datetime
 
-from sqlalchemy import update
+from sqlalchemy import case, func, update
 from sqlalchemy.orm import Session, selectinload
 
+from app.domain.analytics import DailySubmissionCount, ProblemSubmissionCounts
 from app.models.exam import Exam, ExamProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import User
+from app.unit_of_work import UnitOfWork
 
 
 class SubmissionRepository:
@@ -16,6 +18,7 @@ class SubmissionRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def get_problem(self, problem_id: int):
         """查询题目。"""
@@ -33,20 +36,31 @@ class SubmissionRepository:
         """查询考试是否包含指定题目。"""
         return (
             self._db.query(ExamProblem)
-            .filter(ExamProblem.exam_id == exam_id, ExamProblem.problem_id == problem_id)
+            .filter(
+                ExamProblem.exam_id == exam_id, ExamProblem.problem_id == problem_id
+            )
             .first()
         )
 
     def create(
-        self, user_id: int, problem_id: int, exam_id: int | None, language: str, code: str
+        self,
+        user_id: int,
+        problem_id: int,
+        exam_id: int | None,
+        language: str,
+        code: str,
     ) -> Submission:
         """创建提交记录。"""
         submission = Submission(
-            user_id=user_id, problem_id=problem_id, exam_id=exam_id,
-            language=language, code_content=code, status="Pending",
+            user_id=user_id,
+            problem_id=problem_id,
+            exam_id=exam_id,
+            language=language,
+            code_content=code,
+            status="Pending",
         )
         self._db.add(submission)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(submission)
         return submission
 
@@ -71,9 +85,7 @@ class SubmissionRepository:
         if case_results is not None:
             values["case_results"] = case_results
         self._db.execute(
-            update(Submission)
-            .where(Submission.id == submission_id)
-            .values(**values)
+            update(Submission).where(Submission.id == submission_id).values(**values)
         )
 
     def list_all(
@@ -109,3 +121,56 @@ class SubmissionRepository:
             total,
             pages,
         )
+
+    def list_accepted_for_plagiarism(self, problem_id: int) -> list[Submission]:
+        """查询有效代码，数据库访问留在仓储内。"""
+        return (
+            self._db.query(Submission)
+            .filter(
+                Submission.problem_id == problem_id,
+                Submission.status == "Accepted",
+                Submission.code_content.isnot(None),
+            )
+            .options(selectinload(Submission.user))
+            .all()
+        )
+
+    def get_global_counts(self) -> tuple[int, int, int]:
+        total, accepted = self._db.query(
+            func.count(Submission.id),
+            func.coalesce(
+                func.sum(case((Submission.status == "Accepted", 1), else_=0)), 0
+            ),
+        ).one()
+        return total, int(accepted), self._db.query(func.count(Problem.id)).scalar()
+
+    def get_problem_submission_counts(self) -> list[ProblemSubmissionCounts]:
+        rows = (
+            self._db.query(
+                Problem.id,
+                Problem.title,
+                func.count(Submission.id),
+                func.sum(case((Submission.status == "Accepted", 1), else_=0)),
+            )
+            .join(Submission, Submission.problem_id == Problem.id)
+            .group_by(Problem.id, Problem.title)
+            .order_by(Problem.id)
+            .all()
+        )
+        return [
+            ProblemSubmissionCounts(pid, title, total, int(accepted))
+            for pid, title, total, accepted in rows
+        ]
+
+    def get_daily_submission_counts(
+        self, since: datetime
+    ) -> list[DailySubmissionCount]:
+        day = func.date(Submission.created_at)
+        rows = (
+            self._db.query(day, func.count(Submission.id))
+            .filter(Submission.created_at >= since)
+            .group_by(day)
+            .order_by(day)
+            .all()
+        )
+        return [DailySubmissionCount(str(date), count) for date, count in rows]

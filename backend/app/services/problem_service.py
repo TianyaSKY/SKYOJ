@@ -47,6 +47,7 @@ class ProblemService:
             memory_limit=params.memory_limit,
             template_code=params.template_code,
         )
+        self._problem_repository.unit_of_work.commit()
         detail = from_problem_orm(problem, with_content=True)
         # 新建题目的详情立即可缓存（首次读取必然命中）。
         set_detail_cache(detail.id, self._detail_to_dict(detail))
@@ -64,15 +65,14 @@ class ProblemService:
         教师可见全部题目；其他角色仅可见已上传测试用例的题目。
         支持按 tag_id 过滤（仅返回关联该标签且 approved=True 的题目）。
         """
-        from app.repositories.problem_community_repository import ProblemCommunityRepository
-
-        repo = ProblemCommunityRepository(self._problem_repository._db)
         allowed_ids: set[int] | None = None
         if tag_id is not None:
-            ids = repo.list_problem_ids_by_tag(tag_id)
+            ids = self._problem_repository.list_problem_ids_by_tag(tag_id)
             if not ids:
                 if page is not None and page_size is not None:
-                    return PaginatedProblems(total=0, page=page, page_size=page_size, problems=[])
+                    return PaginatedProblems(
+                        total=0, page=page, page_size=page_size, problems=[]
+                    )
                 return []
             allowed_ids = set(ids)
 
@@ -89,7 +89,9 @@ class ProblemService:
                 total = len(items)
             if page is None or page_size is None:
                 return items
-            return PaginatedProblems(total=total or 0, page=page, page_size=page_size, problems=items)
+            return PaginatedProblems(
+                total=total or 0, page=page, page_size=page_size, problems=items
+            )
 
         problems, _ = self._problem_repository.list_all()
         visible = [
@@ -117,6 +119,7 @@ class ProblemService:
         if cached is not None:
             return self._detail_from_dict(cached)
         problem = self._require_problem(problem_id)
+        self._problem_repository.unit_of_work.commit()
         detail = from_problem_orm(problem, with_content=True)
         set_detail_cache(detail.id, self._detail_to_dict(detail))
         return detail
@@ -139,7 +142,10 @@ class ProblemService:
             if value is not None:
                 setattr(problem, attribute, value)
 
-        updated = from_problem_orm(self._problem_repository.update(problem), with_content=True)
+        updated = from_problem_orm(
+            self._problem_repository.update(problem), with_content=True
+        )
+        self._problem_repository.unit_of_work.commit()
         # 写后失效：避免下次读取到陈旧内容。
         invalidate_detail_cache(problem_id)
         return updated
@@ -150,6 +156,7 @@ class ProblemService:
         problem = self._require_problem(problem_id)
         self._test_case_storage.delete_problem_directory(problem_id)
         self._problem_repository.delete(problem)
+        self._problem_repository.unit_of_work.commit()
         invalidate_detail_cache(problem_id)
 
     def upload_test_cases(
@@ -224,9 +231,7 @@ class ProblemService:
         from datetime import datetime
 
         created_at_raw = payload.get("created_at")
-        created_at = (
-            datetime.fromisoformat(created_at_raw) if created_at_raw else None
-        )
+        created_at = datetime.fromisoformat(created_at_raw) if created_at_raw else None
         return ProblemDetail(
             id=int(payload["id"]),
             title=payload["title"],

@@ -1,6 +1,7 @@
 """搜索服务按角色过滤测试。"""
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from app.services.search_facade_service import SearchFacadeService
 
@@ -9,6 +10,7 @@ class FakeSearchRepository:
     """用于验证搜索服务的内存仓储。"""
 
     def __init__(self, problems) -> None:
+        self.unit_of_work = MagicMock()
         self._problems = problems
 
     def search_problems(self, query: str, top_k: int):

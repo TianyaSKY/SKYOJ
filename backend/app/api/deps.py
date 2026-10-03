@@ -3,38 +3,38 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from app.clients.llm_client import LlmClient
 from app.clients.avatar_storage_client import AvatarStorageClient
+from app.clients.dataset_storage_client import DatasetStorageClient
+from app.clients.jplag_client import JPlagClient
+from app.clients.llm_client import LlmClient
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
 from app.clients.submission_storage_client import SubmissionStorageClient
-from app.clients.dataset_storage_client import DatasetStorageClient
 from app.database import get_db
-from app.services.async_job_service import AsyncJobService
 from app.repositories.ai_draft_repository import AiDraftRepository
-from app.repositories.problem_repository import ProblemRepository
-from app.repositories.user_repository import UserRepository
 from app.repositories.dataset_repository import DatasetRepository
+from app.repositories.debug_run_repository import DebugRunRepository
+from app.repositories.exam_repository import ExamRepository
+from app.repositories.plagiarism_repository import PlagiarismRepository
+from app.repositories.problem_repository import ProblemRepository
+from app.repositories.search_repository import SearchRepository
 from app.repositories.submission_repository import SubmissionRepository
 from app.repositories.system_repository import SystemRepository
-from app.repositories.search_repository import SearchRepository
-from app.repositories.exam_repository import ExamRepository
+from app.repositories.user_repository import UserRepository
 from app.services.ai_draft_service import AiDraftService
+from app.services.async_job_service import AsyncJobService
 from app.services.auth_service import AuthService
-from app.services.debug_service import DebugService
-from app.services.problem_service import ProblemService
 from app.services.dataset_service import DatasetService
-from app.services.submission_service import SubmissionService
-from app.services.system_service import SystemService
-from app.services.search_facade_service import SearchFacadeService
-from app.services.user_service import UserService
+from app.services.debug_service import DebugService
 from app.services.exam_service import ExamService
 from app.services.llm_facade_service import LlmFacadeService
 from app.services.plagiarism_service import PlagiarismService
 from app.services.problem_community_service import SolutionService, TagService
+from app.services.problem_service import ProblemService
+from app.services.search_facade_service import SearchFacadeService
+from app.services.submission_service import SubmissionService
+from app.services.system_service import SystemService
+from app.services.user_service import UserService
 from app.services.wrong_book_service import WrongBookService
-from app.repositories.debug_run_repository import DebugRunRepository
-from app.repositories.plagiarism_repository import PlagiarismRepository
-from app.clients.jplag_client import JPlagClient
 
 
 def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
@@ -70,9 +70,9 @@ def get_exam_service(db: Session = Depends(get_db)) -> ExamService:
     return ExamService(ExamRepository(db))
 
 
-def get_llm_facade_service() -> LlmFacadeService:
+def get_llm_facade_service(db: Session = Depends(get_db)) -> LlmFacadeService:
     """构造同步 LLM 功能服务。"""
-    return LlmFacadeService(LlmClient())
+    return LlmFacadeService(LlmClient(), SubmissionRepository(db))
 
 
 def get_dataset_service(db: Session = Depends(get_db)) -> DatasetService:
@@ -88,15 +88,15 @@ def get_dataset_service(db: Session = Depends(get_db)) -> DatasetService:
 def get_submission_service(db: Session = Depends(get_db)) -> SubmissionService:
     """构造提交领域服务。"""
     return SubmissionService(
-        SubmissionRepository(db), AsyncJobService.from_session(db), SubmissionStorageClient()
+        SubmissionRepository(db),
+        AsyncJobService.from_session(db),
+        SubmissionStorageClient(),
     )
 
 
 def get_debug_service(db: Session = Depends(get_db)) -> DebugService:
     """构造调试运行领域服务。"""
-    return DebugService(
-        DebugRunRepository(db), AsyncJobService.from_session(db)
-    )
+    return DebugService(DebugRunRepository(db), AsyncJobService.from_session(db))
 
 
 def get_system_service(db: Session = Depends(get_db)) -> SystemService:
@@ -117,6 +117,7 @@ def get_plagiarism_service(db: Session = Depends(get_db)) -> PlagiarismService:
         plagiarism_repo=PlagiarismRepository(db),
         submission_repo=SubmissionRepository(db),
         jplag_client=JPlagClient(),
+        job_service=AsyncJobService.from_session(db),
     )
 
 

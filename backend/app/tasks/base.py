@@ -4,9 +4,8 @@
 与失败时的草稿/文件侧标记回调。
 """
 
-from typing import Any, Callable
-
 import time
+from typing import Any, Callable
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -35,7 +34,9 @@ def run_job(
             service.start_job(job_id, lease_seconds=service.lease_seconds(task_name))
             is None
         ):
-            logger.warning("异步任务重复投递已跳过 job_id={} task={}", job_id, task_name)
+            logger.warning(
+                "异步任务重复投递已跳过 job_id={} task={}", job_id, task_name
+            )
             return None  # 已被其他 worker 领取（重复投递）
 
         job = AsyncJobRepository(db).get_by_id(job_id)
@@ -60,19 +61,23 @@ def run_job(
                 task_name,
                 exc,
             )
+            db.rollback()
             service.fail_job(job_id, str(exc), retry=False)
             if on_failed:
                 on_failed(payload, str(exc))
             return None
         except Exception as exc:
             logger.exception("异步任务执行失败 job_id={} task={}", job_id, task_name)
+            db.rollback()
             service.fail_job(job_id, str(exc))
             if on_failed:
                 on_failed(payload, str(exc))
             return None
 
         if getattr(result, "status", None) == "failed":
-            logger.warning("异步任务业务失败 job_id={} task={} status=failed", job_id, task_name)
+            logger.warning(
+                "异步任务业务失败 job_id={} task={} status=failed", job_id, task_name
+            )
             if on_failed:
                 on_failed(payload, result)
         service.complete_job(job_id)

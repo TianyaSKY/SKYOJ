@@ -11,6 +11,8 @@ from app.messaging.task_names import EXECUTE_TEST_DATA_TASK, JUDGE_SUBMISSION_TA
 from app.repositories.ai_draft_repository import AiDraftRepository
 from app.services.judge_service import (
     judge_submission as run_submission_judge,
+)
+from app.services.judge_service import (
     save_non_acm_script,
 )
 from app.services.test_gen_service import run_test_generation
@@ -51,6 +53,7 @@ def _handle_test_data_execution(db: Session, payload: dict[str, Any]) -> dict[st
     if draft is None:
         raise ValueError(f"AI 草稿不存在: {draft_id}")
     AiDraftRepository(db).mark_running(draft_id)
+    db.commit()
     request = AiDraftRepository.parse_json_field(draft.request_payload)
     result_payload = _run_test_data_execution(request)
     AiDraftRepository(db).mark_success(
@@ -66,6 +69,7 @@ def _mark_draft_failed(payload: dict[str, Any], result) -> None:
     db = SessionLocal()
     try:
         AiDraftRepository(db).mark_failed(int(payload["draft_id"]), str(result))
+        db.commit()
     finally:
         db.close()
 

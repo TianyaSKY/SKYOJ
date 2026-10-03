@@ -118,7 +118,11 @@ def update_solution(
     return SolutionDetailResponse(**_detail_to_dict(detail))
 
 
-@router.delete("/solutions/{solution_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/solutions/{solution_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 def hide_solution(
     solution_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -128,9 +132,7 @@ def hide_solution(
     return None
 
 
-@router.post(
-    "/solutions/{solution_id}/like", response_model=ToggleLikeResponse
-)
+@router.post("/solutions/{solution_id}/like", response_model=ToggleLikeResponse)
 def toggle_like(
     solution_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -144,9 +146,7 @@ def toggle_like(
     )
 
 
-@router.post(
-    "/solutions/{solution_id}/favorite", response_model=ToggleFavoriteResponse
-)
+@router.post("/solutions/{solution_id}/favorite", response_model=ToggleFavoriteResponse)
 def toggle_favorite(
     solution_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -190,9 +190,7 @@ def add_comment(
     )
 
 
-@router.get(
-    "/solutions/{solution_id}/comments", response_model=CommentListResponse
-)
+@router.get("/solutions/{solution_id}/comments", response_model=CommentListResponse)
 def list_comments(
     solution_id: int,
     page: int = Query(1, ge=1),
@@ -219,7 +217,9 @@ def list_comments(
 
 
 @router.delete(
-    "/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
 )
 def delete_comment(
     comment_id: int,
@@ -272,7 +272,9 @@ def list_problem_tags(
 
 
 @tags_router.post(
-    "/problems/{problem_id}/attach", status_code=status.HTTP_204_NO_CONTENT
+    "/problems/{problem_id}/attach",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
 )
 def attach_tag(
     problem_id: int,
@@ -294,7 +296,9 @@ def attach_tag(
 
 
 @tags_router.delete(
-    "/problems/{problem_id}/{tag_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/problems/{problem_id}/{tag_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
 )
 def detach_tag(
     problem_id: int,

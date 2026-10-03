@@ -1,10 +1,6 @@
 """任务执行骨架 run_job 与 finalize_dataset 下沉测试。"""
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app.database import Base
 from app.domain.async_job import CreateAsyncJobParams
 from app.messaging.queues import JUDGE_QUEUE
@@ -14,6 +10,9 @@ from app.services.async_job_service import AsyncJobService
 from app.services.dataset_service import DatasetService
 from app.tasks import base as tasks_base
 from app.tasks.base import run_job
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 def make_session():
@@ -399,8 +398,11 @@ def test_finalize_dataset_failure_marks_failed_and_raises():
             temp_path="tmp/x.pending",
             status="pending",
         )
+        db.commit()
         service = DatasetService(
-            DatasetRepository(db), FailingStorageClient(), AsyncJobService.from_session(db)
+            DatasetRepository(db),
+            FailingStorageClient(),
+            AsyncJobService.from_session(db),
         )
 
         with pytest.raises(OSError, match="disk full"):

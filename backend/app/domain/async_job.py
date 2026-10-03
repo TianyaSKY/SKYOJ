@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
+
+from app.domain.json import JsonValue
 
 JOB_PENDING = "pending"
 JOB_RUNNING = "running"
@@ -28,7 +30,7 @@ class CreateAsyncJobParams:
 
     task_name: str
     queue: str
-    payload: dict[str, Any]
+    payload: dict[str, JsonValue]
     dedupe_key: Optional[str] = None
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
     available_at: Optional[datetime] = None

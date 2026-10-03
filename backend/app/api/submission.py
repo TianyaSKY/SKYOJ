@@ -3,17 +3,34 @@ import os
 from typing import Optional
 
 import jwt
+import redis as redis_lib
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from loguru import logger
 from pydantic import ValidationError
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 
 from app.api.deps import get_submission_service
-from app.api.schemas.submission import SubmitCodeBody
+from app.api.schemas.submission import (
+    PaginatedSubmissionsResponse,
+    SubmissionDetailResponse,
+    SubmitCodeBody,
+    SubmitCodeResponse,
+)
 from app.config import SECRET_KEY
 from app.domain.submission import SubmissionQuery, SubmitParams
 from app.middleware.rate_limit import enforce
 from app.services.submission_service import SubmissionService
 from app.utils.auth_tools import AuthContext, get_current_auth
-import redis as redis_lib
 
 router = APIRouter()
 
@@ -58,6 +75,7 @@ async def submission_websocket(
             return
 
         import time
+
         start = time.monotonic()
         timeout = 300.0
         while (time.monotonic() - start) < timeout:
@@ -73,8 +91,10 @@ async def submission_websocket(
                 pubsub.unsubscribe()
                 pubsub.close()
             except Exception:
-                pass
-@router.post("/submit", status_code=202)
+                logger.exception("关闭提交订阅失败 submission_id={}", submission_id)
+
+
+@router.post("/submit", status_code=202, response_model=SubmitCodeResponse)
 async def submit_code(
     request: Request,
     auth: AuthContext = Depends(get_current_auth),
@@ -86,8 +106,6 @@ async def submit_code(
     file: Optional[UploadFile] = File(default=None),
 ):
     enforce(f"submit:{auth.user.id}", limit=10, window_seconds=60)
-    if auth.user.role != "student":
-        raise HTTPException(status_code=403, detail={"error": "Only student accounts can submit solutions."})
 
     content_type = request.headers.get("content-type", "")
     user_code = None
@@ -128,15 +146,39 @@ async def submit_code(
     except (ValueError, TypeError):
         exam_id_val = -1
 
+    try:
+        validated = SubmitCodeBody.model_validate(
+            {
+                "problem_id": pid,
+                "code": user_code,
+                "language": lang or "",
+                "exam_id": exam_id_val,
+            }
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
     result = service.submit(
         SubmitParams(
-            user_id=auth.user.id, problem_id=pid, code=user_code,
-            language=lang or "", exam_id=exam_id_val,
+            user_id=auth.user.id,
+            problem_id=validated.problem_id,
+            code=validated.code,
+            language=validated.language,
+            exam_id=validated.exam_id,
             session_exam_id=auth.exam_id,
-            is_file_upload=bool(file and file.filename and (lang == "csv" or file.filename.endswith(".csv"))),
+            is_file_upload=bool(
+                file
+                and file.filename
+                and (lang == "csv" or file.filename.endswith(".csv"))
+            ),
             filename=file.filename if file else None,
-            file_content=content if file and file.filename and (lang == "csv" or file.filename.endswith(".csv")) else None,
-        )
+            file_content=content
+            if file
+            and file.filename
+            and (lang == "csv" or file.filename.endswith(".csv"))
+            else None,
+        ),
+        requester_role=auth.user.role,
     )
 
     return {
@@ -147,23 +189,31 @@ async def submit_code(
     }
 
 
-@router.get("")
+@router.get("", response_model=PaginatedSubmissionsResponse)
 def list_submissions(
     problem_id: Optional[int] = None,
     user_id: Optional[int] = None,
     exam_id: Optional[int] = None,
     status: Optional[str] = None,
     username: Optional[str] = None,
-    page: int = 1,
-    per_page: int = 20,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
     auth: AuthContext = Depends(get_current_auth),
     service: SubmissionService = Depends(get_submission_service),
 ):
-    result = service.list_submissions(SubmissionQuery(
-        requester_id=auth.user.id, requester_role=auth.user.role,
-        problem_id=problem_id, user_id=user_id, exam_id=exam_id, status=status,
-        username=username, page=page, page_size=per_page,
-    ))
+    result = service.list_submissions(
+        SubmissionQuery(
+            requester_id=auth.user.id,
+            requester_role=auth.user.role,
+            problem_id=problem_id,
+            user_id=user_id,
+            exam_id=exam_id,
+            status=status,
+            username=username,
+            page=page,
+            page_size=per_page,
+        )
+    )
 
     return {
         "total": result.total,
@@ -186,7 +236,7 @@ def list_submissions(
     }
 
 
-@router.get("/{submission_id}")
+@router.get("/{submission_id}", response_model=SubmissionDetailResponse)
 def get_submission(
     submission_id: int,
     auth: AuthContext = Depends(get_current_auth),
@@ -202,7 +252,9 @@ def get_submission(
         "code": submission.code,
         "language": submission.language,
         "exam_id": submission.exam_id,
-        "created_at": submission.created_at.isoformat() if submission.created_at else None,
+        "created_at": submission.created_at.isoformat()
+        if submission.created_at
+        else None,
         "case_results": [
             {
                 "case_name": item.case_name,

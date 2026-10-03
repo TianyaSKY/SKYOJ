@@ -14,6 +14,7 @@ from app.domain.async_job import (
     JOB_SUCCEEDED,
 )
 from app.models.async_job import AsyncJob
+from app.unit_of_work import UnitOfWork
 
 
 class AsyncJobRepository:
@@ -21,6 +22,7 @@ class AsyncJobRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def create(
         self,
@@ -43,7 +45,7 @@ class AsyncJobRepository:
             available_at=available_at,
         )
         self._db.add(job)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(job)
         return job
 
@@ -51,24 +53,20 @@ class AsyncJobRepository:
         """按主键查询任务。"""
         return self._db.get(AsyncJob, job_id)
 
-    def rollback(self) -> None:
-        """回滚当前事务。"""
-        self._db.rollback()
-
     def get_by_dedupe_key(self, dedupe_key: str) -> Optional[AsyncJob]:
         """按幂等键查询已有任务。"""
         return (
-            self._db.query(AsyncJob)
-            .filter(AsyncJob.dedupe_key == dedupe_key)
-            .first()
+            self._db.query(AsyncJob).filter(AsyncJob.dedupe_key == dedupe_key).first()
         )
 
     def delete(self, job: AsyncJob) -> None:
         """删除任务记录（用于投递失败时撤销未发布任务）。"""
         self._db.delete(job)
-        self._db.commit()
+        self._db.flush()
 
-    def claim(self, job_id: int, *, now: datetime, lease_until: datetime) -> Optional[AsyncJob]:
+    def claim(
+        self, job_id: int, *, now: datetime, lease_until: datetime
+    ) -> Optional[AsyncJob]:
         """以单进程任务语义领取任务；重复投递时只允许一个执行者继续。"""
         job = self.get_by_id(job_id)
         if job is None:
@@ -84,7 +82,7 @@ class AsyncJobRepository:
             job.finished_at = now
             job.lease_until = None
             job.updated_at = now
-            self._db.commit()
+            self._db.flush()
             return None
 
         claim_statement = (
@@ -112,9 +110,8 @@ class AsyncJobRepository:
         )
         result = self._db.execute(claim_statement)
         if result.rowcount != 1:
-            self._db.rollback()
             return None
-        self._db.commit()
+        self._db.flush()
         return self.get_by_id(job_id)
 
     def mark_succeeded(self, job_id: int, *, now: datetime) -> Optional[AsyncJob]:
@@ -127,7 +124,7 @@ class AsyncJobRepository:
         job.lease_until = None
         job.last_error = None
         job.updated_at = now
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(job)
         return job
 
@@ -153,7 +150,7 @@ class AsyncJobRepository:
         else:
             job.status = JOB_FAILED
             job.finished_at = now
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(job)
         return job
 
@@ -195,7 +192,7 @@ class AsyncJobRepository:
             else:
                 recovered.append(job)
             job.updated_at = now
-        self._db.commit()
+        self._db.flush()
         return recovered
 
     @staticmethod

@@ -6,15 +6,22 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_system_service
-from app.api.schemas.sys_dict import UpdateSysConfigBody
+from app.api.schemas.common import MessageResponse
+from app.api.schemas.sys_dict import (
+    SystemConfigResponse,
+    SystemStatisticsResponse,
+    UpdateSysConfigBody,
+    UpdateSysConfigResponse,
+)
 from app.database import get_db
+from app.domain.system import UpdateSystemConfigParams
 from app.services.system_service import SystemService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 
 
-@router.get("/info")
+@router.get("/info", response_model=SystemConfigResponse)
 def get_sys_info(
     service: SystemService = Depends(get_system_service),
     authorization: Optional[str] = Header(default=None),
@@ -27,21 +34,36 @@ def get_sys_info(
             include_llm_endpoint = auth.user.role == "teacher"
         except HTTPException:
             pass
-    return service.get_config(include_llm_endpoint=include_llm_endpoint)
+    return service.get_config(include_llm_endpoint=include_llm_endpoint).payload
 
 
-@router.put("/info")
-def update_sys_info(body: UpdateSysConfigBody, auth: AuthContext = Depends(get_current_auth), service: SystemService = Depends(get_system_service)):
-    updated, skipped = service.update_config(auth.user.role, body.root)
-    return {"message": "System configuration updated successfully", "updated_keys": updated, "skipped_keys": skipped}
+@router.put("/info", response_model=UpdateSysConfigResponse)
+def update_sys_info(
+    body: UpdateSysConfigBody,
+    auth: AuthContext = Depends(get_current_auth),
+    service: SystemService = Depends(get_system_service),
+):
+    result = service.update_config(auth.user.role, UpdateSystemConfigParams(body.root))
+    return {
+        "message": "System configuration updated successfully",
+        "updated_keys": result.updated_keys,
+        "skipped_keys": result.skipped_keys,
+    }
 
 
-@router.delete("/info/{key}")
-def delete_sys_info(key: str, auth: AuthContext = Depends(get_current_auth), service: SystemService = Depends(get_system_service)):
+@router.delete("/info/{key}", response_model=MessageResponse)
+def delete_sys_info(
+    key: str,
+    auth: AuthContext = Depends(get_current_auth),
+    service: SystemService = Depends(get_system_service),
+):
     service.delete_config(auth.user.role, key)
     return {"message": f"Key '{key}' deleted successfully"}
 
 
-@router.get("/statistics")
-def get_statistics(auth: AuthContext = Depends(get_current_auth), service: SystemService = Depends(get_system_service)):
+@router.get("/statistics", response_model=SystemStatisticsResponse)
+def get_statistics(
+    auth: AuthContext = Depends(get_current_auth),
+    service: SystemService = Depends(get_system_service),
+):
     return service.statistics(auth.user.role)

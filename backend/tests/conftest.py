@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+os.environ.setdefault("CELERY_BROKER_URL", "memory://")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing-only")
 
@@ -67,6 +68,7 @@ def client(db_session, monkeypatch):
         yield TestClient(app)
         app.dependency_overrides.clear()
 
+
 @pytest.fixture
 def teacher_user(db_session):
     """创建一个教师用户并返回其 ORM 对象。"""
@@ -104,7 +106,9 @@ def student_user(db_session):
 @pytest.fixture
 def teacher_token(client, teacher_user):
     """返回教师 JWT token。"""
-    resp = client.post("/api/auth/login", json={"username": "test_teacher", "password": "password123"})
+    resp = client.post(
+        "/api/auth/login", json={"username": "test_teacher", "password": "password123"}
+    )
     assert resp.status_code == 200
     return resp.json()["token"]
 
@@ -112,7 +116,9 @@ def teacher_token(client, teacher_user):
 @pytest.fixture
 def student_token(client, student_user):
     """返回学生 JWT token。"""
-    resp = client.post("/api/auth/login", json={"username": "test_student", "password": "password123"})
+    resp = client.post(
+        "/api/auth/login", json={"username": "test_student", "password": "password123"}
+    )
     assert resp.status_code == 200
     return resp.json()["token"]
 

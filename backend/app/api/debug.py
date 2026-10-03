@@ -7,9 +7,11 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from pydantic import ValidationError
 
 from app.api.deps import get_debug_service
 from app.api.schemas.debug import DebugCodeBody
+from app.api.schemas.debug_run import CreateDebugRunResponse, DebugRunResponse
 from app.domain.debug_run import CreateDebugRunParams
 from app.services.debug_service import DebugService
 from app.utils.auth_tools import AuthContext, get_current_auth
@@ -17,7 +19,7 @@ from app.utils.auth_tools import AuthContext, get_current_auth
 router = APIRouter()
 
 
-@router.post("", status_code=202)
+@router.post("", status_code=202, response_model=CreateDebugRunResponse)
 async def submit_debug(
     request: Request,
     auth: AuthContext = Depends(get_current_auth),
@@ -29,8 +31,6 @@ async def submit_debug(
     file: Optional[UploadFile] = File(default=None),
 ):
     """接收调试请求；不写入 `submissions`，不计入考试或排行榜。"""
-    if auth.user.role != "student":
-        raise HTTPException(status_code=403, detail={"error": "Only student accounts can run debug."})
 
     content_type = request.headers.get("content-type", "")
     pid = problem_id
@@ -39,7 +39,10 @@ async def submit_debug(
     exam_id_val = -1
 
     if "application/json" in content_type:
-        body = DebugCodeBody.model_validate(await request.json())
+        try:
+            body = DebugCodeBody.model_validate(await request.json())
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=exc.errors()) from exc
         pid = body.problem_id
         user_code = body.code
         lang = body.language
@@ -69,14 +72,27 @@ async def submit_debug(
     except (ValueError, TypeError):
         exam_id_val = -1
 
+    try:
+        validated = DebugCodeBody.model_validate(
+            {
+                "problem_id": pid,
+                "code": user_code,
+                "language": lang or "",
+                "exam_id": exam_id_val,
+            }
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
     result = service.create(
         CreateDebugRunParams(
             user_id=auth.user.id,
-            problem_id=pid,
-            language=lang or "",
-            code=user_code,
-            exam_id=exam_id_val,
-        )
+            problem_id=validated.problem_id,
+            language=validated.language,
+            code=validated.code,
+            exam_id=validated.exam_id,
+        ),
+        requester_role=auth.user.role,
     )
 
     return {
@@ -87,7 +103,7 @@ async def submit_debug(
     }
 
 
-@router.get("/{debug_run_id}")
+@router.get("/{debug_run_id}", response_model=DebugRunResponse)
 def get_debug_run(
     debug_run_id: int,
     auth: AuthContext = Depends(get_current_auth),

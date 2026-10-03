@@ -144,6 +144,6 @@ jobs:
           # Start preview server in background
           npm run preview -- --port 80 &
           SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           sleep 5
-          npm run test:e2e || true
-          kill $SERVER_PID 2>/dev/null || true
+          npm run test:e2e

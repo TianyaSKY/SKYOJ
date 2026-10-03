@@ -12,7 +12,7 @@ export default defineConfig({
     ['list'],
   ],
   use: {
-    baseURL: 'http://localhost:80',
+    baseURL: process.env.E2E_BASE_URL || 'http://localhost:80',
     headless: true,
     viewport: { width: 1280, height: 800 },
     ignoreHTTPSErrors: true,
@@ -27,10 +27,5 @@ export default defineConfig({
     { name: 'chromium-mobile', use: { ...devices['Pixel 5'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
   ],
-  webServer: process.env.CI ? {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: false,
-    timeout: 120000,
-  } : undefined,
+  // CI 由工作流启动预览服务；完整 E2E 使用已部署的全栈地址。
 })

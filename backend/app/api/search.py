@@ -3,13 +3,14 @@
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_search_service
+from app.api.schemas.problem import SearchProblemResponse
 from app.services.search_facade_service import SearchFacadeService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=list[SearchProblemResponse])
 def search_problems(
     query: str = Query(default="", max_length=255),
     top_k: int = Query(default=5, ge=1, le=50),

@@ -4,6 +4,11 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_wrong_book_service
+from app.api.schemas.wrong_book import (
+    ToggleReviewResponse,
+    WrongBookListResponse,
+    WrongBookStatsResponse,
+)
 from app.domain.wrong_book import WrongBookItem, WrongBookStats
 from app.services.wrong_book_service import WrongBookService
 from app.utils.auth_tools import AuthContext, get_current_auth
@@ -11,7 +16,7 @@ from app.utils.auth_tools import AuthContext, get_current_auth
 router = APIRouter()
 
 
-@router.get("/wrong-book/stats")
+@router.get("/wrong-book/stats", response_model=WrongBookStatsResponse)
 def get_wrong_book_stats(
     auth: AuthContext = Depends(get_current_auth),
     service: WrongBookService = Depends(get_wrong_book_service),
@@ -25,7 +30,7 @@ def get_wrong_book_stats(
     }
 
 
-@router.get("/wrong-book/")
+@router.get("/wrong-book/", response_model=WrongBookListResponse)
 def list_wrong_book(
     auth: AuthContext = Depends(get_current_auth),
     service: WrongBookService = Depends(get_wrong_book_service),
@@ -49,8 +54,12 @@ def list_wrong_book(
                 "problem_id": item.problem_id,
                 "problem_title": item.problem_title,
                 "submission_id": item.submission_id,
-                "first_wrong_at": item.first_wrong_at.isoformat() if item.first_wrong_at else None,
-                "latest_wrong_at": item.latest_wrong_at.isoformat() if item.latest_wrong_at else None,
+                "first_wrong_at": item.first_wrong_at.isoformat()
+                if item.first_wrong_at
+                else None,
+                "latest_wrong_at": item.latest_wrong_at.isoformat()
+                if item.latest_wrong_at
+                else None,
                 "accepted": item.accepted,
                 "reviewed": item.reviewed,
             }
@@ -59,7 +68,9 @@ def list_wrong_book(
     }
 
 
-@router.post("/wrong-book/{entry_id}/toggle-review")
+@router.post(
+    "/wrong-book/{entry_id}/toggle-review", response_model=ToggleReviewResponse
+)
 def toggle_reviewed(
     entry_id: int,
     auth: AuthContext = Depends(get_current_auth),

@@ -13,8 +13,8 @@ class CreateExamBody(BaseModel):
     description: str = ""
     start_time: datetime
     end_time: datetime
-    contest_type: str = "icpc"
-    freeze_minutes: Optional[int] = None
+    contest_type: str = Field(default="icpc", pattern="^(icpc|ioi)$")
+    freeze_minutes: Optional[int] = Field(default=None, ge=0)
     password: Optional[str] = None
     is_visible: bool = False
 
@@ -26,8 +26,8 @@ class UpdateExamBody(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    contest_type: Optional[str] = None
-    freeze_minutes: Optional[int] = None
+    contest_type: Optional[str] = Field(default=None, pattern="^(icpc|ioi)$")
+    freeze_minutes: Optional[int] = Field(default=None, ge=0)
     password: Optional[str] = None
     is_visible: Optional[bool] = None
 
@@ -44,3 +44,65 @@ class AddProblemToExamBody(BaseModel):
     problem_id: int = Field(ge=1)
     display_id: Optional[str] = None
     score: int = Field(default=100, ge=1)
+
+
+from app.domain.exam import (
+    ExamProblemItem,
+    MonitorEntry,
+    MonitorProblemInfo,
+    RankEntry,
+    RankProblemInfo,
+)
+
+
+class ExamResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    start_time: datetime
+    end_time: datetime
+    contest_type: str
+    freeze_minutes: int | None
+    is_visible: bool
+    created_by: int
+
+
+class ExamListResponse(ExamResponse):
+    problem_count: int
+    submission_count: int
+
+
+class ExamDetailResponse(ExamResponse):
+    has_password: bool
+    problems: list[ExamProblemItem]
+
+
+class ExamTokenResponse(BaseModel):
+    message: str
+    token: str
+
+
+class EnterExamResponse(ExamTokenResponse):
+    exam_id: int
+
+
+class MonitorResponse(BaseModel):
+    exam_title: str
+    problems: list[MonitorProblemInfo]
+    users: list[MonitorEntry]
+
+
+class RankResponse(BaseModel):
+    exam_title: str
+    problems: list[RankProblemInfo]
+    rank: list[RankEntry]
+
+
+class ExamProblemStatusResponse(BaseModel):
+    problem_id: int
+    display_id: str | None
+    title: str
+    max_score: int
+    status: str
+    current_score: float
+    last_submitted_at: datetime | None

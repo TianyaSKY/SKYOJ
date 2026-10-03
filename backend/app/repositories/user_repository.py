@@ -4,8 +4,9 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.user import User
 from app.models.submission import Submission
+from app.models.user import User
+from app.unit_of_work import UnitOfWork
 
 
 class UserRepository:
@@ -13,6 +14,7 @@ class UserRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
 
     def get_by_username(self, username: str) -> Optional[User]:
         """按用户名查询用户。"""
@@ -22,7 +24,7 @@ class UserRepository:
         """创建并持久化用户。"""
         user = User(username=username, password_hash=password_hash, role=role)
         self._db.add(user)
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(user)
         return user
 
@@ -37,7 +39,7 @@ class UserRepository:
     def update_avatar(self, user: User, avatar: str) -> User:
         """更新用户头像路径。"""
         user.avatar = avatar
-        self._db.commit()
+        self._db.flush()
         self._db.refresh(user)
         return user
 

@@ -1,11 +1,10 @@
 """题目关键词搜索业务编排。"""
 
-from loguru import logger
-
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
 from app.domain.problem import ProblemDetail
 from app.mappers import from_problem_orm
 from app.repositories.search_repository import SearchRepository
+from loguru import logger
 
 
 class SearchFacadeService:
@@ -26,7 +25,9 @@ class SearchFacadeService:
             return []
         try:
             self._repository.add_history(user_id, query)
+            self._repository.unit_of_work.commit()
         except Exception:
+            self._repository.unit_of_work.rollback()
             logger.exception("保存搜索历史失败，用户 ID：{}", user_id)
         problems = self._repository.search_problems(query, top_k)
         if requester_role != "teacher":
@@ -35,6 +36,4 @@ class SearchFacadeService:
                 for problem in problems
                 if self._test_case_storage.has_test_cases(problem.id)
             ]
-        return [
-            from_problem_orm(problem, with_content=True) for problem in problems
-        ]
+        return [from_problem_orm(problem, with_content=True) for problem in problems]

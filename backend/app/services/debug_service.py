@@ -1,10 +1,8 @@
 """调试运行业务服务。"""
 
-from datetime import datetime
+from typing import Protocol
 
-from loguru import logger
-from sqlalchemy.orm import Session
-
+from app.clients.submission_storage_client import SubmissionStorageClient
 from app.domain.debug_run import (
     CreateDebugRunParams,
     DebugRunDetail,
@@ -13,7 +11,16 @@ from app.domain.debug_run import (
 from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
 from app.mappers import from_debug_run_orm
 from app.repositories.debug_run_repository import DebugRunRepository
-from app.services.acm import run_acm_single_case
+from app.services.acm import SingleCaseResult
+from app.services.async_job_service import AsyncJobService
+from app.utils.time import utcnow
+from loguru import logger
+
+
+class DebugCaseRunner(Protocol):
+    def __call__(
+        self, *, user_code: str, problem_id: int, language: str
+    ) -> SingleCaseResult: ...
 
 
 _STATUS_MAP = {
@@ -32,19 +39,24 @@ class DebugService:
     def __init__(
         self,
         debug_run_repository: DebugRunRepository,
-        job_service,
-        storage_client=None,
+        job_service: AsyncJobService | None,
+        storage_client: SubmissionStorageClient | None = None,
+        case_runner: DebugCaseRunner | None = None,
     ) -> None:
         self._repo = debug_run_repository
         self._job_service = job_service
         self._storage_client = storage_client
+        self._case_runner = case_runner
 
-    def create(self, params: CreateDebugRunParams) -> DebugRunResult:
-        """创建一条调试记录并投递异步任务；非 ACM 题目在 API 层拦截。"""
-        from app.repositories.submission_repository import SubmissionRepository
-
-        db = self._repo._db
-        problem = SubmissionRepository(db).get_problem(params.problem_id)
+    def create(
+        self, params: CreateDebugRunParams, *, requester_role: str
+    ) -> DebugRunResult:
+        """创建一条调试记录并投递异步任务；在业务层校验角色和题目类型。"""
+        if requester_role != "student":
+            raise PermissionDeniedError("Only student accounts can run debug.")
+        if self._job_service is None:
+            raise RuntimeError("调试任务服务未注入")
+        problem = self._repo.get_problem(params.problem_id)
         if problem is None:
             raise ResourceNotFoundError("题目不存在")
         problem_type = (problem.type or "acm").lower()
@@ -53,8 +65,13 @@ class DebugService:
 
         exam_id = self._resolve_exam_id(params.exam_id)
         code = params.code
-        if self._storage_client is not None and getattr(params, "is_file_upload", False):
-            if not getattr(params, "filename", None) or getattr(params, "file_content", None) is None:
+        if self._storage_client is not None and getattr(
+            params, "is_file_upload", False
+        ):
+            if (
+                not getattr(params, "filename", None)
+                or getattr(params, "file_content", None) is None
+            ):
                 raise ValueError("提交附件信息不完整")
             code = self._storage_client.save(
                 params.user_id, params.problem_id, params.filename, params.file_content
@@ -67,17 +84,14 @@ class DebugService:
             language=params.language,
             code=code,
         )
+        self._repo.unit_of_work.commit()
         self._job_service.enqueue_debug_submission(row.id)
         return DebugRunResult(debug_run_id=row.id, status="Pending", exam_id=exam_id)
 
     def _resolve_exam_id(self, exam_id: int | None) -> int | None:
-        from app.repositories.submission_repository import SubmissionRepository
-
         if exam_id is None or exam_id == -1:
             return None
-        exam = SubmissionRepository(self._repo._db).get_active_exam(
-            exam_id, datetime.now()
-        )
+        exam = self._repo.get_active_exam(exam_id, utcnow())
         return exam.id if exam is not None else None
 
     def get_debug_run(
@@ -101,13 +115,13 @@ class DebugService:
         if row is None:
             logger.warning("调试记录不存在，跳过 debug_run_id={}", debug_run_id)
             return
-        db: Session = self._repo._db
+        if self._case_runner is None:
+            raise RuntimeError("调试运行器未注入")
         try:
-            result = run_acm_single_case(
+            result = self._case_runner(
                 user_code=row.code_content or "",
                 problem_id=row.problem_id,
                 language=row.language or "python",
-                db=db,
             )
             status = _STATUS_MAP.get(result.status, "System Error")
             self._repo.finish(
@@ -119,13 +133,16 @@ class DebugService:
                 actual_output=result.actual_output or "",
                 error_output=result.error_output or "",
             )
+            self._repo.unit_of_work.commit()
         except Exception as exc:
+            self._repo.unit_of_work.rollback()
             logger.exception("调试运行业务执行异常 debug_run_id={}", debug_run_id)
             self._repo.finish(
                 debug_run_id,
                 status="System Error",
                 error_output=str(exc),
             )
+            self._repo.unit_of_work.commit()
 
 
 __all__ = ["DebugService"]
