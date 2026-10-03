@@ -153,11 +153,11 @@ it('当前错题本加载失败会显示错误且允许重试', async () => {
   await wrapper.vm.fetchWrongBook()
   expect(request.mock.calls.filter(([config]) => config.url === '/wrong-book/')).toHaveLength(2)
 })
-it('重复复习点击只发送一次，统计按实际状态变化更新', async () => {
+it('重复复习点击只发送一次，统计取自服务端', async () => {
   delete state.route.params.id
   mountPage(); await flushPromises()
   const post = deferred()
-  request.mockReturnValue(post.promise)
+  request.mockImplementation(config => config.method === 'post' ? post.promise : Promise.resolve({ items: [], total: 0, reviewed: 0 }))
   const item = { id: 1, reviewed: false, accepted: false }
   const first = wrapper.vm.toggleReview(item)
   await wrapper.vm.toggleReview({ ...item })
@@ -165,7 +165,7 @@ it('重复复习点击只发送一次，统计按实际状态变化更新', asyn
   post.resolve({ reviewed: false }); await first
   expect(wrapper.vm.wbStats.reviewed).toBe(0)
   expect(wrapper.vm.pendingReviews.has(1)).toBe(false)
-  request.mockResolvedValue({ reviewed: true })
+  request.mockImplementation(config => Promise.resolve(config.method === 'post' ? { reviewed: true } : { items: [], total: 1, reviewed: 1 }))
   await wrapper.vm.toggleReview(item)
   expect(wrapper.vm.wbStats.reviewed).toBe(1)
 })
@@ -182,6 +182,49 @@ it('切换账户后旧复习请求不修改新账户统计或解除其等待状�
   old.resolve({ reviewed: true }); await first
   expect(wrapper.vm.wbStats.reviewed).toBe(0)
   expect(wrapper.vm.pendingReviews.has(1)).toBe(true)
+  request.mockImplementation(config => config.method === 'post' ? current.promise : Promise.resolve({ items: [], total: 1, reviewed: 1 }))
   current.resolve({ reviewed: true }); await second
+  expect(wrapper.vm.wbStats.reviewed).toBe(1)
+})
+
+it.each([true, false])('复习请求和列表刷新交错时重新读取正确状态（刷新先完成：%s）', async refreshFirst => {
+  delete state.route.params.id
+  request.mockImplementation(config => Promise.resolve(config.url.endsWith('/stats')
+    ? { total: 1, reviewed: 0 } : { total: 1, items: [{ id: 1, reviewed: false }] }))
+  mountPage(); await flushPromises()
+  const item = wrapper.vm.wbItems[0]
+  const post = deferred(), oldListing = deferred(), oldStats = deferred()
+  request.mockImplementation(config => config.method === 'post' ? post.promise
+    : config.url.endsWith('/stats') ? oldStats.promise : oldListing.promise)
+  const mutation = wrapper.vm.toggleReview(item)
+  const refresh = wrapper.vm.fetchWrongBook()
+  const resolveOld = async () => {
+    oldStats.resolve({ total: 1, reviewed: 0 })
+    oldListing.resolve({ total: 1, items: [{ id: 1, reviewed: false }] })
+    await refresh
+  }
+  if (refreshFirst) await resolveOld()
+  request.mockImplementation(config => Promise.resolve(config.url.endsWith('/stats')
+    ? { total: 1, reviewed: 1 } : { total: 1, items: [{ id: 1, reviewed: true }] }))
+  post.resolve({ reviewed: true }); await mutation
+  if (!refreshFirst) await resolveOld()
+  expect(wrapper.vm.wbItems[0].reviewed).toBe(true)
+  expect(wrapper.vm.wbStats.reviewed).toBe(1)
+})
+it('复习完成后刷新用户正在请求的页，不强制返回此前页面', async () => {
+  delete state.route.params.id
+  request.mockImplementation(config => Promise.resolve(config.url.endsWith('/stats')
+    ? { total: 11, reviewed: 0 } : { total: 11, items: [{ id: 1, reviewed: false }] }))
+  mountPage(); await flushPromises()
+  const post = deferred(), old = deferred()
+  request.mockImplementation(config => config.method === 'post' ? post.promise : old.promise)
+  const mutation = wrapper.vm.toggleReview(wrapper.vm.wbItems[0])
+  const navigation = wrapper.vm.fetchWrongBook(2)
+  request.mockImplementation(config => Promise.resolve(config.url.endsWith('/stats')
+    ? { total: 11, reviewed: 1 } : { total: 11, items: [{ id: 11, reviewed: false }] }))
+  post.resolve({ reviewed: true }); await mutation
+  old.resolve({ total: 11, reviewed: 0, items: [{ id: 2 }] }); await navigation
+  expect(wrapper.vm.wbPage).toBe(2)
+  expect(wrapper.vm.wbItems[0].id).toBe(11)
   expect(wrapper.vm.wbStats.reviewed).toBe(1)
 })

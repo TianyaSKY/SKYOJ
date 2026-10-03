@@ -222,6 +222,7 @@ const wbTotal = ref(0)
 const pendingReviews = ref(new Set())
 let wbScopeVersion = 0
 let wbRequestVersion = 0
+let wbRequestedPage = 1
 const isCurrentWrongBook = version => !disposed && version === wbScopeVersion
 
 const userId = computed(() => route.params.id)
@@ -262,6 +263,7 @@ const formatDate = (isoString) => {
 const fetchWrongBook = async (pageNo = wbPage.value) => {
   if (!showWrongBook.value) return
   const scope = wbScopeVersion
+  wbRequestedPage = pageNo
   const requestId = ++wbRequestVersion
   const isCurrent = () => isCurrentWrongBook(scope) && requestId === wbRequestVersion
   wbLoading.value = true
@@ -288,7 +290,6 @@ const toggleReview = async (item) => {
   if (!showWrongBook.value || item.accepted || pendingReviews.value.has(item.id)) return
   const scope = wbScopeVersion
   pendingReviews.value.add(item.id)
-  const wasReviewed = Boolean(item.reviewed)
   try {
     const res = await request({
       url: `/wrong-book/${item.id}/toggle-review`,
@@ -296,7 +297,10 @@ const toggleReview = async (item) => {
     })
     if (!isCurrentWrongBook(scope)) return
     item.reviewed = res.reviewed
-    wbStats.value.reviewed = Math.max(0, wbStats.value.reviewed + Number(res.reviewed) - Number(wasReviewed))
+    const current = wbItems.value.find(entry => entry.id === item.id)
+    if (current) current.reviewed = res.reviewed
+    // 重新读取服务端统计，并使较早的查询失效；保留正在翻到的页码。
+    await fetchWrongBook(wbRequestedPage)
   } catch (error) {
     if (isCurrentWrongBook(scope)) ElMessage.error(error.message || '操作失败')
   } finally {
@@ -374,6 +378,7 @@ watch([userId, () => userStore.user?.id, showWrongBook], () => {
   wbItems.value = []
   wbStats.value = { total: 0, unresolved: 0, reviewed: 0, accepted: 0 }
   wbPage.value = 1
+  wbRequestedPage = 1
   wbTotal.value = 0
   wbLoading.value = false
   pendingReviews.value.clear()
