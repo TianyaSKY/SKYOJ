@@ -571,10 +571,14 @@ class ProblemCommunityRepository:
         self._db.flush()
 
     def list_tags_for_problem(self, problem_id: int) -> list[ProblemTagRecord]:
+        """只返回教师已批准的题目标签，待审建议保留在关联表中。"""
         rows = (
             self._db.query(ProblemTag)
             .join(ProblemTagMap, ProblemTagMap.tag_id == ProblemTag.id)
-            .filter(ProblemTagMap.problem_id == problem_id)
+            .filter(
+                ProblemTagMap.problem_id == problem_id,
+                ProblemTagMap.approved.is_(True),
+            )
             .order_by(ProblemTag.name)
             .all()
         )

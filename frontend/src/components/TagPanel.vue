@@ -21,7 +21,6 @@ const attached = ref([])        // 当前题目已贴标签
 const all = ref([])              // 全站标签
 const attachDialogVisible = ref(false)
 const selectedTagId = ref(null)
-const approved = ref(false)
 
 const userStore = useUserStore()
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
@@ -47,7 +46,6 @@ onMounted(load)
 
 function openAttach () {
   selectedTagId.value = null
-  approved.value = isTeacher.value
   attachDialogVisible.value = true
 }
 
@@ -60,7 +58,7 @@ async function confirmAttach () {
     await request({
       url: `/tags/problems/${props.problemId}/attach`,
       method: 'post',
-      data: { tag_id: selectedTagId.value, approved: approved.value }
+      data: { tag_id: selectedTagId.value, approved: isTeacher.value }
     })
     ElMessage.success(isTeacher.value ? '标签已挂上' : '已提交建议，等待教师审核')
     attachDialogVisible.value = false
@@ -117,11 +115,6 @@ async function detach (tag) {
               :value="t.id"
             />
           </el-select>
-        </el-form-item>
-        <el-form-item v-if="!isTeacher">
-          <el-checkbox v-model="approved">
-            作为教师认证标签（仅教师可勾选）
-          </el-checkbox>
         </el-form-item>
       </el-form>
       <template #footer>

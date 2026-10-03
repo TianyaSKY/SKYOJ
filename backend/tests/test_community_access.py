@@ -151,3 +151,24 @@ def test_solution_list_excludes_hidden_body_and_interactions(
     assert response.status_code == 200
     assert response.json()["total"] == 0
     assert response.json()["items"] == []
+
+
+def test_public_problem_tags_follow_teacher_approval(client, db_session, sample_problem):
+    """待审建议保留在库中，只有教师批准后才成为公开题目标签。"""
+    repository = ProblemCommunityRepository(db_session)
+    service = TagService(repository, uow=UnitOfWork(db_session))
+    tag = service.create(CreateTagParams("teacher", "arrays", "数组"))
+    problem_id = sample_problem.id
+    path = f"/api/tags/problems/{problem_id}"
+    service.attach(AttachTagParams(problem_id, tag.id, False, "student"))
+
+    response = client.get(path)
+    assert response.status_code == 200
+    assert response.json() == []
+    assert repository.get_tag_map(problem_id, tag.id).approved is False
+
+    service.attach(AttachTagParams(problem_id, tag.id, True, "teacher"))
+    assert [item["id"] for item in client.get(path).json()] == [tag.id]
+
+    service.attach(AttachTagParams(problem_id, tag.id, False, "teacher"))
+    assert client.get(path).json() == []

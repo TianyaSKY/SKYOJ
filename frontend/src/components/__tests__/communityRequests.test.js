@@ -19,6 +19,7 @@ const originalAdapter = request.defaults.adapter
 let urls
 let wrapper
 let calls
+let writes
 const mountOptions = {
   props: { problemId: 42 },
   global: { stubs: Object.fromEntries([
@@ -33,10 +34,12 @@ beforeEach(() => {
   setActivePinia(createPinia())
   urls = []
   calls = []
+  writes = []
   ElMessageBox.confirm.mockResolvedValue('confirm')
   request.defaults.adapter = config => {
     urls.push(request.getUri(config))
     calls.push([config.method, request.getUri(config)])
+    if (config.method === 'post') writes.push(JSON.parse(config.data || '{}'))
     return Promise.resolve({
       data: config.url.includes('solutions') ? { items: [], total: 0 } : [],
       status: 200, statusText: 'OK', headers: {}, config,
@@ -166,5 +169,39 @@ describe('社区组件的 API 请求路径', () => {
     expect(wrapper.vm.solutions[0].favorited_by_me).toBe(true)
     wrapper.vm.openWrite(wrapper.vm.solutions[0])
     expect(wrapper.vm.form.content).toBe('## 解法\n原文')
+  })
+
+  it.each([['teacher', true], ['student', false]])('标签提交按当前 %s 身份设置审批状态', async (role, expected) => {
+    useUserStore().user = {id: 1, role}
+    wrapper = shallowMount(TagPanel, mountOptions)
+    await flushPromises()
+    wrapper.vm.openAttach()
+    wrapper.vm.selectedTagId = 7
+    await wrapper.vm.confirmAttach()
+    expect(writes).toContainEqual({tag_id: 7, approved: expected})
+  })
+
+  it('标签对话框打开后角色变更，提交时不保留旧教师审批状态', async () => {
+    const store = useUserStore()
+    store.user = {id: 1, role: 'teacher'}
+    wrapper = shallowMount(TagPanel, mountOptions)
+    await flushPromises()
+    wrapper.vm.openAttach()
+    wrapper.vm.selectedTagId = 7
+    store.user = {id: 2, role: 'student'}
+    await wrapper.vm.confirmAttach()
+    expect(writes).toContainEqual({tag_id: 7, approved: false})
+  })
+
+  it('学生没有教师认证标签的勾选项', async () => {
+    useUserStore().user = {id: 1, role: 'student'}
+    wrapper = shallowMount(TagPanel, {
+      ...mountOptions,
+      global: {...mountOptions.global, renderStubDefaultSlot: true},
+    })
+    await flushPromises()
+    wrapper.vm.openAttach()
+    await flushPromises()
+    expect(wrapper.find('el-checkbox-stub').exists()).toBe(false)
   })
 })
