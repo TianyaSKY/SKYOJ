@@ -348,8 +348,8 @@ class SearchRepository:
 
         matching = self._db.query(Problem).filter(
             or_(
-                Problem.title.like(f"%{query}%"),
-                Problem.content.like(f"%{query}%"),
+                Problem.title.contains(query, autoescape=True),
+                Problem.content.contains(query, autoescape=True),
             )
         )
         if visible_ids is not None:

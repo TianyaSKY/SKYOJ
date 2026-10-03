@@ -1,5 +1,7 @@
 """搜索服务按角色过滤测试。"""
 
+import pytest
+
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -93,3 +95,21 @@ def test_student_search_limit_applies_after_visibility_filter(db_session, studen
     results = service.search(student_user.id, "关键词", 1, "student")
 
     assert [item.id for item in results] == [visible_id]
+
+
+@pytest.mark.parametrize('query, distractor', [('%', '百分比'), ('_', 'a'), ('__init__', 'xxinitxx'), ('a/b', 'aXb'), ('a/%_', 'a/abc')])
+@pytest.mark.parametrize('field', ['title', 'content'])
+def test_keyword_search_matches_special_characters_literally(db_session, query, distractor, field):
+    from app.persistence.problem import Problem
+    from app.persistence.user import SearchRepository
+
+    matching = Problem(title='匹配题目', content='正文', type='acm', language='python')
+    other = Problem(title='其他题目', content='正文', type='acm', language='python')
+    setattr(matching, field, f'前缀{query}后缀')
+    setattr(other, field, f'前缀{distractor}后缀')
+    db_session.add_all([matching, other])
+    db_session.commit()
+
+    results = SearchRepository(db_session).search_problems(query, 10)
+
+    assert [item.id for item in results] == [matching.id]
