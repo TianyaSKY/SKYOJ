@@ -6,7 +6,7 @@ from copy import deepcopy
 from app.core.errors import ResourceNotFoundError
 from app.persistence.community import ProblemCommunityRepository, ProblemSolutionComment, ProblemSolutionLike, ProblemSolutionFavorite
 from app.persistence.unit_of_work import UnitOfWork
-from app.services.community import SolutionService, CreateSolutionParams, CreateCommentParams
+from app.services.community import SolutionService, CreateSolutionParams, CreateCommentParams, UpdateSolutionParams
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def test_interactions_using_old_snapshots_preserve_all_counts(community, student
     # 编辑来自更早的快照，不得把这些计数重新写成旧值。
     stale.vote_count = stale.favorite_count = stale.comment_count = stale.view_count = 0
     stale.title = '更新标题'
-    repo.save_solution(stale)
+    repo.update_solution(solution_id, title=stale.title)
     db_session.commit()
     current = repo.get_solution_by_id(solution_id)
     assert current.title == '更新标题'
@@ -62,3 +62,38 @@ def test_atomic_decrements_do_not_produce_negative_counts(community):
     assert repo.adjust_vote_count(solution_id, -1) == 0
     assert repo.adjust_favorite_count(solution_id, -1) == 0
     assert repo.adjust_comment_count(solution_id, -1) == 0
+
+
+def test_stale_hide_preserves_new_solution_content(community, student_user, monkeypatch, db_session):
+    repo, service, solution_id = community
+    stale = repo.get_solution_by_id(solution_id)
+    repo.update_solution(solution_id, title='新标题', content='新正文', language='cpp', is_official=True)
+    db_session.commit()
+    monkeypatch.setattr(repo, 'get_solution_by_id', lambda ignored: deepcopy(stale))
+    service.hide(solution_id, student_user.id, 'student')
+    current = repo.update_solution(solution_id)
+    assert current.status == 'hidden'
+    assert (current.title, current.content, current.language, current.is_official) == ('新标题', '新正文', 'cpp', True)
+
+
+def test_stale_edit_cannot_unhide_or_revoke_official_status(community, student_user, monkeypatch, db_session):
+    repo, service, solution_id = community
+    stale = repo.get_solution_by_id(solution_id)
+    repo.hide_solution(solution_id)
+    repo.update_solution(solution_id, content='并发更新正文', is_official=True)
+    db_session.commit()
+    monkeypatch.setattr(repo, 'get_solution_by_id', lambda ignored: deepcopy(stale))
+    updated = service.update(UpdateSolutionParams(solution_id, student_user.id, 'student', title='只改标题'))
+    assert updated.title == '只改标题'
+    assert updated.status == 'hidden'
+    assert updated.is_official
+    assert updated.content == '并发更新正文'
+
+
+def test_disjoint_edits_from_same_old_snapshot_both_survive(community, student_user, monkeypatch):
+    repo, service, solution_id = community
+    stale = repo.get_solution_by_id(solution_id)
+    monkeypatch.setattr(repo, 'get_solution_by_id', lambda ignored: deepcopy(stale))
+    service.update(UpdateSolutionParams(solution_id, student_user.id, 'student', title='新标题'))
+    updated = service.update(UpdateSolutionParams(solution_id, student_user.id, 'student', content='新正文'))
+    assert (updated.title, updated.content) == ('新标题', '新正文')

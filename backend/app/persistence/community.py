@@ -313,20 +313,40 @@ class ProblemCommunityRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def save_solution(self, record: ProblemSolutionRecord) -> ProblemSolutionRecord:
-        """写回题解内容与状态；交互计数由独立的原子更新维护。"""
-        row = self._db.get(ProblemSolution, record.id)
-        for attribute in (
-            "title",
-            "content",
-            "language",
-            "is_official",
-            "status",
+    def update_solution(
+        self,
+        solution_id: int,
+        *,
+        title: str | None = None,
+        content: str | None = None,
+        language: str | None = None,
+        is_official: bool | None = None,
+    ) -> ProblemSolutionRecord:
+        """只写明确提供的编辑字段，保留其他事务修改的状态、正文和计数。"""
+        values: dict[str, str | bool] = {}
+        for attribute, value in (
+            ("title", title),
+            ("content", content),
+            ("language", language),
+            ("is_official", is_official),
         ):
-            setattr(row, attribute, getattr(record, attribute))
+            if value is not None:
+                values[attribute] = value
+        if values:
+            self._db.query(ProblemSolution).filter(ProblemSolution.id == solution_id).update(
+                values, synchronize_session="fetch"
+            )
         self._db.flush()
+        row = self._db.get(ProblemSolution, solution_id)
         self._db.refresh(row)
         return _to_problem_solution_record(row)
+
+    def hide_solution(self, solution_id: int) -> None:
+        """隐藏操作仅更新可见状态，不写回旧题解正文。"""
+        self._db.query(ProblemSolution).filter(ProblemSolution.id == solution_id).update(
+            {"status": "hidden"}, synchronize_session="fetch"
+        )
+        self._db.flush()
 
     def _adjust_count(
         self, solution_id: int, column: InstrumentedAttribute[int], delta: int

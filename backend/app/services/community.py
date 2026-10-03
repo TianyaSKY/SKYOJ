@@ -179,8 +179,6 @@ class SolutionService:
                 content=params.content,
                 language=params.language,
             )
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
             return to_solution_detail(solution, viewer_id=params.author_id)
 
     def update(self, params: UpdateSolutionParams) -> SolutionDetail:
@@ -195,20 +193,15 @@ class SolutionService:
             ):
                 raise PermissionDeniedError("无权修改该题解")
 
-            if params.is_official is not None:
-                if params.requester_role != "teacher":
-                    raise PermissionDeniedError("仅教师可标记官方题解")
-                solution.is_official = params.is_official
-
-            if params.title is not None:
-                solution.title = params.title
-            if params.content is not None:
-                solution.content = params.content
-            if params.language is not None:
-                solution.language = params.language
-
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+            if params.is_official is not None and params.requester_role != "teacher":
+                raise PermissionDeniedError("仅教师可标记官方题解")
+            solution = self._repo.update_solution(
+                params.solution_id,
+                title=params.title,
+                content=params.content,
+                language=params.language,
+                is_official=params.is_official,
+            )
             return to_solution_detail(solution, viewer_id=params.requester_id)
 
     def hide(self, solution_id: int, requester_id: int, requester_role: str) -> None:
@@ -219,9 +212,7 @@ class SolutionService:
                 raise ResourceNotFoundError("题解不存在")
             if requester_id != solution.author_id and requester_role != "teacher":
                 raise PermissionDeniedError("无权隐藏该题解")
-            solution.status = "hidden"
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+            self._repo.hide_solution(solution_id)
 
     def get(self, solution_id: int, viewer_id: int) -> SolutionDetail:
         with self._uow.transaction():
