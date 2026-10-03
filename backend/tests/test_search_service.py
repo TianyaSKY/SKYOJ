@@ -13,8 +13,8 @@ class FakeSearchRepository:
         self.unit_of_work = MagicMock()
         self._problems = problems
 
-    def search_problems(self, query: str, top_k: int):
-        return list(self._problems)
+    def search_problems(self, query: str, top_k: int, *, visible_ids=None):
+        return [problem for problem in self._problems if visible_ids is None or problem.id in visible_ids][:top_k]
 
     def add_history(self, user_id: int, query: str) -> None:
         pass
@@ -22,6 +22,9 @@ class FakeSearchRepository:
 
 class FakeTestCaseStorage:
     """内存假测试用例存储：仅 1、3 号题目已有测试用例。"""
+
+    def list_problem_ids_with_test_cases(self):
+        return frozenset({1, 3})
 
     def has_test_cases(self, problem_id: int) -> bool:
         return problem_id in {1, 3}
@@ -67,3 +70,26 @@ def test_search_teacher_sees_all_problems() -> None:
     results = service.search(1, "题目", 10, "teacher")
 
     assert [item.id for item in results] == [1, 2, 3]
+
+def test_student_search_limit_applies_after_visibility_filter(db_session, student_user, tmp_path):
+    from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
+    from app.persistence.problem import Problem
+    from app.persistence.unit_of_work import UnitOfWork
+    from app.persistence.user import SearchRepository
+
+    problems = [Problem(title=f"关键词题目{index}", content="正文", type="acm", language="python") for index in range(3)]
+    db_session.add_all(problems)
+    db_session.commit()
+    visible_id = problems[-1].id
+    folder = tmp_path / str(visible_id)
+    folder.mkdir()
+    (folder / '1.in').write_text('1')
+    service = SearchFacadeService(
+        SearchRepository(db_session),
+        test_case_storage=ProblemTestCaseStorageClient(str(tmp_path)),
+        uow=UnitOfWork(db_session),
+    )
+
+    results = service.search(student_user.id, "关键词", 1, "student")
+
+    assert [item.id for item in results] == [visible_id]

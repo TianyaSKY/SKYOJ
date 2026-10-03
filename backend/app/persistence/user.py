@@ -340,24 +340,22 @@ class SearchRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def search_problems(self, query: str, top_k: int):
-
+    def search_problems(
+        self, query: str, top_k: int, *, visible_ids: frozenset[int] | None = None
+    ) -> list[ProblemRecord]:
+        """先筛选可见题目，再限制关键词搜索结果数量。"""
         from app.persistence.problem import Problem, _to_problem_record
 
-        return [
-            _to_problem_record(row)
-            for row in (
-                self._db.query(Problem)
-                .filter(
-                    or_(
-                        Problem.title.like(f"%{query}%"),
-                        Problem.content.like(f"%{query}%"),
-                    )
-                )
-                .limit(top_k)
-                .all()
+        matching = self._db.query(Problem).filter(
+            or_(
+                Problem.title.like(f"%{query}%"),
+                Problem.content.like(f"%{query}%"),
             )
-        ]
+        )
+        if visible_ids is not None:
+            matching = matching.filter(Problem.id.in_(visible_ids))
+        rows = matching.order_by(Problem.id).limit(top_k).all()
+        return [_to_problem_record(row) for row in rows]
 
     def add_history(self, user_id: int, query: str) -> None:
         self._db.add(SearchHistory(user_id=user_id, query=query))

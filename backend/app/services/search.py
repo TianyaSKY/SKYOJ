@@ -34,11 +34,9 @@ class SearchFacadeService:
         except Exception:
             self._uow.rollback()
             logger.exception("保存搜索历史失败，用户 ID：{}", user_id)
-        problems = self._repository.search_problems(query, top_k)
-        if requester_role != "teacher":
-            problems = [
-                problem
-                for problem in problems
-                if self._test_case_storage.has_test_cases(problem.id)
-            ]
+        visible_ids = (
+            None if requester_role == "teacher"
+            else self._test_case_storage.list_problem_ids_with_test_cases()
+        )
+        problems = self._repository.search_problems(query, top_k, visible_ids=visible_ids)
         return [to_problem_result(problem, with_content=True) for problem in problems]
