@@ -218,7 +218,7 @@ class ExamRepository:
                 query.options(
                     selectinload(Submission.user), selectinload(Submission.problem)
                 )
-                .order_by(Submission.created_at.asc())
+                .order_by(Submission.created_at.asc(), Submission.id.asc())
                 .all()
             )
         ]

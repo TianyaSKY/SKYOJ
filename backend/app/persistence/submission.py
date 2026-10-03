@@ -365,7 +365,7 @@ class SubmissionRepository:
                     query.options(
                         selectinload(Submission.user), selectinload(Submission.problem)
                     )
-                    .order_by(Submission.created_at.desc())
+                    .order_by(Submission.created_at.desc(), Submission.id.desc())
                     .offset((page - 1) * page_size)
                     .limit(page_size)
                     .all()

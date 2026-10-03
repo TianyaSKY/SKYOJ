@@ -176,7 +176,7 @@ class UserRepository:
         return _to_user_record(user)
 
     def list_submissions(self, user_id: int) -> list[SubmissionRecord]:
-        """按创建时间倒序查询用户的提交记录。"""
+        """按创建时间和 ID 倒序查询用户提交，同秒记录也保持稳定顺序。"""
         from app.persistence.submission import Submission, _to_submission_record
 
         return [
@@ -184,7 +184,7 @@ class UserRepository:
             for row in (
                 self._db.query(Submission)
                 .filter_by(user_id=user_id)
-                .order_by(Submission.created_at.desc())
+                .order_by(Submission.created_at.desc(), Submission.id.desc())
                 .all()
             )
         ]

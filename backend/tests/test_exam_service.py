@@ -19,6 +19,7 @@ from app.services.exam import (
     UpdateExamParams,
 )
 from sqlalchemy import create_engine
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -489,3 +490,23 @@ def test_rank_api_returns_frozen_pending_attempts(seeded, client, teacher_token,
     bob = next(entry for entry in response.json()["rank"] if entry["user_id"] == seeded["bob"].id)
     assert bob["solved"] == 0
     assert bob["problems"][str(seeded["p1"].id)]["pending_attempts"] == 1
+
+
+def test_rank_tied_submissions_follow_id_order_with_different_index(seeded):
+    """索引访问顺序改变时，通过后的同秒错误提交也不能增加罚时。"""
+    session = seeded["session"]
+    accepted = seeded["ac1"]
+    later = Submission(
+        user_id=accepted.user_id, problem_id=accepted.problem_id, exam_id=accepted.exam_id,
+        status="Wrong Answer", score=0, created_at=accepted.created_at,
+    )
+    session.add(later)
+    session.commit()
+    session.execute(text(
+        "CREATE INDEX ix_test_exam_time ON submissions (exam_id, created_at ASC, id DESC)"
+    ))
+
+    result = seeded["service"].rank(seeded["exam"].id, "teacher", -1)
+    alice = next(entry for entry in result.rank if entry.user_id == accepted.user_id)
+    assert alice.penalty == 2100
+    assert alice.problems[accepted.problem_id].failed_attempts == 1
