@@ -341,7 +341,8 @@ class SearchRepository:
         self._db = db
 
     def search_problems(
-        self, query: str, top_k: int, *, visible_ids: frozenset[int] | None = None
+        self, query: str, top_k: int, *, visible_ids: frozenset[int] | None = None,
+        tag_id: int | None = None, problem_type: str | None = None,
     ) -> list[ProblemRecord]:
         """先筛选可见题目，再限制关键词搜索结果数量。"""
         from app.persistence.problem import Problem, _to_problem_record
@@ -354,6 +355,16 @@ class SearchRepository:
         )
         if visible_ids is not None:
             matching = matching.filter(Problem.id.in_(visible_ids))
+        if problem_type is not None:
+            matching = matching.filter(Problem.type == problem_type)
+        if tag_id is not None:
+            from app.persistence.community import ProblemTagMap
+
+            approved = self._db.query(ProblemTagMap.problem_id).filter(
+                ProblemTagMap.tag_id == tag_id,
+                ProblemTagMap.approved.is_(True),
+            )
+            matching = matching.filter(Problem.id.in_(approved))
         rows = matching.order_by(Problem.id).limit(top_k).all()
         return [_to_problem_record(row) for row in rows]
 

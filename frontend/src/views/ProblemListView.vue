@@ -16,7 +16,7 @@
             style="width: 350px"
         />
         <div class="filter-group">
-          <el-select v-model="typeFilter" clearable placeholder="题目类型" style="width: 140px">
+          <el-select v-model="typeFilter" @change="handleTypeChange" clearable placeholder="题目类型" style="width: 140px">
             <el-option label="ACM" value="acm"/>
             <el-option label="Kaggle" value="kaggle"/>
             <el-option label="OOP" value="oop"/>
@@ -180,13 +180,15 @@ const handleSearch = async () => {
   }
   const version = ++requestVersion
   const query = searchQuery.value
-  const isCurrent = () => !disposed && version === requestVersion && query === searchQuery.value
+  const tag = tagFilter.value
+  const type = typeFilter.value
+  const isCurrent = () => !disposed && version === requestVersion && query === searchQuery.value && tag === tagFilter.value && type === typeFilter.value
   loading.value = true
   try {
-    const data = await searchProblems({
-      query,
-      top_k: 50
-    })
+    const params = { query, top_k: 50 }
+    if (tag) params.tag_id = tag
+    if (type) params.problem_type = type
+    const data = await searchProblems(params)
     if (!isCurrent()) return
     searchResults.value = data
     // 更新总数，使分页组件显示正确的搜索结果数量
@@ -274,7 +276,12 @@ const fetchTags = async () => {
 
 const handleTagChange = () => {
   currentPage.value = 1
-  fetchProblems()
+  if (searchQuery.value) return handleSearch()
+  return fetchProblems()
+}
+
+const handleTypeChange = () => {
+  if (searchQuery.value) return handleSearch()
 }
 
 const handleSizeChange = (val) => {

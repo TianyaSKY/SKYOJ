@@ -15,7 +15,7 @@ class FakeSearchRepository:
         self.unit_of_work = MagicMock()
         self._problems = problems
 
-    def search_problems(self, query: str, top_k: int, *, visible_ids=None):
+    def search_problems(self, query: str, top_k: int, *, visible_ids=None, tag_id=None, problem_type=None):
         return [problem for problem in self._problems if visible_ids is None or problem.id in visible_ids][:top_k]
 
     def add_history(self, user_id: int, query: str) -> None:
@@ -113,3 +113,32 @@ def test_keyword_search_matches_special_characters_literally(db_session, query, 
     results = SearchRepository(db_session).search_problems(query, 10)
 
     assert [item.id for item in results] == [matching.id]
+
+
+def test_search_combines_approved_tag_and_type_before_limit(client, db_session, teacher_token):
+    from app.persistence.problem import Problem
+    from app.persistence.community import ProblemTag, ProblemTagMap
+
+    tag = ProblemTag(slug='search-tag', name='知识点')
+    db_session.add(tag)
+    db_session.flush()
+    problems = [Problem(title='组合搜索', content='正文', type=kind, language='python') for kind in ['acm', 'oop', 'acm', 'acm']]
+    db_session.add_all(problems)
+    db_session.flush()
+    for index in [1, 2, 3]:
+        db_session.add(ProblemTagMap(problem_id=problems[index].id, tag_id=tag.id, approved=index != 2))
+    db_session.commit()
+    tag_id, target_id = tag.id, problems[-1].id
+
+    response = client.get('/api/search', headers={"Authorization": f"Bearer {teacher_token}"}, params={
+        'query': '组合搜索', 'top_k': 1, 'tag_id': tag_id, 'problem_type': 'acm',
+    })
+
+    assert response.status_code == 200
+    assert [item['id'] for item in response.json()] == [target_id]
+
+
+@pytest.mark.parametrize('params', [{'tag_id': 0}, {'problem_type': 'invalid'}])
+def test_search_rejects_invalid_filter_parameters(client, teacher_token, params):
+    response = client.get('/api/search', headers={"Authorization": f"Bearer {teacher_token}"}, params=params)
+    assert response.status_code == 422

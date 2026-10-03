@@ -95,3 +95,30 @@ it('旧标签列表请求不能覆盖新筛选结果', async () => {
   expect(wrapper.vm.filteredProblems).toEqual([{ id: 3 }])
   expect(wrapper.vm.total).toBe(3)
 })
+it('关键词搜索携带当前类型和知识点，筛选变化后重新搜索', async () => {
+  mountPage(); await flushPromises()
+  wrapper.vm.tagFilter = 7
+  wrapper.vm.typeFilter = 'oop'
+  await search('query')
+  expect(searchProblems).toHaveBeenLastCalledWith({ query: 'query', top_k: 50, tag_id: 7, problem_type: 'oop' })
+  wrapper.vm.tagFilter = 8
+  await wrapper.vm.handleTagChange()
+  expect(searchProblems).toHaveBeenLastCalledWith({ query: 'query', top_k: 50, tag_id: 8, problem_type: 'oop' })
+  wrapper.vm.typeFilter = 'acm'
+  await wrapper.vm.handleTypeChange()
+  expect(searchProblems).toHaveBeenLastCalledWith({ query: 'query', top_k: 50, tag_id: 8, problem_type: 'acm' })
+  wrapper.vm.tagFilter = ''; wrapper.vm.typeFilter = ''
+  await wrapper.vm.handleTagChange()
+  expect(searchProblems).toHaveBeenLastCalledWith({ query: 'query', top_k: 50 })
+  expect(getProblemList).toHaveBeenCalledOnce()
+})
+it('旧筛选搜索响应不能覆盖新筛选结果', async () => {
+  const old = deferred()
+  mountPage(); await flushPromises()
+  searchProblems.mockReturnValueOnce(old.promise).mockResolvedValueOnce([{ id: 3, type: 'oop' }])
+  await search('query')
+  wrapper.vm.typeFilter = 'oop'; await wrapper.vm.handleTypeChange()
+  old.resolve([{ id: 2, type: 'acm' }]); await flushPromises()
+  expect(wrapper.vm.searchResults).toEqual([{ id: 3, type: 'oop' }])
+  expect(wrapper.vm.total).toBe(1)
+})

@@ -24,7 +24,8 @@ class SearchFacadeService:
         self._test_case_storage = test_case_storage or ProblemTestCaseStorageClient()
 
     def search(
-        self, user_id: int, query: str, top_k: int, requester_role: str
+        self, user_id: int, query: str, top_k: int, requester_role: str,
+        *, tag_id: int | None = None, problem_type: str | None = None,
     ) -> list[ProblemDetail]:
         if not query:
             return []
@@ -38,5 +39,8 @@ class SearchFacadeService:
             None if requester_role == "teacher"
             else self._test_case_storage.list_problem_ids_with_test_cases()
         )
-        problems = self._repository.search_problems(query, top_k, visible_ids=visible_ids)
+        problems = self._repository.search_problems(
+            query, top_k, visible_ids=visible_ids,
+            tag_id=tag_id, problem_type=problem_type,
+        )
         return [to_problem_result(problem, with_content=True) for problem in problems]
