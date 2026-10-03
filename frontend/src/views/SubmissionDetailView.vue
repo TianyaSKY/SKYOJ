@@ -83,6 +83,7 @@
 <script setup>
 import {computed, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
+import { formatServerDateTime as formatTime } from '@/utils/date'
 import {getSubmissionDetail} from '@/api/problem'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
@@ -145,10 +146,6 @@ const getScoreColor = (percentage) => {
   return '#F56C6C'
 }
 
-const formatTime = (isoString) => {
-  if (!isoString) return ''
-  return new Date(isoString).toLocaleString()
-}
 
 const copyCode = async () => {
   try {

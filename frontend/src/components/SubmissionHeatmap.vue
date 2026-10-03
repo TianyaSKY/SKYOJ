@@ -32,6 +32,7 @@
 
 <script setup>
 import {computed} from 'vue'
+import { parseServerDate } from '@/utils/date'
 
 const props = defineProps({
   submissions: {
@@ -54,12 +55,8 @@ const activity = computed(() => {
   const counts = new Map()
   let total = 0
   for (const submission of props.submissions) {
-    const value = submission.created_at
-    if (typeof value !== 'string' || !value.trim()) continue
-    // 后端无时区时间沿用 UTC 约定，带时区时间保留原有偏移。
-    const timestamp = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`
-    const date = new Date(timestamp)
-    if (Number.isNaN(date.getTime()) || date > now) continue
+    const date = parseServerDate(submission.created_at)
+    if (!date || date > now) continue
     const key = dateKey(date)
     if (key < firstDate || key > lastDate) continue
     counts.set(key, (counts.get(key) || 0) + 1)

@@ -194,6 +194,7 @@
 <script setup>
 import {computed, onBeforeUnmount, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
+import { formatServerDateTime as formatTime, formatServerDate as formatDate } from '@/utils/date'
 import {useUserStore} from '@/stores/user'
 import {useSysStore} from '@/stores/sys'
 import {getUserProfile, getUserSubmissions, uploadAvatar} from '@/api/user'
@@ -250,15 +251,7 @@ const getScoreClass = (score) => {
   return 'text-danger'
 }
 
-const formatTime = (isoString) => {
-  if (!isoString) return ''
-  return new Date(isoString).toLocaleString()
-}
 
-const formatDate = (isoString) => {
-  if (!isoString) return ''
-  return new Date(isoString).toLocaleDateString()
-}
 
 const fetchWrongBook = async (pageNo = wbPage.value) => {
   if (!showWrongBook.value) return

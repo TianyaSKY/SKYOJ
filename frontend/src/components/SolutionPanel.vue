@@ -15,6 +15,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { formatServerDateTime, formatServerDate } from '@/utils/date'
 import { useUserStore } from '@/stores/user'
 import { solutionFormSchema, commentFormSchema } from '@/schemas/community'
 import MarkdownIt from 'markdown-it'
@@ -370,7 +371,7 @@ async function deleteComment (commentId) {
           </div>
           <div class="head-right">
             <span class="meta">@{{ item.author_username }}</span>
-            <span class="meta">{{ new Date(item.created_at).toLocaleDateString() }}</span>
+            <span class="meta">{{ formatServerDate(item.created_at) }}</span>
           </div>
         </div>
         <div class="solution-body markdown-body" v-html="renderMarkdown(item.content)" />
@@ -458,7 +459,7 @@ async function deleteComment (commentId) {
         <div v-for="c in comments" :key="c.id" class="comment-item">
           <div class="comment-meta">
             <span class="username">@{{ c.username }}</span>
-            <span class="time">{{ new Date(c.created_at).toLocaleString() }}</span>
+            <span class="time">{{ formatServerDateTime(c.created_at) }}</span>
             <el-button
               v-if="userInfo.id === c.user_id || isTeacher"
               type="danger"
