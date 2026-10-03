@@ -14,6 +14,7 @@
               :show-file-list="false"
               :http-request="handleAvatarUpload"
               :before-upload="beforeAvatarUpload"
+              :disabled="uploadingAvatar"
           >
             <div class="avatar-edit-overlay">
               <el-icon><Camera /></el-icon>
@@ -186,7 +187,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {useUserStore} from '@/stores/user'
 import {useSysStore} from '@/stores/sys'
@@ -203,6 +204,10 @@ const sysStore = useSysStore()
 const targetUser = ref({})
 const submissions = ref([])
 const loading = ref(false)
+const uploadingAvatar = ref(false)
+let profileVersion = 0
+let disposed = false
+const isCurrentProfile = version => !disposed && version === profileVersion
 const wbItems = ref([])
 const wbStats = ref({ total: 0, unresolved: 0, reviewed: 0, accepted: 0 })
 const wbLoading = ref(false)
@@ -284,55 +289,58 @@ const beforeAvatarUpload = (file) => {
 }
 
 const handleAvatarUpload = async (options) => {
+  if (!isCurrentUser.value || !userStore.user?.id || uploadingAvatar.value) return
+  const version = profileVersion
+  const ownerId = userStore.user.id
+  uploadingAvatar.value = true
   const formData = new FormData()
   formData.append('avatar', options.file)
   try {
     const res = await uploadAvatar(formData)
-    ElMessage.success('Avatar uploaded successfully')
-    // Update local user data
-    const newAvatar = res.avatar
-    targetUser.value.avatar = newAvatar
-    if (isCurrentUser.value) {
-      const updatedUser = { ...userStore.user, avatar: newAvatar }
+    // 头像属于上传时的账户；切换资料页后仍更新该账户缓存。
+    if (userStore.user?.id === ownerId) {
+      const updatedUser = { ...userStore.user, avatar: res.avatar }
       userStore.user = updatedUser
       localStorage.setItem('user', JSON.stringify(updatedUser))
     }
+    if (!isCurrentProfile(version)) return
+    targetUser.value.avatar = res.avatar
+    ElMessage.success('Avatar uploaded successfully')
   } catch (error) {
-    ElMessage.error('Failed to upload avatar')
+    if (isCurrentProfile(version)) ElMessage.error('Failed to upload avatar')
+  } finally {
+    uploadingAvatar.value = false
   }
 }
 
 const fetchData = async () => {
-  if (!isPracticeMode.value && !isTeacher.value) return
-
+  const version = ++profileVersion
+  const id = userId.value
+  const showHistory = isPracticeMode.value || isTeacher.value
+  targetUser.value = id ? {} : { ...userStore.user }
+  submissions.value = []
   loading.value = true
   try {
-    const id = userId.value
     if (id) {
-      // Fetch specific user profile and submissions
       const profile = await getUserProfile(id)
+      if (!isCurrentProfile(version)) return
       targetUser.value = profile
-      const subs = await getUserSubmissions(id)
-      submissions.value = subs
-    } else {
-      // Fetch current user profile and submissions
-      targetUser.value = userStore.user || {}
-      const subs = await getUserSubmissions()
-      submissions.value = subs
     }
+    if (!showHistory) return
+    const subs = await getUserSubmissions(id)
+    if (!isCurrentProfile(version)) return
+    submissions.value = subs
   } catch (error) {
-    ElMessage.error('Failed to load profile data')
+    if (isCurrentProfile(version)) ElMessage.error('Failed to load profile data')
   } finally {
-    loading.value = false
+    if (isCurrentProfile(version)) loading.value = false
   }
 }
 
-watch(() => route.params.id, () => {
-  fetchData()
-})
+watch([userId, () => userStore.user?.id, isPracticeMode, isTeacher], fetchData, { immediate: true })
+onBeforeUnmount(() => { disposed = true; profileVersion += 1 })
 
 onMounted(() => {
-  fetchData()
   fetchWrongBook()
 })
 </script>
