@@ -228,9 +228,7 @@ class SolutionService:
             solution = self._repo.get_solution_by_id(solution_id)
             if solution is None or solution.status == "hidden":
                 raise ResourceNotFoundError("题解不存在")
-            solution.view_count = (solution.view_count or 0) + 1
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+            solution.view_count = self._repo.increment_view_count(solution_id)
             return to_solution_detail(solution, viewer_id=viewer_id)
 
     def list_for_problem(
@@ -251,16 +249,12 @@ class SolutionService:
             existing = self._repo.get_like(solution_id, user_id)
             if existing is None:
                 self._repo.add_like(solution_id, user_id)
-                solution.vote_count = (solution.vote_count or 0) + 1
-                if solution is not None:
-                    solution = self._repo.save_solution(solution)
+                solution.vote_count = self._repo.adjust_vote_count(solution_id, 1)
                 return ToggleLikeResult(
                     solution_id=solution_id, liked=True, vote_count=solution.vote_count
                 )
             self._repo.remove_like(existing)
-            solution.vote_count = max(0, (solution.vote_count or 0) - 1)
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+            solution.vote_count = self._repo.adjust_vote_count(solution_id, -1)
             return ToggleLikeResult(
                 solution_id=solution_id, liked=False, vote_count=solution.vote_count
             )
@@ -273,14 +267,10 @@ class SolutionService:
             existing = self._repo.get_favorite(solution_id, user_id)
             if existing is None:
                 self._repo.add_favorite(solution_id, user_id)
-                solution.favorite_count = (solution.favorite_count or 0) + 1
-                if solution is not None:
-                    solution = self._repo.save_solution(solution)
+                self._repo.adjust_favorite_count(solution_id, 1)
                 return ToggleFavoriteResult(solution_id=solution_id, favorited=True)
             self._repo.remove_favorite(existing)
-            solution.favorite_count = max(0, (solution.favorite_count or 0) - 1)
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+            self._repo.adjust_favorite_count(solution_id, -1)
             return ToggleFavoriteResult(solution_id=solution_id, favorited=False)
 
     # -- 评论 --
@@ -295,9 +285,7 @@ class SolutionService:
                 user_id=params.user_id,
                 content=params.content,
             )
-            solution.comment_count = (solution.comment_count or 0) + 1
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+            self._repo.adjust_comment_count(params.solution_id, 1)
             return to_comment_detail(comment)
 
     def list_comments(
@@ -319,11 +307,10 @@ class SolutionService:
             if requester_id != comment.user_id and requester_role != "teacher":
                 raise PermissionDeniedError("无权删除该评论")
             solution = self._repo.get_solution_by_id(comment.solution_id)
+            if not self._repo.delete_comment(comment):
+                raise ResourceNotFoundError("评论不存在")
             if solution is not None:
-                solution.comment_count = max(0, (solution.comment_count or 0) - 1)
-            self._repo.delete_comment(comment)
-            if solution is not None:
-                solution = self._repo.save_solution(solution)
+                self._repo.adjust_comment_count(comment.solution_id, -1)
 
 
 class TagService:

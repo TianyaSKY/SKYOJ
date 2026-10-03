@@ -18,8 +18,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    case,
 )
-from sqlalchemy.orm import Session, relationship, selectinload
+from sqlalchemy.orm import InstrumentedAttribute, Session, relationship, selectinload
 
 from app.persistence.database import Base
 from app.persistence.user import UserRecord
@@ -313,7 +314,7 @@ class ProblemCommunityRepository:
         self._db = db
 
     def save_solution(self, record: ProblemSolutionRecord) -> ProblemSolutionRecord:
-        """将业务修改写回题解行，事务由服务控制。"""
+        """写回题解内容与状态；交互计数由独立的原子更新维护。"""
         row = self._db.get(ProblemSolution, record.id)
         for attribute in (
             "title",
@@ -321,15 +322,34 @@ class ProblemCommunityRepository:
             "language",
             "is_official",
             "status",
-            "vote_count",
-            "favorite_count",
-            "comment_count",
-            "view_count",
         ):
             setattr(row, attribute, getattr(record, attribute))
         self._db.flush()
         self._db.refresh(row)
         return _to_problem_solution_record(row)
+
+    def _adjust_count(
+        self, solution_id: int, column: InstrumentedAttribute[int], delta: int
+    ) -> int:
+        """在数据库内增减计数，避免用旧快照覆盖并发写入。"""
+        value = column + delta
+        self._db.query(ProblemSolution).filter(ProblemSolution.id == solution_id).update(
+            {column: case((value < 0, 0), else_=value)}, synchronize_session="fetch"
+        )
+        self._db.flush()
+        return self._db.query(column).filter(ProblemSolution.id == solution_id).one()[0]
+
+    def adjust_vote_count(self, solution_id: int, delta: int) -> int:
+        return self._adjust_count(solution_id, ProblemSolution.vote_count, delta)
+
+    def adjust_favorite_count(self, solution_id: int, delta: int) -> int:
+        return self._adjust_count(solution_id, ProblemSolution.favorite_count, delta)
+
+    def adjust_comment_count(self, solution_id: int, delta: int) -> int:
+        return self._adjust_count(solution_id, ProblemSolution.comment_count, delta)
+
+    def increment_view_count(self, solution_id: int) -> int:
+        return self._adjust_count(solution_id, ProblemSolution.view_count, 1)
 
     def save_tag_map(self, record: ProblemTagMapRecord) -> None:
         """更新标签审批状态。"""
@@ -502,9 +522,13 @@ class ProblemCommunityRepository:
         )
         return ([_to_problem_solution_comment_record(row) for row in (rows)], total)
 
-    def delete_comment(self, comment: ProblemSolutionCommentRecord) -> None:
-        self._db.delete(self._db.get(ProblemSolutionComment, comment.id))
+    def delete_comment(self, comment: ProblemSolutionCommentRecord) -> bool:
+        """只有实际删除评论的事务才能扣减计数。"""
+        deleted = self._db.query(ProblemSolutionComment).filter(
+            ProblemSolutionComment.id == comment.id
+        ).delete(synchronize_session="fetch")
         self._db.flush()
+        return deleted == 1
 
     # -- 标签 --
 

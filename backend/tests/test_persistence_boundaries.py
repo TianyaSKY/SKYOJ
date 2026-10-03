@@ -137,7 +137,7 @@ def test_like_and_counter_roll_back_together(
         CreateSolutionParams(sample_problem.id, student_user.id, "题解", "解法")
     )
     monkeypatch.setattr(
-        repo, "save_solution", MagicMock(side_effect=RuntimeError("计数写入失败"))
+        repo, "adjust_vote_count", MagicMock(side_effect=RuntimeError("计数写入失败"))
     )
     with pytest.raises(RuntimeError, match="计数写入失败"):
         service.toggle_like(created.id, student_user.id)
