@@ -116,11 +116,11 @@ jobs:
       CI: true
       E2E_BASE_URL: http://127.0.0.1:4173
       E2E_API_URL: http://127.0.0.1:5015
-      DATABASE_URL: sqlite:///${{ runner.temp }}/skyoj-e2e.sqlite
+      DATABASE_URL: sqlite:////tmp/skyoj-e2e.sqlite
       SECRET_KEY: ci-e2e-secret-key-for-github-actions
       CELERY_BROKER_URL: memory://
       REDIS_URL: ""
-      UPLOAD_FOLDER: ${{ runner.temp }}/skyoj-e2e-uploads
+      UPLOAD_FOLDER: /tmp/skyoj-e2e-uploads
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
