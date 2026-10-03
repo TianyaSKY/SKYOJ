@@ -17,6 +17,7 @@ describe('useSysStore', () => {
     const store = useSysStore()
     expect(store.practice).toBe(true)
     expect(store.warning).toBe(false)
+    expect(store.loaded).toBe(false)
   })
 
   it('获取系统配置并更新文档标题', async () => {
@@ -29,6 +30,7 @@ describe('useSysStore', () => {
     expect(store.practice).toBe(false)
     expect(store.warning).toBe(true)
     expect(store.info).toBe('通知')
+    expect(store.loaded).toBe(true)
   })
 
   it('网络失败时保留当前配置并记录错误', async () => {
@@ -39,6 +41,7 @@ describe('useSysStore', () => {
       const store = useSysStore()
       await store.fetchSysInfo()
       expect(store.practice).toBe(true)
+      expect(store.loaded).toBe(false)
       expect(logged).toHaveBeenCalledWith('Failed to fetch system info:', error)
     } finally {
       logged.mockRestore()

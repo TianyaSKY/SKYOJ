@@ -52,6 +52,27 @@ cd frontend
 E2E_BASE_URL=http://127.0.0.1:4173 npm run test:e2e -- e2e/validation.spec.js --project=chromium --project=chromium-mobile
 ```
 
-原有完整 `frontend/e2e` 套件依赖已运行的全栈、测试账号、题目和考试数据，其中部分 fixture 使用假 token。CI 已移除 `|| true`，这些用例失败会真实导致 job 失败；当前 CI 的预览服务不能替代完整后端环境。完整套件需要补齐环境及 fixture 后才能作为稳定的全栈门禁，不能把单独的表单回归视为全套 E2E 验证。
+CI 为完整 `frontend/e2e` 套件执行 Alembic 迁移，再用 `backend/scripts/seed_e2e.py` 填充专用临时 `skyoj-e2e.sqlite`。脚本拒绝其他数据库和已有用户的数据，不能对业务库运行。Playwright 管理 API（5015）与预览服务（4173），等待健康检查后才开始测试；认证 fixture 使用实际登录接口签发的 token。预览代理通过 `E2E_API_URL` 指向独立 API。考试模式的系统信息按浏览器页面隔离，避免并行修改全局配置互相干扰。
+
+本地复现完整 CI 浏览器套件时，在仓库根目录设置隔离环境（使用全新的临时目录）：
+
+```bash
+E2E_TMP=$(mktemp -d)
+export DATABASE_URL="sqlite:///$E2E_TMP/skyoj-e2e.sqlite"
+export SECRET_KEY=local-e2e-secret-key
+export CELERY_BROKER_URL=memory:// REDIS_URL=''
+export UPLOAD_FOLDER="$E2E_TMP/uploads"
+export E2E_BASE_URL=http://127.0.0.1:4173 E2E_API_URL=http://127.0.0.1:5015
+uv sync --frozen
+uv run alembic -c backend/alembic.ini upgrade head
+uv run python backend/scripts/seed_e2e.py
+cd frontend
+npm ci
+npx playwright install
+npm run build
+CI=true npm run test:e2e
+```
+
+失败会真实导致 CI 失败，并上传报告、截图和 trace。此环境覆盖页面与真实 API、数据库交互；Celery 使用内存 broker，未启动判题执行器或外部 LLM，不代表 Docker 判题全链路验证。部分历史用例的断言仍较弱，需要逐步增强，不能把通过数量等同于完整业务覆盖。
 
 判题执行器和社区/错题本仍保留部分历史 Session 装配方式；本次分层检查针对已整改服务，不代表整个仓库已完成所有架构迁移。

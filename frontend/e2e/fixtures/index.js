@@ -119,6 +119,8 @@ export async function waitForElement(page, selector, timeout = 10000) {
  * @param {import('@playwright/test').Page} page
  */
 export async function clearStorage(page) {
+  // 新建页面为 about:blank，必须先进入应用来源才能访问存储。
+  if (!page.url().startsWith(FRONTEND)) await page.goto(FRONTEND)
   await page.evaluate(() => localStorage.clear())
 }
 
@@ -128,12 +130,18 @@ export async function clearStorage(page) {
  * @param {object} user - 用户信息
  */
 export async function setAuthState(page, user) {
+  const response = await page.request.post(`${FRONTEND}/api/auth/login`, {
+    data: {username: user.username, password: user.password},
+  })
+  if (!response.ok()) throw new Error(`测试用户登录失败：${response.status()} ${await response.text()}`)
+  const auth = await response.json()
+  if (!page.url().startsWith(FRONTEND)) await page.goto(FRONTEND)
   await page.evaluate(
-    (userData) => {
-      localStorage.setItem('token', 'test_token_' + Date.now())
-      localStorage.setItem('user', JSON.stringify(userData))
+    ({token, user}) => {
+      localStorage.setItem('token', token)
+      localStorage.setItem('user', JSON.stringify(user))
     },
-    user
+    auth
   )
 }
 

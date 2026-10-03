@@ -27,5 +27,19 @@ export default defineConfig({
     { name: 'chromium-mobile', use: { ...devices['Pixel 5'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
   ],
-  // CI 由工作流启动预览服务；完整 E2E 使用已部署的全栈地址。
+  // Playwright 等待健康检查通过后运行测试，并在结束时回收两个服务。
+  webServer: process.env.CI ? [
+    {
+      command: 'cd .. && uv run uvicorn --app-dir backend app.main:app --host 127.0.0.1 --port 5015',
+      url: 'http://127.0.0.1:5015/healthz',
+      reuseExistingServer: false,
+      timeout: 60000,
+    },
+    {
+      command: 'npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+      url: 'http://127.0.0.1:4173',
+      reuseExistingServer: false,
+      timeout: 30000,
+    },
+  ] : undefined,
 })

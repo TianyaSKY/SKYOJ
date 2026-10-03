@@ -26,3 +26,7 @@ skyoj.egg-info/
 backend/test_*.db
 backend/*.db
 *.db-journal
+
+# Playwright 本地报告与失败诊断，由 CI 单独上传。
+frontend/test-results/
+frontend/playwright-report/

@@ -22,5 +22,11 @@ export default defineConfig({
                 changeOrigin: true,
             }
         }
-    }
+    },
+    preview: {
+        proxy: {
+            '/api': {target: process.env.E2E_API_URL || 'http://127.0.0.1:5000', changeOrigin: true},
+            '/healthz': {target: process.env.E2E_API_URL || 'http://127.0.0.1:5000', changeOrigin: true},
+        },
+    },
 })

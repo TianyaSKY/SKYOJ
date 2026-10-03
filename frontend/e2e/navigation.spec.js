@@ -24,7 +24,7 @@ test.describe('导航栏', () => {
     await page.waitForTimeout(2000)
 
     // 验证首页链接
-    const homeLink = page.locator('a[href="/"], a[href="/"], [class*="logo"]').first()
+    const homeLink = page.locator('.brand-item').first()
     await expect(homeLink).toBeVisible()
 
     // 验证登录入口（未登录状态）
@@ -62,7 +62,7 @@ test.describe('导航栏', () => {
     await page.waitForTimeout(2000)
 
     // 尝试点击导航链接
-    const navLinks = page.locator('nav a, header a, .navbar a').all()
+    const navLinks = await page.locator('nav a, header a, .navbar a').all()
 
     for (const link of navLinks.slice(0, 3)) {
       if (await link.isVisible()) {
@@ -169,7 +169,7 @@ test.describe('路由跳转', () => {
     await page.waitForTimeout(2000)
 
     // 访问第二个页面
-    await page.goto(`${FRONTEND}/exam`)
+    await page.goto(`${FRONTEND}/profile`)
     await page.waitForTimeout(2000)
 
     // 后退
@@ -180,7 +180,7 @@ test.describe('路由跳转', () => {
     // 前进
     await page.goForward()
     await page.waitForTimeout(2000)
-    await expect(page).toHaveURL(/\/exam/)
+    await expect(page).toHaveURL(/\/profile/)
 
     await clearStorage(page)
   })
@@ -202,16 +202,12 @@ test.describe('路由跳转', () => {
 })
 
 test.describe('404 和错误处理', () => {
-  test('不存在的路由显示友好页面', async ({ page }) => {
+  test('不存在的路由返回首页', async ({ page }) => {
     await page.goto(`${FRONTEND}/this-does-not-exist`)
     await page.waitForTimeout(3000)
 
-    // 验证不是空白页
-    const body = page.locator('body')
-    const content = await body.textContent()
-
-    // 应该显示 404 或返回首页
-    expect(content.length).toBeGreaterThan(100)
+    await expect(page).toHaveURL(`${FRONTEND}/`)
+    await expect(page.locator('main')).toBeVisible()
   })
 
   test('无效的题目ID显示错误', async ({ page }) => {
@@ -230,17 +226,12 @@ test.describe('404 和错误处理', () => {
   })
 
   test('网络错误时显示友好提示', async ({ page }) => {
-    // 使用无效的 baseURL 触发网络错误
     await clearStorage(page)
-
-    // 访问不存在的服务器
-    await page.goto('http://localhost:99999')
-    await page.waitForTimeout(3000)
-
-    // 应该显示连接错误页面
-    const body = page.locator('body')
-    const content = await body.textContent()
-    expect(content.length).toBeGreaterThan(0)
+    await setAuthState(page, testUsers.student)
+    // 阻断应用自己的 API，验证产品的错误提示而非浏览器错误页。
+    await page.route('**/api/problems/**', route => route.abort('failed'))
+    await page.goto(`${FRONTEND}/problems`)
+    await expect(page.locator('.el-message--error').first()).toBeVisible()
   })
 })
 
