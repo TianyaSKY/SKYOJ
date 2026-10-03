@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {computed, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {getSubmissionDetail} from '@/api/problem'
 import {ElMessage} from 'element-plus'
@@ -95,12 +95,13 @@ import {
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
-const submissionId = route.params.id
 const loading = ref(false)
 let timer = null
+let requestVersion = 0
+let disposed = false
 
-const submission = ref({
-  id: submissionId,
+const initialSubmission = (id) => ({
+  id,
   status: 'Loading...',
   score: 0,
   log: '',
@@ -108,6 +109,7 @@ const submission = ref({
   language: 'python',
   created_at: ''
 })
+const submission = ref(initialSubmission(route.params.id))
 
 const isPending = computed(() => {
   const pendingStatuses = ['Pending', 'Judging', 'Compiling', 'Loading...']
@@ -154,9 +156,12 @@ const copyCode = async () => {
 }
 
 const fetchSubmission = async (silent = false) => {
+  const version = ++requestVersion
+  const submissionId = route.params.id
   if (!silent) loading.value = true
   try {
     const data = await getSubmissionDetail(submissionId)
+    if (disposed || version !== requestVersion) return
     submission.value = data
 
     if (isPending.value) {
@@ -165,32 +170,39 @@ const fetchSubmission = async (silent = false) => {
       stopPolling()
     }
   } catch (error) {
+    if (disposed || version !== requestVersion) return
     ElMessage.error('Failed to load submission details')
     stopPolling()
   } finally {
-    if (!silent) loading.value = false
+    if (!silent && !disposed && version === requestVersion) loading.value = false
   }
 }
 
 const startPolling = () => {
-  if (timer) return
-  timer = setInterval(() => {
+  if (disposed || timer !== null) return
+  // 上次查询完成后再等待两秒，避免慢请求产生重叠轮询。
+  timer = setTimeout(() => {
+    timer = null
     fetchSubmission(true)
   }, 2000)
 }
 
 const stopPolling = () => {
-  if (timer) {
-    clearInterval(timer)
+  if (timer !== null) {
+    clearTimeout(timer)
     timer = null
   }
 }
 
-onMounted(() => {
+watch(() => route.params.id, (id) => {
+  stopPolling()
+  submission.value = initialSubmission(id)
   fetchSubmission()
-})
+}, { immediate: true })
 
 onUnmounted(() => {
+  disposed = true
+  requestVersion++
   stopPolling()
 })
 </script>
