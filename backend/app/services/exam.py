@@ -328,7 +328,7 @@ class ExamService:
         now = utcnow()
         if now < exam.start_time:
             raise PermissionDeniedError("考试尚未开始")
-        if now > exam.end_time:
+        if now >= exam.end_time:
             raise PermissionDeniedError("考试已结束")
         if (
             current_exam_id != exam.id

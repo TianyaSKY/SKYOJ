@@ -265,12 +265,12 @@ class SubmissionRepository:
         return _to_problem_record(self._db.get(Problem, problem_id))
 
     def get_active_exam(self, exam_id: int, now: datetime):
-        """查询当前处于开放时间内的考试。"""
+        """查询当前处于开放时间内的考试，开始可用、结束不可用。"""
         from app.persistence.exam import Exam, _to_exam_record
 
         return _to_exam_record(
             self._db.query(Exam)
-            .filter(Exam.id == exam_id, Exam.start_time <= now, Exam.end_time >= now)
+            .filter(Exam.id == exam_id, Exam.start_time <= now, Exam.end_time > now)
             .first()
         )
 

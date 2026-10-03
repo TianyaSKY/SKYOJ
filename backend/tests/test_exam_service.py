@@ -524,3 +524,77 @@ def test_rank_tied_submissions_follow_id_order_with_different_index(seeded):
     alice = next(entry for entry in result.rank if entry.user_id == accepted.user_id)
     assert alice.penalty == 2100
     assert alice.problems[accepted.problem_id].failed_attempts == 1
+
+
+@pytest.mark.parametrize(
+    "offset,allowed",
+    [
+        (timedelta(microseconds=-1), False),
+        (timedelta(), True),
+        (timedelta(hours=1), True),
+        (timedelta(hours=2, microseconds=-1), True),
+        (timedelta(hours=2), False),
+        (timedelta(hours=2, microseconds=1), False),
+    ],
+)
+def test_enter_exam_uses_start_inclusive_end_exclusive_window(seeded, monkeypatch, offset, allowed):
+    from app.core.errors import PermissionDeniedError
+
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + offset)
+    service = seeded["service"]
+    args = ("student", seeded["alice"].id, -1, EnterExamParams(seeded["exam"].id))
+    if allowed:
+        assert service.enter_exam(*args) == seeded["exam"].id
+    else:
+        with pytest.raises(PermissionDeniedError, match="考试尚未开始|考试已结束"):
+            service.enter_exam(*args)
+
+
+@pytest.mark.parametrize("repository_type", ["submission", "debug"])
+@pytest.mark.parametrize(
+    "offset,allowed",
+    [
+        (timedelta(microseconds=-1), False),
+        (timedelta(), True),
+        (timedelta(hours=1), True),
+        (timedelta(hours=2, microseconds=-1), True),
+        (timedelta(hours=2), False),
+        (timedelta(hours=2, microseconds=1), False),
+    ],
+)
+def test_active_exam_repository_time_boundaries(seeded, repository_type, offset, allowed):
+    from app.persistence.submission import DebugRunRepository, SubmissionRepository
+
+    repo_cls = SubmissionRepository if repository_type == "submission" else DebugRunRepository
+    record = repo_cls(seeded["session"]).get_active_exam(seeded["exam"].id, T0 + offset)
+    assert (record is not None) is allowed
+
+
+@pytest.mark.parametrize("operation", ["submission", "debug"])
+@pytest.mark.parametrize("offset", [timedelta(microseconds=-1), timedelta(hours=2), timedelta(hours=2, microseconds=1)])
+def test_closed_exam_rejects_writes_before_creating_or_enqueuing(seeded, monkeypatch, operation, offset):
+    from unittest.mock import MagicMock
+    from app.persistence.submission import DebugRun, DebugRunRepository, SubmissionRepository
+    from app.services.debug import CreateDebugRunParams, DebugService
+    from app.services.submission import SubmitParams, SubmissionService
+
+    session = seeded["session"]
+    jobs = MagicMock()
+    params = dict(user_id=seeded["alice"].id, problem_id=seeded["p1"].id,
+                  language="python", code="print(1)", exam_id=seeded["exam"].id,
+                  session_exam_id=seeded["exam"].id)
+    initial_submissions = session.query(Submission).count()
+    initial_debug_runs = session.query(DebugRun).count()
+    monkeypatch.setattr(f"app.services.{operation}.utcnow", lambda: T0 + offset)
+    if operation == "submission":
+        service = SubmissionService(SubmissionRepository(session), jobs, MagicMock(), uow=UnitOfWork(session))
+        call = lambda: service.submit(SubmitParams(**params), requester_role="student")
+    else:
+        service = DebugService(DebugRunRepository(session), jobs, uow=UnitOfWork(session))
+        call = lambda: service.create(CreateDebugRunParams(**params), requester_role="student")
+    with pytest.raises(InvalidStateError, match="考试未在进行中"):
+        call()
+    assert session.query(Submission).count() == initial_submissions
+    assert session.query(DebugRun).count() == initial_debug_runs
+    jobs.enqueue_judge_submission.assert_not_called()
+    jobs.enqueue_debug_submission.assert_not_called()
