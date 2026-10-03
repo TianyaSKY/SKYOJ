@@ -197,3 +197,44 @@ it('成功收到消息后恢复初始重连等待时间', async () => {
   expect(FakeWebSocket.lastInstance).not.toBe(recovered)
   ws.close()
 })
+
+it('重连通知抛错仍建立连接，并保留原始回调异常', async () => {
+  const { createSubmissionWS } = await import('@/utils/websocket')
+  const error = new Error('reconnect notification failed')
+  const ws = createSubmissionWS(1, 't', { onReconnect: () => { throw error } })
+  ws.connect()
+  const first = FakeWebSocket.lastInstance
+  first.triggerServerClose(1006)
+  await expect(vi.advanceTimersByTimeAsync(1000)).rejects.toBe(error)
+  expect(FakeWebSocket.lastInstance).not.toBe(first)
+  ws.close()
+})
+
+it('构造连接失败时错误回调抛错也不能停止后续重试', async () => {
+  const { createSubmissionWS } = await import('@/utils/websocket')
+  let attempts = 0
+  global.WebSocket = class extends FakeWebSocket {
+    constructor(url) {
+      attempts += 1
+      if (attempts === 1) throw new Error('constructor failed')
+      super(url)
+    }
+  }
+  const error = new Error('error notification failed')
+  const ws = createSubmissionWS(1, 't', { onError: () => { throw error } })
+  expect(() => ws.connect()).toThrow(error)
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(attempts).toBe(2)
+  expect(FakeWebSocket.lastInstance).toBeTruthy()
+  ws.close()
+})
+
+it('重连通知主动关闭时不再建立新连接', async () => {
+  const { createSubmissionWS } = await import('@/utils/websocket')
+  const ws = createSubmissionWS(1, 't', { onReconnect: () => ws.close() })
+  ws.connect()
+  const first = FakeWebSocket.lastInstance
+  first.triggerServerClose(1006)
+  await vi.advanceTimersByTimeAsync(60000)
+  expect(FakeWebSocket.lastInstance).toBe(first)
+})

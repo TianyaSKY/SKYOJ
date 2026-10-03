@@ -60,8 +60,12 @@ export function createSubmissionWS(submissionId, token, {
     reconnectAttempt += 1
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
-      onReconnect?.(reconnectAttempt)
-      connect()
+      try {
+        onReconnect?.(reconnectAttempt)
+      } finally {
+        // 页面通知出错不能中断连接恢复；主动关闭仍由 connect() 的守卫处理。
+        connect()
+      }
     }, delay)
   }
 
@@ -72,8 +76,11 @@ export function createSubmissionWS(submissionId, token, {
     try {
       ws = new WebSocket(url)
     } catch (err) {
-      onError?.(err)
-      scheduleReconnect()
+      try {
+        onError?.(err)
+      } finally {
+        scheduleReconnect()
+      }
       return
     }
     const socket = ws
