@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from loguru import logger
+
 from app.core.errors import ResourceNotFoundError
+from app.core.time import utcnow
 from app.persistence.unit_of_work import UnitOfWork
 from app.persistence.user import WrongBookRepository
 
@@ -74,7 +77,17 @@ class WrongBookService:
         self, user_id: int, problem_id: int, submission_id: int, status: str
     ) -> None:
         """写入判题结果对应的错题状态，由调用方统一提交。"""
-        now = datetime.utcnow()
+        if status != "Accepted" and status not in _WRONG_STATUSES:
+            return
+        if self._repo.has_newer_judged_submission(
+            user_id, problem_id, submission_id, ("Accepted", *sorted(_WRONG_STATUSES))
+        ):
+            logger.info(
+                "已有更新提交的判题结果，跳过旧错题状态更新 user_id={} problem_id={} submission_id={}",
+                user_id, problem_id, submission_id,
+            )
+            return
+        now = utcnow()
         if status == "Accepted":
             self._repo.mark_accepted(user_id, problem_id)
         elif status in _WRONG_STATUSES:

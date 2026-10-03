@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    and_,
     func,
     or_,
 )
@@ -200,6 +201,37 @@ class WrongBookRepository:
     def get_by_id(self, entry_id: int) -> WrongBookRecord | None:
         """查询用于访问控制的错题本快照。"""
         return _to_wrong_book_record(self._db.get(WrongBook, entry_id))
+
+    def has_newer_judged_submission(
+        self,
+        user_id: int,
+        problem_id: int,
+        submission_id: int,
+        relevant_statuses: tuple[str, ...],
+    ) -> bool:
+        """判断是否已有更新的学习结果，避免旧判题任务倒退错题状态。"""
+        from app.persistence.submission import Submission
+
+        current = self._db.get(Submission, submission_id)
+        if current is None:
+            return False
+        return (
+            self._db.query(Submission.id)
+            .filter(
+                Submission.user_id == user_id,
+                Submission.problem_id == problem_id,
+                Submission.status.in_(relevant_statuses),
+                or_(
+                    Submission.created_at > current.created_at,
+                    and_(
+                        Submission.created_at == current.created_at,
+                        Submission.id > submission_id,
+                    ),
+                ),
+            )
+            .first()
+            is not None
+        )
 
     def upsert(
         self,
