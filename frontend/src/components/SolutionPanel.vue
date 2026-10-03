@@ -11,7 +11,7 @@
  * - 不在卡片内嵌评论，只点开抽屉，避免卡片过长。
  * - Markdown 渲染沿用项目通用的 markdown-it（与题目描述一致）。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
@@ -40,12 +40,23 @@ const currentSolution = ref(null)
 const comments = ref([])
 const commentsTotal = ref(0)
 const newComment = ref('')
+let scopeVersion = 0
+let loadVersion = 0
+let commentsVersion = 0
+let commentRequestVersion = 0
+let disposed = false
+const isCurrentScope = version => !disposed && version === scopeVersion
+const isCurrentComments = (scope, version, item) =>
+  isCurrentScope(scope) && version === commentsVersion && commentsDialog.value && currentSolution.value === item
 
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.user || {})
 const isTeacher = computed(() => userInfo.value.role === 'teacher')
 
 async function load () {
+  const scope = scopeVersion
+  const requestId = ++loadVersion
+  const isCurrent = () => isCurrentScope(scope) && requestId === loadVersion
   loading.value = true
   try {
     const resp = await request({
@@ -53,17 +64,42 @@ async function load () {
       method: 'get',
       params: { page: page.value, page_size: pageSize }
     })
+    if (!isCurrent()) return
     solutions.value = resp.items || []
     total.value = resp.total || 0
   } catch (e) {
-    ElMessage.error('加载题解失败：' + (e.message || '未知错误'))
+    if (isCurrent()) ElMessage.error('加载题解失败：' + (e.message || '未知错误'))
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
 
-watch(() => props.problemId, () => { page.value = 1; load() }, { immediate: false })
-onMounted(load)
+watch(() => props.problemId, () => {
+  scopeVersion += 1
+  commentsVersion += 1
+  page.value = 1
+  solutions.value = []
+  total.value = 0
+  writeDialogVisible.value = false
+  editing.value = null
+  form.value = { title: '', content: '', language: '' }
+  commentsDialog.value = false
+  currentSolution.value = null
+  comments.value = []
+  commentsTotal.value = 0
+  newComment.value = ''
+  load()
+}, { immediate: true })
+watch(commentsDialog, visible => {
+  if (!visible) {
+    commentsVersion += 1
+    currentSolution.value = null
+    comments.value = []
+    commentsTotal.value = 0
+    newComment.value = ''
+  }
+})
+onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
 
 function renderMarkdown (text) {
   if (!text) return ''
@@ -79,6 +115,7 @@ function openWrite (item = null) {
 }
 
 async function submitSolution () {
+  const scope = scopeVersion
   const parsed = solutionFormSchema.safeParse(form.value)
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查题解输入')
@@ -91,6 +128,7 @@ async function submitSolution () {
         method: 'put',
         data: parsed.data
       })
+      if (!isCurrentScope(scope)) return
       ElMessage.success('题解已更新')
     } else {
       await request({
@@ -98,108 +136,137 @@ async function submitSolution () {
         method: 'post',
         data: parsed.data
       })
+      if (!isCurrentScope(scope)) return
       ElMessage.success('题解已发布')
     }
     writeDialogVisible.value = false
     load()
   } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    if (isCurrentScope(scope)) ElMessage.error(e.message || '操作失败')
   }
 }
 
 async function toggleLike (item) {
+  const scope = scopeVersion
   try {
     const resp = await request({
       url: `/problems/solutions/${item.id}/like`,
       method: 'post'
     })
+    if (!isCurrentScope(scope)) return
     item.vote_count = resp.vote_count
     item.liked_by_me = resp.liked
   } catch (e) {
-    ElMessage.error(e.message || '点赞失败')
+    if (isCurrentScope(scope)) ElMessage.error(e.message || '点赞失败')
   }
 }
 
 async function toggleFavorite (item) {
+  const scope = scopeVersion
   try {
     const resp = await request({
       url: `/problems/solutions/${item.id}/favorite`,
       method: 'post'
     })
+    if (!isCurrentScope(scope)) return
     item.favorited_by_me = resp.favorited
   } catch (e) {
-    ElMessage.error(e.message || '收藏失败')
+    if (isCurrentScope(scope)) ElMessage.error(e.message || '收藏失败')
   }
 }
 
 async function hideSolution (item) {
+  const scope = scopeVersion
   try {
     await ElMessageBox.confirm('确定要隐藏该题解吗？隐藏后仅你自己与教师可见。', '确认隐藏', { type: 'warning' })
+    if (!isCurrentScope(scope)) return
     await request({ url: `/problems/solutions/${item.id}`, method: 'delete' })
+    if (!isCurrentScope(scope)) return
     ElMessage.success('已隐藏')
     load()
   } catch (e) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
+    if (isCurrentScope(scope) && e !== 'cancel' && e?.message !== 'cancel') {
       ElMessage.error(e.message || '隐藏失败')
     }
   }
 }
 
 async function openComments (item) {
+  commentsVersion += 1
   currentSolution.value = item
+  comments.value = []
+  commentsTotal.value = 0
   commentsDialog.value = true
   newComment.value = ''
   await loadComments()
 }
 
 async function loadComments (pageNo = 1) {
-  if (!currentSolution.value) return
+  const item = currentSolution.value
+  if (!item) return
+  const scope = scopeVersion, version = commentsVersion
+  const requestId = ++commentRequestVersion
+  const isCurrent = () => isCurrentComments(scope, version, item) && requestId === commentRequestVersion
   try {
     const resp = await request({
-      url: `/problems/solutions/${currentSolution.value.id}/comments`,
+      url: `/problems/solutions/${item.id}/comments`,
       method: 'get',
       params: { page: pageNo, page_size: 50 }
     })
+    if (!isCurrent()) return
     comments.value = resp.items || []
     commentsTotal.value = resp.total || 0
   } catch (e) {
-    ElMessage.error(e.message || '加载评论失败')
+    if (isCurrent()) ElMessage.error(e.message || '加载评论失败')
   }
 }
 
 async function submitComment () {
-  const parsed = commentFormSchema.safeParse({content: newComment.value})
+  const item = currentSolution.value
+  if (!item) return
+  const scope = scopeVersion, version = commentsVersion
+  const content = newComment.value
+  const parsed = commentFormSchema.safeParse({content})
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查评论输入')
     return
   }
   try {
     await request({
-      url: `/problems/solutions/${currentSolution.value.id}/comments`,
+      url: `/problems/solutions/${item.id}/comments`,
       method: 'post',
       data: parsed.data
     })
-    newComment.value = ''
-    currentSolution.value.comment_count += 1
+    if (!isCurrentScope(scope)) return
+    item.comment_count += 1
+    if (!isCurrentComments(scope, version, item)) return
+    if (newComment.value === content) newComment.value = ''
     await loadComments()
   } catch (e) {
-    ElMessage.error(e.message || '评论失败')
+    if (isCurrentComments(scope, version, item)) ElMessage.error(e.message || '评论失败')
   }
 }
 
 async function deleteComment (commentId) {
+  const item = currentSolution.value
+  if (!item) return
+  const scope = scopeVersion, version = commentsVersion
   try {
     await ElMessageBox.confirm('删除这条评论？', '确认', { type: 'warning' })
+    if (!isCurrentComments(scope, version, item)) return
     await request({ url: `/problems/comments/${commentId}`, method: 'delete' })
+    if (!isCurrentScope(scope)) return
+    item.comment_count = Math.max(0, item.comment_count - 1)
+    if (!isCurrentComments(scope, version, item)) return
     ElMessage.success('已删除')
-    currentSolution.value.comment_count = Math.max(0, currentSolution.value.comment_count - 1)
     await loadComments()
   } catch (e) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
+    if (isCurrentComments(scope, version, item) && e !== 'cancel' && e?.message !== 'cancel') {
       ElMessage.error(e.message || '删除失败')
     }
   }
 }
+
 </script>
 
 <template>
