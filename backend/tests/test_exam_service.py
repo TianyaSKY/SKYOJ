@@ -388,3 +388,104 @@ def test_disabling_freeze_persists_and_refreshes_rank(seeded, rank_cache):
     assert seeded["repository"].get_by_id(exam_id).freeze_minutes is None
     assert exam_id not in rank_cache
     assert service.rank(exam_id, "teacher", -1).rank[0].penalty == 2100
+
+
+@pytest.mark.parametrize("offset", [5400, 6000, 7200, 7300])
+def test_freeze_preserves_pre_freeze_results_and_penalties(seeded, offset):
+    exam = seeded["exam"]
+    exam.freeze_minutes = 30
+    seeded["session"].commit()
+    result = seeded["service"].rank(
+        exam.id, "teacher", -1, as_of=(T0 + timedelta(seconds=offset)).isoformat()
+    )
+    alice = next(entry for entry in result.rank if entry.user_id == seeded["alice"].id)
+    assert alice.solved == 2
+    assert alice.penalty == 2100
+    assert alice.problems[seeded["p1"].id].failed_attempts == 1
+
+
+def test_freeze_hides_late_acceptance_and_unfreezes_at_exam_end(seeded, rank_cache, monkeypatch):
+    exam = seeded["exam"]
+    exam.freeze_minutes = 30
+    session = seeded["session"]
+    session.add(Submission(
+        user_id=seeded["bob"].id, problem_id=seeded["p1"].id, exam_id=exam.id,
+        status="Accepted", score=100, created_at=T0 + timedelta(seconds=6000),
+    ))
+    session.commit()
+
+    def bob_entry(result):
+        return next(entry for entry in result.rank if entry.user_id == seeded["bob"].id)
+
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + timedelta(seconds=5399))
+    before = bob_entry(seeded["service"].rank(exam.id, "teacher", -1))
+    assert before.solved == 0
+    assert before.problems[seeded["p1"].id].pending_attempts == 0
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + timedelta(seconds=6000))
+    frozen = bob_entry(seeded["service"].rank(exam.id, "teacher", -1))
+    assert frozen.solved == 0
+    assert frozen.problems[seeded["p1"].id].pending_attempts == 1
+    assert frozen.problems[seeded["p1"].id].failed_attempts == 1
+    # 再读缓存也必须保留封榜状态。
+    assert bob_entry(seeded["service"].rank(exam.id, "teacher", -1)) == frozen
+
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + timedelta(seconds=7200))
+    final = bob_entry(seeded["service"].rank(exam.id, "teacher", -1))
+    assert final.solved == 1
+    assert final.penalty == 7200
+    assert final.problems[seeded["p1"].id].pending_attempts == 0
+
+
+def test_future_rank_timestamp_cannot_bypass_current_freeze(seeded, monkeypatch):
+    exam = seeded["exam"]
+    exam.freeze_minutes = 30
+    seeded["session"].add(Submission(
+        user_id=seeded["bob"].id, problem_id=seeded["p1"].id, exam_id=exam.id,
+        status="Accepted", score=100, created_at=T0 + timedelta(seconds=6000),
+    ))
+    seeded["session"].commit()
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + timedelta(seconds=6100))
+    result = seeded["service"].rank(
+        exam.id, "student", exam.id, as_of=(T0 + timedelta(seconds=8000)).isoformat()
+    )
+    bob = next(entry for entry in result.rank if entry.user_id == seeded["bob"].id)
+    assert bob.solved == 0
+
+
+@pytest.mark.parametrize("contest_type,freeze_minutes", [("icpc", 0), ("ioi", 30)])
+def test_freeze_does_not_apply_when_disabled_or_not_icpc(seeded, contest_type, freeze_minutes):
+    exam = seeded["exam"]
+    exam.contest_type, exam.freeze_minutes = contest_type, freeze_minutes
+    seeded["session"].add(Submission(
+        user_id=seeded["bob"].id, problem_id=seeded["p1"].id, exam_id=exam.id,
+        status="Accepted", score=100, created_at=T0 + timedelta(seconds=6000),
+    ))
+    seeded["session"].commit()
+    result = seeded["service"].rank(
+        exam.id, "teacher", -1, as_of=(T0 + timedelta(seconds=6000)).isoformat()
+    )
+    bob = next(entry for entry in result.rank if entry.user_id == seeded["bob"].id)
+    assert bob.problems[seeded["p1"].id].solved is True
+    assert bob.problems[seeded["p1"].id].pending_attempts == 0
+
+
+def test_rank_api_returns_frozen_pending_attempts(seeded, client, teacher_token, monkeypatch):
+    from app.api.deps import get_exam_service
+
+    exam = seeded["exam"]
+    exam.freeze_minutes = 30
+    seeded["session"].add(Submission(
+        user_id=seeded["bob"].id, problem_id=seeded["p1"].id, exam_id=exam.id,
+        status="Accepted", score=100, created_at=T0 + timedelta(seconds=6000),
+    ))
+    seeded["session"].commit()
+    monkeypatch.setattr("app.services.exam.utcnow", lambda: T0 + timedelta(seconds=6100))
+    client.app.dependency_overrides[get_exam_service] = lambda: seeded["service"]
+
+    response = client.get(
+        f"/api/exams/{exam.id}/rank", headers={"Authorization": f"Bearer {teacher_token}"}
+    )
+    assert response.status_code == 200
+    bob = next(entry for entry in response.json()["rank"] if entry["user_id"] == seeded["bob"].id)
+    assert bob["solved"] == 0
+    assert bob["problems"][str(seeded["p1"].id)]["pending_attempts"] == 1

@@ -222,6 +222,7 @@ def get_exam_rank(
                         "solved": item.solved,
                         "failed_attempts": item.failed_attempts,
                         "time": item.time,
+                        "pending_attempts": item.pending_attempts,
                     }
                     for problem_id, item in user.problems.items()
                 },

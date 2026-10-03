@@ -148,6 +148,9 @@
                   <span v-if="getProblemStatus(scope.row, problem.problem_id).solved">
                     {{ formatTime(getProblemStatus(scope.row, problem.problem_id).time) }}
                   </span>
+                  <span v-else-if="getProblemStatus(scope.row, problem.problem_id).pending_attempts > 0">
+                    ? {{ getProblemStatus(scope.row, problem.problem_id).pending_attempts }}
+                  </span>
                   <span v-else-if="getProblemStatus(scope.row, problem.problem_id).failed_attempts > 0">
                     -{{ getProblemStatus(scope.row, problem.problem_id).failed_attempts }}
                   </span>
@@ -279,6 +282,7 @@ const getProblemStatus = (row, problemId) => {
 
 const getStatusClass = (status) => {
   if (status.solved) return 'status-ac'
+  if (status.pending_attempts > 0) return 'status-pending'
   if (status.failed_attempts > 0) return 'status-wa'
   return ''
 }
@@ -622,6 +626,11 @@ onUnmounted(() => clearInterval(refreshTimer))
 .status-wa {
   background-color: #ef4444;
   color: #fff;
+}
+
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .solved-count {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 from app.clients.redis_client import redis_client
@@ -170,6 +170,7 @@ class RankProblemStats:
     solved: bool
     failed_attempts: int
     time: int
+    pending_attempts: int = 0
 
 
 @dataclass(frozen=True)
@@ -217,6 +218,7 @@ class RankResult:
                             "solved": stats.solved,
                             "failed_attempts": stats.failed_attempts,
                             "time": stats.time,
+                            "pending_attempts": stats.pending_attempts,
                         }
                         for pid, stats in e.problems.items()
                     },
@@ -244,6 +246,7 @@ class RankResult:
                             solved=stats["solved"],
                             failed_attempts=stats["failed_attempts"],
                             time=stats["time"],
+                            pending_attempts=stats.get("pending_attempts", 0),
                         )
                         for pid, stats in e.get("problems", {}).items()
                     },
@@ -470,29 +473,19 @@ class ExamService:
           例如 as_of=exam.end_time - freeze_minutes 即可看到封榜前的最后一刻。
           不传时按当前时间计算（实况排行榜）。
         - exam.freeze_minutes: ICPC 比赛结束前 N 分钟封榜。
-          封榜期间所有未 Accepted 提交在 scoreboard 上显示为 '?'。
+          封榜期间隐藏封榜后未解决题目的提交结果，结束后自动解封。
         """
 
         exam = self._require_exam(exam_id)
         self._assert_exam_discoverable(requester_role, exam, session_exam_id)
         if self._should_hide_problems(requester_role, exam, session_exam_id):
             raise PermissionDeniedError("请先进入考试")
-        if as_of is None:
-            cached = get_rank_cache(exam_id)
-            if cached is not None:
-                return RankResult.from_dict(cached)
-
-        problems = self._repository.list_problems(exam_id)
-        problem_ids = [item.problem_id for item in problems]
-
         # as_of 决定截断时间：排行榜只统计 as_of 之前的提交。
-        now = datetime.utcnow()
+        now = utcnow()
         view_time = now
         if as_of is not None:
             try:
-                view_time = datetime.fromisoformat(as_of)
-                if view_time.tzinfo is not None:
-                    view_time = view_time.astimezone(UTC).replace(tzinfo=None)
+                view_time = min(to_utc_naive(datetime.fromisoformat(as_of)), now)
             except (TypeError, ValueError):
                 logger.warning(
                     "排行榜回溯时间无效，使用当前时间 exam_id={} as_of={}",
@@ -500,12 +493,21 @@ class ExamService:
                     as_of,
                 )
                 view_time = now
-        # freeze_minutes: 如果当前视口时间 > (end_time - freeze_minutes)，
-        # 则视为处于封榜期，failed_attempts 不计入 scoreboard。
-        freeze_end = None
-        if exam.freeze_minutes is not None:
-            freeze_end = exam.end_time - timedelta(minutes=exam.freeze_minutes)
-        in_freeze = freeze_end is not None and view_time >= freeze_end
+        freeze_start = None
+        if exam.contest_type == "icpc" and exam.freeze_minutes:
+            freeze_start = max(
+                exam.start_time, exam.end_time - timedelta(minutes=exam.freeze_minutes)
+            )
+        in_freeze = freeze_start is not None and freeze_start <= view_time < exam.end_time
+        # 跨越封榜和解封时刻，不能复用上一阶段的缓存。
+        cache_phase = "frozen" if in_freeze else "open"
+        if as_of is None:
+            cached = get_rank_cache(exam_id)
+            if cached is not None and cached.get("_freeze_phase") == cache_phase:
+                return RankResult.from_dict(cached)
+
+        problems = self._repository.list_problems(exam_id)
+        problem_ids = [item.problem_id for item in problems]
 
         ranks: dict[int, RankEntry] = {}
         # 过滤只取 view_time 之前的提交。
@@ -525,11 +527,16 @@ class ExamService:
             stats = entry.problems.get(submission.problem_id)
             if stats is None or stats.solved:
                 continue
+            if in_freeze and submission.created_at >= freeze_start:
+                entry.problems[submission.problem_id] = RankProblemStats(
+                    False, stats.failed_attempts, 0, stats.pending_attempts + 1
+                )
+                continue
             if submission.status == "Accepted":
                 elapsed = int((submission.created_at - exam.start_time).total_seconds())
                 entry.problems[submission.problem_id] = RankProblemStats(
                     True,
-                    stats.failed_attempts if not in_freeze else 0,
+                    stats.failed_attempts,
                     elapsed,
                 )
                 ranks[submission.user_id] = RankEntry(
@@ -538,15 +545,13 @@ class ExamService:
                     entry.solved + 1,
                     entry.penalty
                     + elapsed
-                    + (stats.failed_attempts if not in_freeze else 0) * 1200,
+                    + stats.failed_attempts * 1200,
                     entry.problems,
                 )
             elif submission.status not in {"Pending", "Compile Error"}:
                 entry.problems[submission.problem_id] = RankProblemStats(
                     False,
-                    stats.failed_attempts + 1
-                    if not in_freeze
-                    else stats.failed_attempts,
+                    stats.failed_attempts + 1,
                     0,
                 )
 
@@ -556,7 +561,9 @@ class ExamService:
             sorted(ranks.values(), key=lambda item: (-item.solved, item.penalty)),
         )
         if as_of is None:
-            set_rank_cache(exam_id, result.to_dict())
+            payload = result.to_dict()
+            payload["_freeze_phase"] = cache_phase
+            set_rank_cache(exam_id, payload)
         return result
 
     def score_rows(
