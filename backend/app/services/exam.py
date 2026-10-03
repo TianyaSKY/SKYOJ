@@ -382,12 +382,14 @@ class ExamService:
             exam.password = self._hash_password(params.password)
         self._repository.update(exam)
         self._uow.commit()
+        invalidate_rank_cache(exam_id)
         return to_exam_detail(exam, self._repository.list_problems(exam_id))
 
     def delete_exam(self, requester_role: str, exam_id: int) -> None:
         self._require_teacher(requester_role)
         self._repository.delete(self._require_exam(exam_id))
         self._uow.commit()
+        invalidate_rank_cache(exam_id)
 
     def add_problem(
         self, requester_role: str, exam_id: int, params: AddExamProblemParams
@@ -398,6 +400,7 @@ class ExamService:
             exam_id, params.problem_id, params.display_id, params.score
         )
         self._uow.commit()
+        invalidate_rank_cache(exam_id)
 
     def remove_problem(
         self, requester_role: str, exam_id: int, problem_id: int
@@ -408,6 +411,7 @@ class ExamService:
             raise ResourceNotFoundError("考试题目不存在")
         self._repository.delete_exam_problem(item)
         self._uow.commit()
+        invalidate_rank_cache(exam_id)
 
     def monitor(self, requester_role: str, exam_id: int) -> MonitorResult:
         self._require_teacher(requester_role)

@@ -199,7 +199,7 @@ class ExamRepository:
         return _to_submission_record(
             self._db.query(Submission)
             .filter_by(exam_id=exam_id, user_id=user_id, problem_id=problem_id)
-            .order_by(Submission.created_at.desc())
+            .order_by(Submission.created_at.desc(), Submission.id.desc())
             .first()
         )
 
@@ -242,7 +242,7 @@ class ExamRepository:
         user_ids: list[int] | None = None,
         problem_ids: list[int] | None = None,
     ) -> dict[tuple[int, int], SubmissionRecord]:
-        """一次查询拉全量提交，按 created_at 降序，返回每个 (user_id, problem_id) 的最新提交。"""
+        """按时间和 ID 降序，返回每个 (user_id, problem_id) 的最新提交。"""
         from app.persistence.submission import Submission, _to_submission_record
 
         query = self._db.query(Submission).filter(Submission.exam_id == exam_id)
@@ -251,7 +251,9 @@ class ExamRepository:
         if problem_ids is not None:
             query = query.filter(Submission.problem_id.in_(problem_ids))
         result: dict[tuple[int, int], Submission] = {}
-        for submission in query.order_by(Submission.created_at.desc()).all():
+        for submission in query.order_by(
+            Submission.created_at.desc(), Submission.id.desc()
+        ).all():
             result.setdefault((submission.user_id, submission.problem_id), submission)
         return {key: _to_submission_record(row) for key, row in (result).items()}
 

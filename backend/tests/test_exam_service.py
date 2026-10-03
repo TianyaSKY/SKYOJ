@@ -10,7 +10,7 @@ from app.persistence.problem import Problem
 from app.persistence.submission import Submission
 from app.persistence.unit_of_work import UnitOfWork
 from app.persistence.user import User
-from app.services.exam import ExamService
+from app.services.exam import AddExamProblemParams, ExamService, UpdateExamParams
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -191,3 +191,105 @@ def test_list_exams_uses_batch_counts(seeded):
     assert len(items) == 1
     assert items[0].problem_count == 2
     assert items[0].submission_count == 4
+
+
+@pytest.fixture()
+def rank_cache(monkeypatch):
+    """用内存缓存验证业务写入后不会继续返回旧排行榜。"""
+    cache = {}
+    monkeypatch.setattr("app.services.exam.get_rank_cache", cache.get)
+    monkeypatch.setattr("app.services.exam.set_rank_cache", cache.__setitem__)
+    monkeypatch.setattr(
+        "app.services.exam.invalidate_rank_cache", lambda exam_id: cache.pop(exam_id, None)
+    )
+    return cache
+
+
+def test_update_exam_refreshes_cached_rank(seeded, rank_cache):
+    service, exam_id = seeded["service"], seeded["exam"].id
+    service.rank(exam_id, "teacher", -1)
+
+    service.update_exam("teacher", exam_id, UpdateExamParams(title="新考试标题"))
+
+    assert service.rank(exam_id, "teacher", -1).exam_title == "新考试标题"
+
+
+def test_remove_problem_refreshes_cached_rank(seeded, rank_cache):
+    service, exam_id = seeded["service"], seeded["exam"].id
+    service.rank(exam_id, "teacher", -1)
+
+    service.remove_problem("teacher", exam_id, seeded["p2"].id)
+
+    result = service.rank(exam_id, "teacher", -1)
+    assert [item.problem_id for item in result.problems] == [seeded["p1"].id]
+    assert result.rank[0].solved == 1
+    assert result.rank[0].penalty == 1500
+
+
+def test_add_problem_refreshes_cached_rank(seeded, rank_cache):
+    service, exam_id = seeded["service"], seeded["exam"].id
+    service.remove_problem("teacher", exam_id, seeded["p2"].id)
+    service.rank(exam_id, "teacher", -1)
+
+    service.add_problem(
+        "teacher", exam_id, AddExamProblemParams(seeded["p2"].id, "B", 100)
+    )
+
+    result = service.rank(exam_id, "teacher", -1)
+    assert len(result.problems) == 2
+    assert result.rank[0].solved == 2
+    assert result.rank[0].penalty == 2100
+
+
+def test_delete_exam_invalidates_cached_rank(seeded, rank_cache):
+    service, exam_id = seeded["service"], seeded["exam"].id
+    service.rank(exam_id, "teacher", -1)
+    assert exam_id in rank_cache
+
+    service.delete_exam("teacher", exam_id)
+
+    assert exam_id not in rank_cache
+
+
+def test_failed_exam_update_preserves_rank_cache(seeded, rank_cache, monkeypatch):
+    service, exam_id = seeded["service"], seeded["exam"].id
+    service.rank(exam_id, "teacher", -1)
+
+    def fail_commit():
+        raise RuntimeError("提交失败")
+
+    monkeypatch.setattr(service._uow, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="提交失败"):
+        service.update_exam("teacher", exam_id, UpdateExamParams(title="新考试标题"))
+
+    assert rank_cache[exam_id]["exam_title"] == "期中考试"
+
+
+def test_latest_submission_breaks_timestamp_ties_by_id(seeded):
+    """同一时间戳的后续提交必须覆盖旧提交，状态与成绩导出保持一致。"""
+    session = seeded["session"]
+    old = seeded["ac1"]
+    newer = Submission(
+        user_id=old.user_id,
+        problem_id=old.problem_id,
+        exam_id=old.exam_id,
+        status="Wrong Answer",
+        score=0,
+        created_at=old.created_at,
+    )
+    session.add(newer)
+    session.commit()
+
+    repository = seeded["repository"]
+    latest = repository.list_latest_submissions(old.exam_id)
+    assert latest[(old.user_id, old.problem_id)].id == newer.id
+    assert (
+        repository.get_latest_submission(old.exam_id, old.user_id, old.problem_id).id
+        == newer.id
+    )
+
+    statuses = seeded["service"].get_status(old.user_id, old.exam_id)
+    assert statuses[0].status == "Wrong Answer"
+    _, rows = seeded["service"].score_rows("teacher", old.exam_id)
+    alice_row = next(row for row in rows if row.user_id == old.user_id)
+    assert alice_row.scores == [0.0, 100.0]
