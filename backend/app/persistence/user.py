@@ -183,6 +183,9 @@ class UserRepository:
             _to_submission_record(row)
             for row in (
                 self._db.query(Submission)
+                .options(
+                    selectinload(Submission.user), selectinload(Submission.problem)
+                )
                 .filter_by(user_id=user_id)
                 .order_by(Submission.created_at.desc(), Submission.id.desc())
                 .all()
