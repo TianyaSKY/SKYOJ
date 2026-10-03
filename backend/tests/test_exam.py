@@ -5,6 +5,42 @@ import datetime
 import pytest
 
 
+@pytest.mark.parametrize(
+    "patch,expected",
+    [
+        ({"freeze_minutes": None}, None),
+        ({"title": "更名"}, 30),
+        ({"freeze_minutes": 0}, 0),
+        ({"freeze_minutes": 15}, 15),
+    ],
+)
+def test_exam_update_distinguishes_omitted_and_cleared_freeze(
+    client, teacher_token, patch, expected
+):
+    """封榜可明确清空，省略字段保留原值；响应与后续读取必须一致。"""
+    headers = {"Authorization": f"Bearer {teacher_token}"}
+    created = client.post(
+        "/api/exams/",
+        headers=headers,
+        json={
+            "title": "封榜考试",
+            "start_time": "2026-01-01T09:00:00",
+            "end_time": "2026-01-01T11:00:00",
+            "freeze_minutes": 30,
+        },
+    )
+    assert created.status_code == 201
+    exam_id = created.json()["id"]
+
+    response = client.put(f"/api/exams/{exam_id}", headers=headers, json=patch)
+
+    assert response.status_code == 200
+    assert response.json()["freeze_minutes"] == expected
+    detail = client.get(f"/api/exams/{exam_id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["freeze_minutes"] == expected
+
+
 def test_exam_api_normalizes_timezone_and_accepts_partial_updates(client, teacher_token):
     """带时区的请求和无时区的数据库时间使用同一 UTC 时间轴。"""
     headers = {"Authorization": f"Bearer {teacher_token}"}

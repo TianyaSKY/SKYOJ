@@ -47,6 +47,7 @@ class UpdateExamParams:
     freeze_minutes: Optional[int] = None
     password: Optional[str] = None
     is_visible: Optional[bool] = None
+    clear_freeze_minutes: bool = False
 
 
 @dataclass(frozen=True)
@@ -382,6 +383,8 @@ class ExamService:
         ):
             if value is not None:
                 setattr(exam, field, value)
+        if params.clear_freeze_minutes:
+            exam.freeze_minutes = None
         if params.password is not None:
             exam.password = self._hash_password(params.password)
         self._repository.update(exam)

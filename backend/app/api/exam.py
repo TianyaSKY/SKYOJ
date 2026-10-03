@@ -250,6 +250,9 @@ def update_exam(
             freeze_minutes=body.freeze_minutes,
             password=body.password,
             is_visible=body.is_visible,
+            clear_freeze_minutes=(
+                "freeze_minutes" in body.model_fields_set and body.freeze_minutes is None
+            ),
         ),
     )
     return _exam_response(exam)

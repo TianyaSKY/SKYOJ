@@ -371,3 +371,20 @@ def test_timezone_update_rejects_equal_or_reversed_times_without_persisting(seed
     stored = seeded["repository"].get_by_id(exam_id)
     assert stored.start_time == T0
     assert stored.end_time == T0 + timedelta(hours=2)
+
+
+def test_disabling_freeze_persists_and_refreshes_rank(seeded, rank_cache):
+    """关闭封榜后，既清空持久化设置，也立即重算已有缓存中的罚时。"""
+    service, exam_id = seeded["service"], seeded["exam"].id
+    service.update_exam("teacher", exam_id, UpdateExamParams(freeze_minutes=30))
+    service.rank(exam_id, "teacher", -1)
+    assert exam_id in rank_cache
+
+    updated = service.update_exam(
+        "teacher", exam_id, UpdateExamParams(clear_freeze_minutes=True)
+    )
+
+    assert updated.freeze_minutes is None
+    assert seeded["repository"].get_by_id(exam_id).freeze_minutes is None
+    assert exam_id not in rank_cache
+    assert service.rank(exam_id, "teacher", -1).rank[0].penalty == 2100

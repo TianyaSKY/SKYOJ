@@ -30,4 +30,13 @@ describe('HTTP 请求校验契约', () => {
     }
     expect(updateExamSchema.safeParse({title: '更名'}).success).toBe(true)
   })
+  it('考试更新保留明确清空封榜与省略字段的区别', () => {
+    expect(updateExamSchema.parse({freeze_minutes: null})).toEqual({freeze_minutes: null})
+    expect(updateExamSchema.parse({title: '更名'})).not.toHaveProperty('freeze_minutes')
+    expect(updateExamSchema.parse({title: '更名'})).toEqual({title: '更名'})
+    expect(updateExamSchema.parse({freeze_minutes: 0})).toEqual({freeze_minutes: 0})
+    expect(createExamSchema.parse(exam)).toMatchObject({
+      description: '', contest_type: 'icpc', is_visible: false,
+    })
+  })
 })

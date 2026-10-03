@@ -7,17 +7,21 @@ const datetime = z.string().refine(value =>
 )
 const fields = z.object({
   title: z.string().min(1, '请输入考试标题').max(100, '标题最多 100 个字符'),
-  description: z.string().default(''),
+  description: z.string(),
   start_time: datetime,
   end_time: datetime,
-  contest_type: z.enum(['icpc', 'ioi']).default('icpc'),
+  contest_type: z.enum(['icpc', 'ioi']),
   freeze_minutes: z.number().int().nonnegative().nullable().optional(),
   password: z.string().nullable().optional(),
-  is_visible: z.boolean().default(false),
+  is_visible: z.boolean(),
 })
 const timesValid = value => !value.start_time || !value.end_time ||
   Date.parse(value.start_time) < Date.parse(value.end_time)
-export const createExamSchema = fields.refine(timesValid, {
+export const createExamSchema = fields.extend({
+  description: fields.shape.description.default(''),
+  contest_type: fields.shape.contest_type.default('icpc'),
+  is_visible: fields.shape.is_visible.default(false),
+}).refine(timesValid, {
   message: '考试开始时间必须早于结束时间', path: ['end_time'],
 })
 export const updateExamSchema = fields.partial().refine(timesValid, {
