@@ -17,10 +17,10 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from loguru import logger
-from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.auth_context import AuthContext, get_current_auth
+from app.api.validation import is_json_content_type, parse_json_code_body, validate_code_body
 from app.api.deps import get_submission_service
 from app.api.schemas.submission import (
     PaginatedSubmissionsResponse,
@@ -174,11 +174,8 @@ async def submit_code(
     lang = language
     pid = problem_id
 
-    if "application/json" in content_type:
-        try:
-            body = SubmitCodeBody.model_validate(await request.json())
-        except ValidationError as exc:
-            raise HTTPException(status_code=422, detail=exc.errors()) from exc
+    if is_json_content_type(content_type):
+        body = await parse_json_code_body(request, SubmitCodeBody)
         pid = body.problem_id
         user_code = body.code
         lang = body.language
@@ -207,17 +204,15 @@ async def submit_code(
     except (ValueError, TypeError):
         exam_id_val = -1
 
-    try:
-        validated = SubmitCodeBody.model_validate(
-            {
-                "problem_id": pid,
-                "code": user_code,
-                "language": lang or "",
-                "exam_id": exam_id_val,
-            }
-        )
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+    validated = validate_code_body(
+        SubmitCodeBody,
+        {
+            "problem_id": pid,
+            "code": user_code,
+            "language": lang or "",
+            "exam_id": exam_id_val,
+        },
+    )
 
     result = service.submit(
         SubmitParams(

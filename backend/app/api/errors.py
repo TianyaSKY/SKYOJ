@@ -1,6 +1,8 @@
 """统一业务异常与 HTTP 错误响应。"""
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.error_codes import (
@@ -29,6 +31,16 @@ def register_exception_handlers(application: FastAPI) -> None:
         """构造统一的错误响应体：``{"code": ..., "error": ..., ...}``。"""
         payload = {"code": code, **fields}
         return payload
+
+    @application.exception_handler(RequestValidationError)
+    async def request_validation_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """保留结构化字段错误，并统一提供可供客户端判断的错误码。"""
+        return JSONResponse(
+            status_code=422,
+            content=_envelope(422, status_to_code(422), detail=jsonable_encoder(exc.errors())),
+        )
 
     @application.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
