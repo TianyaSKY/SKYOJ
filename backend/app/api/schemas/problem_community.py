@@ -3,20 +3,30 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
+
+
+def _require_nonblank(value: str) -> str:
+    """拒绝纯空白文本，保留 Markdown 缩进和用户原文。"""
+    if not value.strip():
+        raise ValueError("文本不能为空或仅包含空白")
+    return value
+
+
+NonBlankText = Annotated[str, AfterValidator(_require_nonblank)]
 
 
 class CreateSolutionRequest(BaseModel):
-    title: str = Field(..., min_length=2, max_length=200)
-    content: str = Field(..., min_length=1, max_length=20000)
+    title: NonBlankText = Field(..., min_length=2, max_length=200)
+    content: NonBlankText = Field(..., min_length=1, max_length=20000)
     language: Optional[str] = Field(None, max_length=50)
 
 
 class UpdateSolutionRequest(BaseModel):
-    title: Optional[str] = Field(None, min_length=2, max_length=200)
-    content: Optional[str] = Field(None, min_length=1, max_length=20000)
+    title: Optional[NonBlankText] = Field(None, min_length=2, max_length=200)
+    content: Optional[NonBlankText] = Field(None, min_length=1, max_length=20000)
     language: Optional[str] = Field(None, max_length=50)
     is_official: Optional[bool] = None
 
@@ -92,7 +102,7 @@ class CommentListResponse(BaseModel):
 
 
 class CreateCommentRequest(BaseModel):
-    content: str = Field(..., min_length=1, max_length=1000)
+    content: NonBlankText = Field(..., min_length=1, max_length=1000)
 
 
 # --- 标签 ---

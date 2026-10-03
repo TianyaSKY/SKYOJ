@@ -12,7 +12,7 @@ vi.mock('element-plus', () => ({
 import request from '@/utils/request'
 import TagPanel from '../TagPanel.vue'
 import SolutionPanel from '../SolutionPanel.vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 const originalAdapter = request.defaults.adapter
@@ -30,6 +30,7 @@ const mountOptions = {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
   localStorage.clear()
   setActivePinia(createPinia())
   urls = []
@@ -203,5 +204,40 @@ describe('社区组件的 API 请求路径', () => {
     wrapper.vm.openAttach()
     await flushPromises()
     expect(wrapper.find('el-checkbox-stub').exists()).toBe(false)
+  })
+
+  it.each([
+    ['短标题', {title: '一'}], ['长标题', {title: 'x'.repeat(201)}],
+    ['空白正文', {content: '  \n  '}], ['长正文', {content: 'x'.repeat(20001)}],
+    ['长语言字段', {language: 'x'.repeat(51)}],
+  ])('题解无效字段在发请求前被拦截：%s', async (label, patch) => {
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    wrapper.vm.form = {title: '题解', content: '正文', language: '', ...patch}
+    await wrapper.vm.submitSolution()
+    expect(writes).toEqual([])
+    expect(ElMessage.warning).toHaveBeenCalled()
+  })
+
+  it('题解长度边界有效，Markdown 缩进不会被校验删除', async () => {
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    const content = '    ' + 'x'.repeat(19995) + '\n'
+    wrapper.vm.form = {title: 'x'.repeat(200), content, language: 'x'.repeat(50)}
+    await wrapper.vm.submitSolution()
+    expect(writes).toHaveLength(1)
+    expect(writes[0].content).toBe(content)
+    expect(ElMessage.warning).not.toHaveBeenCalled()
+  })
+
+  it('超长评论不发请求并保留输入', async () => {
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    await wrapper.vm.openComments({id: 7, comment_count: 0})
+    wrapper.vm.newComment = 'x'.repeat(1001)
+    await wrapper.vm.submitComment()
+    expect(writes).toEqual([])
+    expect(wrapper.vm.newComment).toHaveLength(1001)
+    expect(ElMessage.warning).toHaveBeenCalled()
   })
 })

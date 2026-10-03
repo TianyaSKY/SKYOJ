@@ -16,6 +16,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { useUserStore } from '@/stores/user'
+import { solutionFormSchema, commentFormSchema } from '@/schemas/community'
 import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
@@ -78,8 +79,9 @@ function openWrite (item = null) {
 }
 
 async function submitSolution () {
-  if (!form.value.title.trim() || !form.value.content.trim()) {
-    ElMessage.warning('标题和正文不能为空')
+  const parsed = solutionFormSchema.safeParse(form.value)
+  if (!parsed.success) {
+    ElMessage.warning(parsed.error.issues[0]?.message || '请检查题解输入')
     return
   }
   try {
@@ -87,14 +89,14 @@ async function submitSolution () {
       await request({
         url: `/problems/solutions/${editing.value.id}`,
         method: 'put',
-        data: form.value
+        data: parsed.data
       })
       ElMessage.success('题解已更新')
     } else {
       await request({
         url: `/problems/${props.problemId}/solutions`,
         method: 'post',
-        data: form.value
+        data: parsed.data
       })
       ElMessage.success('题解已发布')
     }
@@ -166,13 +168,16 @@ async function loadComments (pageNo = 1) {
 }
 
 async function submitComment () {
-  const text = newComment.value.trim()
-  if (!text) return
+  const parsed = commentFormSchema.safeParse({content: newComment.value})
+  if (!parsed.success) {
+    ElMessage.warning(parsed.error.issues[0]?.message || '请检查评论输入')
+    return
+  }
   try {
     await request({
       url: `/problems/solutions/${currentSolution.value.id}/comments`,
       method: 'post',
-      data: { content: text }
+      data: parsed.data
     })
     newComment.value = ''
     currentSolution.value.comment_count += 1

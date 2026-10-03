@@ -1,6 +1,7 @@
 """社区访问控制回归：隐藏评论与标签审批权限。"""
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -16,6 +17,7 @@ from app.services.community import (
     SolutionService,
     TagService,
 )
+from app.api.schemas.problem_community import CreateSolutionRequest, UpdateSolutionRequest
 
 
 @pytest.fixture
@@ -172,3 +174,46 @@ def test_public_problem_tags_follow_teacher_approval(client, db_session, sample_
 
     service.attach(AttachTagParams(problem_id, tag.id, False, "teacher"))
     assert client.get(path).json() == []
+
+
+@pytest.mark.parametrize("field", ["title", "content"])
+def test_solution_api_rejects_whitespace_only_text(
+    client, db_session, student_token, sample_problem, field
+):
+    body = {"title": "题解", "content": "正文"}
+    body[field] = "  \n  "
+    response = client.post(
+        f"/api/problems/{sample_problem.id}/solutions",
+        headers={"Authorization": f"Bearer {student_token}"}, json=body,
+    )
+    assert response.status_code == 422
+
+
+def test_comment_api_rejects_whitespace_only_text(
+    client, db_session, student_token, student_user, sample_problem
+):
+    repository = ProblemCommunityRepository(db_session)
+    service = SolutionService(repository, uow=UnitOfWork(db_session))
+    solution = service.create(
+        CreateSolutionParams(sample_problem.id, student_user.id, "题解", "正文")
+    )
+    response = client.post(
+        f"/api/problems/solutions/{solution.id}/comments",
+        headers={"Authorization": f"Bearer {student_token}"}, json={"content": "  \n  "},
+    )
+    assert response.status_code == 422
+    assert repository.get_solution_by_id(solution.id).comment_count == 0
+
+
+@pytest.mark.parametrize("field", ["title", "content"])
+def test_solution_update_rejects_whitespace_only_text(field):
+    with pytest.raises(ValidationError):
+        UpdateSolutionRequest.model_validate({field: "  \n  "})
+
+
+def test_solution_validation_preserves_markdown_and_optional_updates():
+    content = "    " + "x" * 19995 + "\n"
+    created = CreateSolutionRequest(title="x" * 200, content=content, language="x" * 50)
+    assert created.content == content
+    assert UpdateSolutionRequest(content=content).content == content
+    assert UpdateSolutionRequest(title=None, content=None).content is None
