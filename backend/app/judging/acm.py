@@ -72,7 +72,8 @@ def _prepare_and_run_case(
             return case_name, "passed", None
         return case_name, "wrong_answer", None
     except Exception as exc:
-        return case_name, "runtime_error", str(exc)
+        logger.exception("ACM 测试容器执行失败 case_name={}", case_name)
+        return case_name, "system_error", str(exc)
     finally:
         if runner:
             try:
@@ -386,7 +387,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
 
     test_case_dir = f"uploads/problems/{problem_id}"
     if not os.path.exists(test_case_dir):
-        return "Runtime Error", 0, "System Error: Test cases missing", []
+        return "System Error", 0, "System Error: Test cases missing", []
 
     in_files = sorted(
         [name for name in os.listdir(test_case_dir) if name.endswith(".in")],
@@ -394,7 +395,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
     )
     total_cases = len(in_files)
     if total_cases == 0:
-        return "Runtime Error", 0, "System Error: No .in files found", []
+        return "System Error", 0, "System Error: No .in files found", []
 
     case_payloads = []
     for in_file in in_files:
@@ -438,10 +439,12 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             for case_name, input_data, expected_output in case_payloads
         ]
     except Exception as exc:
-        return "Runtime Error", 0, str(exc), []
+        logger.exception("ACM 测试点执行失败 problem_id={}", problem_id)
+        return "System Error", 0, str(exc), []
 
     passed_count = 0
     has_compile_error = False
+    has_system_error = False
     has_tle = False
     has_re = False
     logs = []
@@ -451,6 +454,19 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             passed_count += 1
             logs.append(f"Test Case {case_name}: Passed")
             case_results.append({"case_name": case_name, "status": "passed"})
+        elif result_type == "system_error":
+            has_system_error = True
+            logs.append(
+                f"Test Case {case_name}: System Error"
+                + (f"\n{detail}" if detail else "")
+            )
+            case_results.append(
+                {
+                    "case_name": case_name,
+                    "status": "system_error",
+                    "error_output": str(detail) if detail else None,
+                }
+            )
         elif result_type == "compile_error":
             has_compile_error = True
             logs.append(
@@ -486,7 +502,10 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             case_results.append({"case_name": case_name, "status": "wrong_answer"})
 
     final_score = (passed_count / total_cases) * 100
-    if has_compile_error:
+    if has_system_error:
+        final_status = "System Error"
+        final_score = 0
+    elif has_compile_error:
         final_status = "Compile Error"
         final_score = 0
     elif has_tle:

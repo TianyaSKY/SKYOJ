@@ -193,6 +193,20 @@ def test_rank_keeps_ac_and_penalty_semantics(seeded):
     assert bob_entry.problems[seeded["p1"].id].failed_attempts == 1
 
 
+@pytest.mark.parametrize('status', ['System Error', 'Pending', 'Compile Error'])
+def test_rank_does_not_penalize_infrastructure_or_unfinished_results(seeded, status):
+    session = seeded['session']
+    session.add(Submission(
+        user_id=seeded['alice'].id, problem_id=seeded['p1'].id, exam_id=seeded['exam'].id,
+        status=status, score=0, created_at=T0 + timedelta(seconds=200),
+    ))
+    session.commit()
+    result = seeded['service'].rank(seeded['exam'].id, 'teacher', -1)
+    alice = next(entry for entry in result.rank if entry.user_id == seeded['alice'].id)
+    assert alice.penalty == 2100
+    assert alice.problems[seeded['p1'].id].failed_attempts == 1
+
+
 def test_list_exams_uses_batch_counts(seeded):
     items = seeded["service"].list_exams("teacher")
 

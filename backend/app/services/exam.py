@@ -548,7 +548,7 @@ class ExamService:
                     + stats.failed_attempts * 1200,
                     entry.problems,
                 )
-            elif submission.status not in {"Pending", "Compile Error"}:
+            elif submission.status not in {"Pending", "Compile Error", "System Error"}:
                 entry.problems[submission.problem_id] = RankProblemStats(
                     False,
                     stats.failed_attempts + 1,

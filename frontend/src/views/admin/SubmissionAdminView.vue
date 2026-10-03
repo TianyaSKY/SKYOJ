@@ -33,6 +33,7 @@
             <el-option label="Memory Limit Exceeded" value="Memory Limit Exceeded" />
             <el-option label="Runtime Error" value="Runtime Error" />
             <el-option label="Compile Error" value="Compile Error" />
+            <el-option label="System Error" value="System Error" />
             <el-option label="Pending" value="Pending" />
             <el-option label="Judging" value="Judging" />
           </el-select>
@@ -234,6 +235,7 @@ const getStatusType = (status) => {
     'Pending': 'info',
     'Judging': 'warning',
     'Compile Error': 'info',
+    'System Error': 'danger',
     'Runtime Error': 'danger',
     'Time Limit Exceeded': 'warning',
     'Memory Limit Exceeded': 'warning'

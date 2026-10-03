@@ -41,14 +41,14 @@ function deferred() {
 }
 
 describe('提交管理的筛选恢复与请求顺序', () => {
-  it('编译失败筛选使用判题后端的 Compile Error 状态', async () => {
+  it.each(['Compile Error', 'System Error'])('错误筛选使用后端状态 %s', async (status) => {
     mountPage(true)
-    const option = wrapper.find('el-option-stub[value="Compile Error"]')
+    const option = wrapper.find(`el-option-stub[value="${status}"]`)
     expect(option.exists()).toBe(true)
     wrapper.vm.filterForm.status = option.attributes('value')
     wrapper.vm.handleFilter()
     await flushPromises()
-    expect(getSubmissions).toHaveBeenLastCalledWith({ status: 'Compile Error', page: 1, per_page: 20 })
+    expect(getSubmissions).toHaveBeenLastCalledWith({ status, page: 1, per_page: 20 })
   })
 
   it('恢复旧版编译失败缓存时转换为后端状态', async () => {

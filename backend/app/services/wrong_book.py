@@ -51,7 +51,6 @@ _WRONG_STATUSES = {
     "Wrong Answer",
     "Time Limit Exceeded",
     "Runtime Error",
-    "System Error",
 }
 
 

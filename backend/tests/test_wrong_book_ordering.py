@@ -38,7 +38,7 @@ def test_older_judge_result_cannot_reverse_newer_result(
         assert after[0].submission_id == newer.id
 
 
-@pytest.mark.parametrize('newer_status', ['Pending', 'Judging', 'Compile Error'])
+@pytest.mark.parametrize('newer_status', ['Pending', 'Judging', 'Compile Error', 'System Error'])
 def test_newer_attempt_without_learning_result_does_not_block_wrong_book(
     db_session, student_user, sample_problem, newer_status
 ):
@@ -54,6 +54,15 @@ def test_newer_attempt_without_learning_result_does_not_block_wrong_book(
     assert total == 1
     assert items[0].submission_id == older.id
     assert not items[0].accepted
+
+
+def test_system_error_does_not_create_wrong_book_entry(db_session, student_user, sample_problem):
+    attempt = Submission(user_id=student_user.id, problem_id=sample_problem.id, status='System Error')
+    db_session.add(attempt)
+    db_session.commit()
+    service = WrongBookService(WrongBookRepository(db_session), uow=UnitOfWork(db_session))
+    service.on_judge_complete(student_user.id, sample_problem.id, attempt.id, 'System Error')
+    assert service.list_for_user(student_user.id) == ([], 0)
 
 
 @pytest.mark.parametrize('newer_status', ['Accepted', 'Wrong Answer'])
