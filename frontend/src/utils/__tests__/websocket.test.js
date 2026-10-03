@@ -155,3 +155,45 @@ describe('websocket 自动重连', () => {
     ws.close()
   })
 })
+
+it('握手成功后立即断线仍按指数退避，并保持 30 秒上限', async () => {
+  const { createSubmissionWS } = await import('@/utils/websocket')
+  const onReconnect = vi.fn()
+  const ws = createSubmissionWS(1, 't', { onReconnect })
+  ws.connect()
+  for (const delay of [1000, 2000, 4000, 8000, 16000, 30000, 30000]) {
+    const current = FakeWebSocket.lastInstance
+    current.readyState = 1
+    current.onopen?.()
+    current.triggerServerClose(1006)
+    const attempts = onReconnect.mock.calls.length
+    await vi.advanceTimersByTimeAsync(delay - 1)
+    expect(onReconnect).toHaveBeenCalledTimes(attempts)
+    expect(FakeWebSocket.lastInstance).toBe(current)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(onReconnect).toHaveBeenCalledTimes(attempts + 1)
+    expect(FakeWebSocket.lastInstance).not.toBe(current)
+  }
+  ws.close()
+})
+
+it('成功收到消息后恢复初始重连等待时间', async () => {
+  const { createSubmissionWS } = await import('@/utils/websocket')
+  const onReconnect = vi.fn(), onMessage = vi.fn()
+  const ws = createSubmissionWS(1, 't', { onReconnect, onMessage })
+  ws.connect()
+  FakeWebSocket.lastInstance.triggerServerClose(1006)
+  await vi.advanceTimersByTimeAsync(1000)
+  FakeWebSocket.lastInstance.triggerServerClose(1006)
+  await vi.advanceTimersByTimeAsync(2000)
+  const recovered = FakeWebSocket.lastInstance
+  recovered.onmessage({ data: '{"status":"Accepted","score":100}' })
+  expect(onMessage).toHaveBeenCalledOnce()
+  recovered.triggerServerClose(1006)
+  await vi.advanceTimersByTimeAsync(999)
+  expect(onReconnect).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(1)
+  expect(onReconnect).toHaveBeenLastCalledWith(1)
+  expect(FakeWebSocket.lastInstance).not.toBe(recovered)
+  ws.close()
+})

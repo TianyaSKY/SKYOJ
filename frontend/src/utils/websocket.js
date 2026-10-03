@@ -78,14 +78,10 @@ export function createSubmissionWS(submissionId, token, {
     }
     const socket = ws
 
-    socket.onopen = () => {
-      if (closed || ws !== socket) return
-      // 连接建立：成功拿到一次消息就重置重连计数，下次提交走干净的连接。
-      reconnectAttempt = 0
-    }
-
     socket.onmessage = (event) => {
       if (closed || ws !== socket) return
+      // 握手成功仍可能立即掉线；收到消息后才视为恢复，重置退避计数。
+      reconnectAttempt = 0
       let data = event.data
       try {
         data = JSON.parse(event.data)
