@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional, Protocol
 
 from app.clients.submission_storage_client import SubmissionStorageClient
-from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.core.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
 from app.core.time import utcnow
 from app.judging.acm import SingleCaseResult
 from app.persistence.submission import DebugRunRecord, DebugRunRepository
@@ -26,6 +26,7 @@ class CreateDebugRunParams:
     language: str
     code: str
     exam_id: Optional[int] = None
+    session_exam_id: int = -1
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,12 @@ class DebugService:
             raise ResourceNotFoundError("仅 ACM 类型题目支持调试运行")
         validate_submission_language(problem, params.language)
 
-        exam_id = self._resolve_exam_id(params.exam_id)
+        exam_id = self._resolve_exam_id(params.exam_id, params.session_exam_id)
+        if (
+            exam_id is not None
+            and self._repo.get_exam_problem(exam_id, params.problem_id) is None
+        ):
+            raise PermissionDeniedError("该题目不属于当前考试")
         code = params.code
         if self._storage_client is not None and getattr(
             params, "is_file_upload", False
@@ -136,11 +142,19 @@ class DebugService:
             raise
         return DebugRunResult(debug_run_id=row.id, status="Pending", exam_id=exam_id)
 
-    def _resolve_exam_id(self, exam_id: int | None) -> int | None:
-        if exam_id is None or exam_id == -1:
+    def _resolve_exam_id(self, exam_id: int | None, session_exam_id: int) -> int | None:
+        if session_exam_id != -1:
+            if exam_id not in (None, -1, session_exam_id):
+                raise PermissionDeniedError("未进入该考试，无法调试")
+            exam_id = session_exam_id
+        elif exam_id is None or exam_id == -1:
             return None
+        else:
+            raise PermissionDeniedError("未进入该考试，无法调试")
         exam = self._repo.get_active_exam(exam_id, utcnow())
-        return exam.id if exam is not None else None
+        if exam is None:
+            raise InvalidStateError("考试未在进行中")
+        return exam.id
 
     def get_debug_run(
         self, debug_run_id: int, requester_id: int, requester_role: str

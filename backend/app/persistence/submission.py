@@ -527,6 +527,10 @@ class DebugRunRepository:
             SubmissionRepository(self._db).get_active_exam(exam_id, now)
         )
 
+    def get_exam_problem(self, exam_id: int, problem_id: int):
+        """查询调试题目是否属于当前考试。"""
+        return SubmissionRepository(self._db).get_exam_problem(exam_id, problem_id)
+
 
 class PlagiarismRepository:
     def __init__(self, db: Session) -> None:

@@ -85,6 +85,7 @@ async def submit_debug(
             language=validated.language,
             code=validated.code,
             exam_id=validated.exam_id,
+            session_exam_id=auth.exam_id,
         ),
         requester_role=auth.user.role,
     )
