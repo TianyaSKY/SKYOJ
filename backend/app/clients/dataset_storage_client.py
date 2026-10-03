@@ -2,15 +2,15 @@
 
 import hashlib
 import os
+import uuid
 from pathlib import Path
 from typing import BinaryIO
-import uuid
 
 from loguru import logger
 
 from app.core.config import UPLOAD_FOLDER
 from app.core.errors import InvalidStateError
-from app.utils.files import secure_filename
+from app.core.files import secure_filename
 
 
 class DatasetStorageClient:
@@ -28,7 +28,9 @@ class DatasetStorageClient:
             with open(file_path, "wb") as file:
                 file.write(content)
         except OSError:
-            logger.exception("保存数据集文件失败，数据集 ID：{}，路径：{}", dataset_id, file_path)
+            logger.exception(
+                "保存数据集文件失败，数据集 ID：{}，路径：{}", dataset_id, file_path
+            )
             raise
 
     def stage_upload(
@@ -90,7 +92,9 @@ class DatasetStorageClient:
             Path(file_path).parent.mkdir(parents=True, exist_ok=True)
             os.replace(temporary_path, file_path)
         except OSError:
-            logger.exception("数据集文件落盘失败，数据集 ID：{}，路径：{}", dataset_id, file_path)
+            logger.exception(
+                "数据集文件落盘失败，数据集 ID：{}，路径：{}", dataset_id, file_path
+            )
             raise
         return total_size, digest.hexdigest()
 
@@ -120,7 +124,9 @@ class DatasetStorageClient:
         try:
             os.remove(file_path)
         except OSError:
-            logger.exception("删除数据集文件失败，数据集 ID：{}，路径：{}", dataset_id, file_path)
+            logger.exception(
+                "删除数据集文件失败，数据集 ID：{}，路径：{}", dataset_id, file_path
+            )
             raise
 
     @staticmethod

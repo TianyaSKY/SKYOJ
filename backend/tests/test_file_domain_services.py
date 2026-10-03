@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
-from app.services.problem import UploadTestCasesParams
-from app.services.dataset import DatasetRecord, DatasetService, UploadDatasetParams
-from app.services.problem import ProblemService
+from app.persistence.dataset import DatasetRecord
+from app.services.dataset import DatasetService, UploadDatasetParams
+from app.services.problem import ProblemService, UploadTestCasesParams
 
 
 class FakeDatasetRepository:
@@ -71,7 +71,7 @@ def test_dataset_service_checks_role_and_submits_file_job() -> None:
     repository = FakeDatasetRepository()
     storage = FakeDatasetStorage()
     task = FakeFileJobService()
-    service = DatasetService(repository, storage, task)
+    service = DatasetService(repository, storage, task, uow=MagicMock())
 
     with pytest.raises(PermissionDeniedError):
         service.upload_dataset(
@@ -140,7 +140,9 @@ class FakeTestCaseStorage:
 
 
 def test_problem_test_case_operations_require_teacher_and_problem() -> None:
-    service = ProblemService(FakeProblemRepository(), FakeTestCaseStorage())
+    service = ProblemService(
+        FakeProblemRepository(), FakeTestCaseStorage(), uow=MagicMock()
+    )
 
     with pytest.raises(PermissionDeniedError):
         service.upload_test_cases(

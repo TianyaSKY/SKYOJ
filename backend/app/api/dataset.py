@@ -1,15 +1,9 @@
 from typing import Optional
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    Query,
-    UploadFile,
-)
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_dataset_service
 from app.api.schemas.common import MessageResponse
 from app.api.schemas.dataset import (
@@ -18,7 +12,6 @@ from app.api.schemas.dataset import (
     UploadDatasetResponse,
 )
 from app.services.dataset import DatasetService, PaginatedDatasets, UploadDatasetParams
-from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 

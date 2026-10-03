@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from pydantic import JsonValue
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_ai_draft_service, get_llm_facade_service
 from app.api.schemas.ai_draft import (
     ApplyDraftResponse,
@@ -24,14 +25,12 @@ from app.api.schemas.ai_draft import (
 )
 from app.api.schemas.common import MessageResponse
 from app.services.ai_draft import (
+    AiDraftService,
     SubmitProblemGenerationParams,
     SubmitTestDataExecutionParams,
     SubmitTestScriptGenerationParams,
 )
-from app.services.llm import AskLlmParams
-from app.services.ai_draft import AiDraftService
-from app.services.llm import LlmFacadeService
-from app.utils.auth_tools import AuthContext, get_current_auth
+from app.services.llm import AskLlmParams, LlmFacadeService
 
 router = APIRouter()
 

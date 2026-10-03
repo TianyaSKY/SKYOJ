@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, Path, Query
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_plagiarism_service
 from app.api.schemas.plagiarism import (
     PlagiarismListResponse,
@@ -9,7 +10,6 @@ from app.api.schemas.plagiarism import (
     PlagiarismScanResponse,
 )
 from app.services.plagiarism import PlagiarismService
-from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 

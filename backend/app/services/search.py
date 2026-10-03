@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from loguru import logger
-
-
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
-from app.persistence.problem import to_problem_result
+from app.persistence.unit_of_work import UnitOfWork
 from app.persistence.user import SearchRepository
-from app.services.problem import ProblemDetail
+from app.services.problem import ProblemDetail, to_problem_result
+from loguru import logger
 
 
 class SearchFacadeService:
@@ -18,7 +16,10 @@ class SearchFacadeService:
         self,
         repository: SearchRepository,
         test_case_storage: ProblemTestCaseStorageClient | None = None,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._repository = repository
         self._test_case_storage = test_case_storage or ProblemTestCaseStorageClient()
 
@@ -29,9 +30,9 @@ class SearchFacadeService:
             return []
         try:
             self._repository.add_history(user_id, query)
-            self._repository.unit_of_work.commit()
+            self._uow.commit()
         except Exception:
-            self._repository.unit_of_work.rollback()
+            self._uow.rollback()
             logger.exception("保存搜索历史失败，用户 ID：{}", user_id)
         problems = self._repository.search_problems(query, top_k)
         if requester_role != "teacher":

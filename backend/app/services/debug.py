@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from app.core.errors import PermissionDeniedError, ResourceNotFoundError
-from app.core.time import utcnow
 from dataclasses import dataclass
 from datetime import datetime
-from loguru import logger
 from typing import Optional, Protocol
+
+from app.clients.submission_storage_client import SubmissionStorageClient
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.core.time import utcnow
+from app.judging.acm import SingleCaseResult
+from app.persistence.submission import DebugRunRecord, DebugRunRepository
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.async_job import AsyncJobService
+from loguru import logger
 
 
 @dataclass(frozen=True)
@@ -67,34 +73,6 @@ _STATUS_MAP = {
 }
 
 
-@dataclass
-class DebugRunRecord:
-    """DebugRun 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    user_id: int
-    problem_id: int
-    exam_id: int | None
-    language: str
-    code_content: str
-    status: str
-    case_name: str | None
-    input: str | None
-    expected_output: str | None
-    actual_output: str | None
-    error_output: str | None
-    time_used_ms: int | None
-    memory_used_kb: int | None
-    created_at: datetime
-    finished_at: datetime | None
-
-
-from app.clients.submission_storage_client import SubmissionStorageClient
-from app.persistence.submission import DebugRunRepository, to_debug_run_detail
-from app.services.acm import SingleCaseResult
-from app.services.async_job import AsyncJobService
-
-
 class DebugService:
     """ACM 调试运行编排：创建运行、异步判题并落库、查询运行结果。"""
 
@@ -104,7 +82,10 @@ class DebugService:
         job_service: AsyncJobService | None,
         storage_client: SubmissionStorageClient | None = None,
         case_runner: DebugCaseRunner | None = None,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._repo = debug_run_repository
         self._job_service = job_service
         self._storage_client = storage_client
@@ -139,15 +120,18 @@ class DebugService:
                 params.user_id, params.problem_id, params.filename, params.file_content
             )
 
-        row = self._repo.create(
-            user_id=params.user_id,
-            problem_id=params.problem_id,
-            exam_id=exam_id,
-            language=params.language,
-            code=code,
-        )
-        self._repo.unit_of_work.commit()
-        self._job_service.enqueue_debug_submission(row.id)
+        try:
+            row = self._repo.create(
+                user_id=params.user_id,
+                problem_id=params.problem_id,
+                exam_id=exam_id,
+                language=params.language,
+                code=code,
+            )
+            self._job_service.enqueue_debug_submission(row.id)
+        except Exception:
+            self._uow.rollback()
+            raise
         return DebugRunResult(debug_run_id=row.id, status="Pending", exam_id=exam_id)
 
     def _resolve_exam_id(self, exam_id: int | None) -> int | None:
@@ -195,13 +179,35 @@ class DebugService:
                 actual_output=result.actual_output or "",
                 error_output=result.error_output or "",
             )
-            self._repo.unit_of_work.commit()
+            self._uow.commit()
         except Exception as exc:
-            self._repo.unit_of_work.rollback()
+            self._uow.rollback()
             logger.exception("调试运行业务执行异常 debug_run_id={}", debug_run_id)
             self._repo.finish(
                 debug_run_id,
                 status="System Error",
                 error_output=str(exc),
             )
-            self._repo.unit_of_work.commit()
+            self._uow.commit()
+
+
+def to_debug_run_detail(row: DebugRunRecord) -> DebugRunDetail:
+    """调试运行 快照 → 详情。"""
+
+    return DebugRunDetail(
+        id=row.id,
+        status=row.status,
+        language=row.language,
+        case_name=row.case_name,
+        input=row.input,
+        expected_output=row.expected_output,
+        actual_output=row.actual_output,
+        error_output=row.error_output,
+        time_used_ms=row.time_used_ms,
+        memory_used_kb=row.memory_used_kb,
+        created_at=row.created_at,
+        finished_at=row.finished_at,
+        problem_id=row.problem_id,
+        user_id=row.user_id,
+        exam_id=row.exam_id,
+    )

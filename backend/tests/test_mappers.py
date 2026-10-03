@@ -3,26 +3,41 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+from app.api.auth_context import get_current_auth
+from app.core.auth_tokens import encode_auth_token
+from app.persistence.database import Base
+from app.persistence.user import User
+from app.services.ai_draft import to_ai_draft_result
+from app.services.async_job import AsyncJobResult, to_async_job_result
+from app.services.auth import AuthUserInfo
+from app.services.dataset import (
+    DatasetDetail,
+    DatasetListItem,
+    to_dataset_detail,
+    to_dataset_list_item,
+)
+from app.services.exam import (
+    ExamDetail,
+    ExamListItem,
+    to_exam_detail,
+    to_exam_list_item,
+)
+from app.services.problem import ProblemListItem, to_problem_result
+from app.services.submission import (
+    SubmissionDetail,
+    SubmissionListItem,
+    to_submission_detail,
+    to_submission_list_item,
+)
+from app.services.user import (
+    UserProfile,
+    UserSubmissionItem,
+    to_user_profile,
+    to_user_submission_item,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app.persistence.database import Base
-from app.services.auth import AuthUserInfo
-from app.services.async_job import AsyncJobResult
-from app.services.dataset import DatasetDetail, DatasetListItem
-from app.services.exam import ExamDetail, ExamListItem
-from app.services.problem import ProblemDetail, ProblemListItem
-from app.services.submission import SubmissionDetail, SubmissionListItem
-from app.services.user import UserProfile, UserSubmissionItem
-from app.persistence.jobs import to_ai_draft_result, to_async_job_result
-from app.persistence.exam import to_exam_detail, to_exam_list_item
-from app.persistence.problem import to_problem_result
-from app.persistence.submission import to_submission_detail, to_submission_list_item
-from app.persistence.user import to_user_profile, to_user_submission_item
-from app.persistence.dataset import to_dataset_detail, to_dataset_list_item
-from app.persistence.user import User
-from app.utils.auth_tools import encode_auth_token, get_current_auth
 
 NOW = datetime(2026, 1, 1, 9, 0, 0)
 
@@ -143,7 +158,7 @@ def test_to_dataset_list_item_list_and_detail():
         file_path="uploads/datasets/iris.csv",
         file_size="2.00 KB",
         uploader_id=1,
-        uploader=SimpleNamespace(username="alice"),
+        uploader="alice",
         created_at=NOW,
         status="ready",
     )
@@ -180,6 +195,7 @@ def test_to_exam_list_item_counts_and_password():
     assert item.submission_count == 5
     assert item.has_password is True
 
+
 def test_to_exam_detail_problems_with_titles():
     exam = SimpleNamespace(
         id=1,
@@ -194,8 +210,18 @@ def test_to_exam_detail_problems_with_titles():
         password=None,
     )
     problems = [
-        SimpleNamespace(problem_id=1, display_id="A", score=100, problem=SimpleNamespace(title="求和")),
-        SimpleNamespace(problem_id=2, display_id="B", score=50, problem=SimpleNamespace(title="排序")),
+        SimpleNamespace(
+            problem_id=1,
+            display_id="A",
+            score=100,
+            problem=SimpleNamespace(title="求和"),
+        ),
+        SimpleNamespace(
+            problem_id=2,
+            display_id="B",
+            score=50,
+            problem=SimpleNamespace(title="排序"),
+        ),
     ]
 
     detail = to_exam_detail(exam, problems)

@@ -5,10 +5,10 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.core.errors import PermissionDeniedError
-from app.persistence.submission import Submission
-from app.persistence.submission import SubmissionRepository
-from app.services.submission import SubmissionService
 from app.core.time import utcnow
+from app.persistence.submission import Submission, SubmissionRepository
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.submission import SubmissionService
 
 
 def test_analytics_aggregates_counts_without_loading_source_rows(
@@ -34,7 +34,9 @@ def test_analytics_aggregates_counts_without_loading_source_rows(
         ]
     )
     db_session.flush()
-    service = SubmissionService(SubmissionRepository(db_session), MagicMock())
+    service = SubmissionService(
+        SubmissionRepository(db_session), MagicMock(), uow=UnitOfWork(db_session)
+    )
     result = service.get_platform_analytics("teacher")
     assert (result.total_submissions, result.total_accepted, result.total_problems) == (
         2,
@@ -53,7 +55,7 @@ def test_analytics_aggregates_counts_without_loading_source_rows(
 
 def test_analytics_empty_database(db_session):
     result = SubmissionService(
-        SubmissionRepository(db_session), MagicMock()
+        SubmissionRepository(db_session), MagicMock(), uow=UnitOfWork(db_session)
     ).get_platform_analytics("teacher")
     assert result.total_submissions == 0
     assert result.global_pass_rate == 0

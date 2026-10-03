@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
 from sqlalchemy import (
     Boolean,
     Column,
@@ -19,17 +20,41 @@ from sqlalchemy import (
     or_,
 )
 from sqlalchemy.orm import Session, relationship, selectinload
-from typing import Optional, TYPE_CHECKING
+
+from app.persistence.database import Base
+from app.persistence.problem import ProblemRecord
+
+
+@dataclass
+class UserRecord:
+    """User 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    username: str
+    password_hash: str
+    role: str | None
+    avatar: str | None
+
+
+@dataclass
+class WrongBookRecord:
+    """WrongBook 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    problem_id: int
+    first_wrong_at: datetime
+    latest_wrong_at: datetime
+    submission_id: int | None
+    accepted: bool
+    reviewed: bool
+    created_at: datetime
+    updated_at: datetime
+    problem: ProblemRecord | None
 
 
 if TYPE_CHECKING:
-    from app.services.user import UserRecord
-    from app.services.submission import SubmissionRecord
-    from app.services.wrong_book import WrongBookRecord
-
-
-if TYPE_CHECKING:
-    from app.services.user import UserProfile, UserSubmissionItem
+    from app.persistence.submission import SubmissionRecord
 
 
 class User(Base):
@@ -119,7 +144,6 @@ class UserRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_by_username(self, username: str) -> Optional[UserRecord]:
         """按用户名查询用户。"""
@@ -153,9 +177,7 @@ class UserRepository:
 
     def list_submissions(self, user_id: int) -> list[SubmissionRecord]:
         """按创建时间倒序查询用户的提交记录。"""
-        from app.persistence.submission import _to_submission_record
-
-        from app.persistence.submission import Submission
+        from app.persistence.submission import Submission, _to_submission_record
 
         return [
             _to_submission_record(row)
@@ -171,7 +193,6 @@ class UserRepository:
 class WrongBookRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, entry_id: int) -> WrongBookRecord | None:
         """查询用于访问控制的错题本快照。"""
@@ -278,12 +299,10 @@ class SearchRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def search_problems(self, query: str, top_k: int):
 
-        from app.persistence.problem import _to_problem_record
-        from app.persistence.problem import Problem
+        from app.persistence.problem import Problem, _to_problem_record
 
         return [
             _to_problem_record(row)
@@ -305,39 +324,8 @@ class SearchRepository:
         self._db.flush()
 
 
-def to_user_profile(user) -> UserProfile:
-    """用户 ORM → 公开资料。"""
-
-    from app.services.user import UserProfile
-
-    return UserProfile(
-        id=user.id,
-        username=user.username,
-        role=user.role,
-        avatar=user.avatar,
-    )
-
-
-def to_user_submission_item(submission) -> UserSubmissionItem:
-    """提交 ORM → 用户提交项（problem_title 取 submission.problem.title，调用方须预取）。"""
-
-    from app.services.user import UserSubmissionItem
-
-    return UserSubmissionItem(
-        id=submission.id,
-        problem_id=submission.problem_id,
-        problem_title=submission.problem.title if submission.problem else "Unknown",
-        status=submission.status,
-        score=submission.score,
-        language=submission.language,
-        created_at=submission.created_at,
-        exam_id=submission.exam_id,
-    )
-
-
 def _to_user_record(row: User | None) -> UserRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.user import UserRecord
 
     if row is None or isinstance(row, UserRecord):
         return row
@@ -352,7 +340,6 @@ def _to_user_record(row: User | None) -> UserRecord | None:
 
 def _to_wrong_book_record(row: WrongBook | None) -> WrongBookRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.wrong_book import WrongBookRecord
     from app.persistence.problem import _to_problem_record
 
     if row is None or isinstance(row, WrongBookRecord):

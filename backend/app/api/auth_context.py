@@ -1,55 +1,19 @@
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.services.auth import AuthUserInfo
-
-import datetime
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.core.config import SECRET_KEY
+from app.core.auth_tokens import decode_auth_token
 from app.persistence.database import get_db
 from app.persistence.user import User
 
-
-def encode_auth_token(user_id, role, exam_id=-1):
-    """
-    生成加密的 Token
-    :param user_id: 用户ID
-    :param role: 用户角色
-    :param exam_id: 正在进行的考试ID，-1表示不在考试中
-    """
-    try:
-        now = datetime.datetime.now(datetime.UTC)
-        payload = {
-            "exp": now + datetime.timedelta(days=1),
-            "iat": now,
-            "sub": str(user_id),
-            "role": role,
-            "exam_id": exam_id,
-        }
-        return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-    except Exception:
-        logger.exception("生成认证令牌失败，用户 ID：{}", user_id)
-        return None
-
-
-def decode_auth_token(auth_token):
-    """验证并解析 Token"""
-    return jwt.decode(
-        auth_token,
-        SECRET_KEY,
-        algorithms=["HS256"],
-        leeway=10,
-    )
+if TYPE_CHECKING:
+    from app.services.auth import AuthUserInfo
 
 
 @dataclass
@@ -76,6 +40,7 @@ def get_current_auth(
     request: Request = None,
 ) -> AuthContext:
     from app.services.auth import AuthUserInfo
+
     token = _extract_bearer(authorization)
     try:
         payload = decode_auth_token(token)
@@ -99,9 +64,7 @@ def get_current_auth(
     except HTTPException:
         raise
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=401, detail={"message": "Token has expired."}
-        )
+        raise HTTPException(status_code=401, detail={"message": "Token has expired."})
     except jwt.InvalidTokenError as exc:
         logger.warning("认证令牌无效，原因：{}", exc)
         raise HTTPException(

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
+from app.clients.llm_client import LlmClient
 from app.core.errors import (
     InvalidStateError,
     LlmConfigError,
@@ -9,11 +14,18 @@ from app.core.errors import (
     ResourceNotFoundError,
 )
 from app.core.json import JsonObjectResult, JsonValue
-from dataclasses import dataclass
-from datetime import datetime
+from app.messaging.task_names import GENERATE_PROBLEM_TASK, GENERATE_TEST_SCRIPT_TASK
+from app.persistence.jobs import AiDraftRecord, AiDraftRepository
+from app.persistence.problem import ProblemRepository
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.async_job import AsyncJobService
+from app.services.llm_prompts import (
+    PROBLEM_GENERATION_OUTPUT_FORMAT,
+    PROBLEM_GENERATION_SYSTEM_SETTING,
+    TEST_SCRIPT_MODE_CONFIGS,
+    TEST_SCRIPT_OUTPUT_FORMAT,
+)
 from loguru import logger
-from typing import Optional
-
 
 # 任务类型
 TASK_PROBLEM_GENERATION = "problem_generation"
@@ -123,37 +135,6 @@ class ApplyProblemDraftResult:
     title: str
 
 
-@dataclass
-class AiDraftRecord:
-    """AiDraft 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    user_id: int
-    task_type: str
-    status: str
-    title: str
-    problem_id: int | None
-    request_payload: str | None
-    result_payload: str | None
-    error_message: str | None
-    created_at: datetime | None
-    updated_at: datetime | None
-    consumed_at: datetime | None
-
-
-from app.clients.llm_client import LlmClient
-from app.messaging.task_names import GENERATE_PROBLEM_TASK, GENERATE_TEST_SCRIPT_TASK
-from app.persistence.jobs import AiDraftRepository, to_ai_draft_result
-from app.persistence.problem import ProblemRepository
-from app.services.async_job import AsyncJobService
-from app.services.llm_prompts import (
-    PROBLEM_GENERATION_OUTPUT_FORMAT,
-    PROBLEM_GENERATION_SYSTEM_SETTING,
-    TEST_SCRIPT_MODE_CONFIGS,
-    TEST_SCRIPT_OUTPUT_FORMAT,
-)
-
-
 class AiDraftService:
     """AI 异步出题 / 测例生成与草稿箱业务。"""
 
@@ -174,7 +155,10 @@ class AiDraftService:
         problem_repository: ProblemRepository,
         job_service: AsyncJobService,
         llm_client: Optional[LlmClient] = None,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._drafts = draft_repository
         self._problems = problem_repository
         self._job_service = job_service
@@ -203,14 +187,18 @@ class AiDraftService:
             "background": background,
             "difficulty": difficulty,
         }
-        draft = self._drafts.create(
-            user_id=params.user_id,
-            task_type=TASK_PROBLEM_GENERATION,
-            title=title,
-            request_payload=request_payload,
-            status=STATUS_PENDING,
-        )
-        self._enqueue_draft_job(draft)
+        try:
+            draft = self._drafts.create(
+                user_id=params.user_id,
+                task_type=TASK_PROBLEM_GENERATION,
+                title=title,
+                request_payload=request_payload,
+                status=STATUS_PENDING,
+            )
+            self._enqueue_draft_job(draft)
+        except Exception:
+            self._uow.rollback()
+            raise
         logger.info(
             "已提交 AI 出题任务 draft_id={} user_id={}",
             draft.id,
@@ -239,15 +227,19 @@ class AiDraftService:
             "problem_id": params.problem_id,
             "direction": (params.direction or "").strip(),
         }
-        draft = self._drafts.create(
-            user_id=params.user_id,
-            task_type=TASK_TEST_SCRIPT_GENERATION,
-            title=title,
-            request_payload=request_payload,
-            problem_id=params.problem_id,
-            status=STATUS_PENDING,
-        )
-        self._enqueue_draft_job(draft)
+        try:
+            draft = self._drafts.create(
+                user_id=params.user_id,
+                task_type=TASK_TEST_SCRIPT_GENERATION,
+                title=title,
+                request_payload=request_payload,
+                problem_id=params.problem_id,
+                status=STATUS_PENDING,
+            )
+            self._enqueue_draft_job(draft)
+        except Exception:
+            self._uow.rollback()
+            raise
         logger.info(
             "已提交测例脚本任务 draft_id={} problem_id={}",
             draft.id,
@@ -285,15 +277,19 @@ class AiDraftService:
             "language": language,
             "source_draft_id": params.source_draft_id,
         }
-        draft = self._drafts.create(
-            user_id=params.user_id,
-            task_type=TASK_TEST_DATA_EXECUTION,
-            title=title,
-            request_payload=request_payload,
-            problem_id=params.problem_id,
-            status=STATUS_PENDING,
-        )
-        self._enqueue_draft_job(draft)
+        try:
+            draft = self._drafts.create(
+                user_id=params.user_id,
+                task_type=TASK_TEST_DATA_EXECUTION,
+                title=title,
+                request_payload=request_payload,
+                problem_id=params.problem_id,
+                status=STATUS_PENDING,
+            )
+            self._enqueue_draft_job(draft)
+        except Exception:
+            self._uow.rollback()
+            raise
         logger.info(
             "已提交测例执行任务 draft_id={} problem_id={}",
             draft.id,
@@ -306,9 +302,8 @@ class AiDraftService:
             title=draft.title,
         )
 
-    def _enqueue_draft_job(self, draft) -> None:
+    def _enqueue_draft_job(self, draft: AiDraftRecord) -> None:
         """创建异步任务；按草稿任务类型选择入队方法。"""
-        self._drafts.unit_of_work.commit()
         enqueue_name = self._TASK_TYPE_TO_ENQUEUE.get(draft.task_type)
         if enqueue_name is None:
             raise ValueError(f"不支持的草稿任务类型: {draft.task_type}")
@@ -325,7 +320,7 @@ class AiDraftService:
         if draft is None:
             raise ValueError(f"AI 草稿不存在: {draft_id}")
         self._drafts.mark_running(draft_id)
-        self._drafts.unit_of_work.commit()
+        self._uow.commit()
         request = AiDraftRepository.parse_json_field(draft.request_payload)
 
         background = str(request.get("background", "")).strip()
@@ -339,7 +334,7 @@ class AiDraftService:
         )
         title = str(result.get("title") or "AI 生成题目").strip() or "AI 生成题目"
         self._drafts.mark_success(draft_id, result_payload=result, title=title)
-        self._drafts.unit_of_work.commit()
+        self._uow.commit()
         logger.info("AI 出题完成 draft_id={} title={}", draft_id, title)
         return JsonObjectResult(result)
 
@@ -349,7 +344,7 @@ class AiDraftService:
         if draft is None:
             raise ValueError(f"AI 草稿不存在: {draft_id}")
         self._drafts.mark_running(draft_id)
-        self._drafts.unit_of_work.commit()
+        self._uow.commit()
         request = AiDraftRepository.parse_json_field(draft.request_payload)
 
         problem_id = int(request["problem_id"])
@@ -413,7 +408,7 @@ class AiDraftService:
             result_payload=payload,
             title=f"测例脚本 · {problem.title}",
         )
-        self._drafts.unit_of_work.commit()
+        self._uow.commit()
         logger.info("测例脚本生成完成 draft_id={} problem_id={}", draft_id, problem_id)
         return JsonObjectResult(payload)
 
@@ -451,7 +446,7 @@ class AiDraftService:
         if draft.status in ("pending", "running"):
             raise InvalidStateError("任务进行中，暂不可删除，请稍后再试")
         self._drafts.delete(draft)
-        self._drafts.unit_of_work.commit()
+        self._uow.commit()
         logger.info("已删除草稿 draft_id={} user_id={}", draft_id, user_id)
 
     def get_stats(self, user_id: int, *, requester_role: str) -> AiDraftStats:
@@ -506,7 +501,7 @@ class AiDraftService:
         except (TypeError, ValueError):
             memory_limit = 128
 
-        with self._drafts.unit_of_work.transaction():
+        with self._uow.transaction():
             problem = self._problems.create(
                 title=title,
                 content=content,
@@ -540,3 +535,35 @@ class AiDraftService:
     def _require_teacher(role: str) -> None:
         if role != "teacher":
             raise PermissionDeniedError("仅教师可操作 AI 草稿")
+
+
+def to_ai_draft_result(
+    draft: AiDraftRecord, *, detail: bool = False
+) -> AiDraftSummary | AiDraftDetail:
+    """AI 草稿 快照 → 列表项或详情。"""
+
+    if detail:
+        return AiDraftDetail(
+            id=draft.id,
+            task_type=draft.task_type,
+            status=draft.status,
+            title=draft.title or "",
+            problem_id=draft.problem_id,
+            request_payload=AiDraftRepository.parse_json_field(draft.request_payload),
+            result_payload=AiDraftRepository.parse_json_field(draft.result_payload),
+            error_message=draft.error_message,
+            created_at=draft.created_at,
+            updated_at=draft.updated_at,
+            consumed_at=draft.consumed_at,
+        )
+    return AiDraftSummary(
+        id=draft.id,
+        task_type=draft.task_type,
+        status=draft.status,
+        title=draft.title or "",
+        problem_id=draft.problem_id,
+        error_message=draft.error_message,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
+        consumed_at=draft.consumed_at,
+    )

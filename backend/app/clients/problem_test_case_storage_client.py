@@ -2,22 +2,43 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.services.problem import TestCaseItem, TestCaseSummary
-
-
 import io
 import re
 import shutil
 import stat
 import uuid
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import Optional
 
 from app.core.errors import InvalidStateError, ResourceNotFoundError
 
+
+@dataclass(frozen=True)
+class StoredTestCase:
+    """单个测试点的输入输出文件状态。"""
+
+    name: str
+    input_file: Optional[str]
+    output_file: Optional[str]
+    input_size: Optional[int]
+    output_size: Optional[int]
+    status: str
+
+
+@dataclass(frozen=True)
+class TestCaseStorageSummary:
+    """题目测试点的整体状态摘要。"""
+
+    status: str
+    total_count: int
+    valid_count: int
+    invalid_count: int
+    file_count: int
+    total_size: int
+    ignored_files: list[str]
+    cases: list[StoredTestCase]
 
 
 MAX_ARCHIVE_SIZE = 100 * 1024 * 1024
@@ -105,9 +126,8 @@ class ProblemTestCaseStorageClient:
         folder = self._folder(problem_id)
         return folder.is_dir() and any(folder.iterdir())
 
-    def summarize(self, problem_id: int) -> TestCaseSummary:
+    def summarize(self, problem_id: int) -> TestCaseStorageSummary:
         """读取题目测试点的配对状态和文件明细。"""
-        from app.services.problem import TestCaseItem, TestCaseSummary
 
         folder = self._folder(problem_id)
         if not folder.is_dir():
@@ -153,7 +173,7 @@ class ProblemTestCaseStorageClient:
                 status = "missing_input"
 
             cases.append(
-                TestCaseItem(
+                StoredTestCase(
                     name=name,
                     input_file=input_path.name if input_path else None,
                     output_file=output_path.name if output_path else None,
@@ -174,7 +194,7 @@ class ProblemTestCaseStorageClient:
         else:
             status = "ready"
 
-        return TestCaseSummary(
+        return TestCaseStorageSummary(
             status=status,
             total_count=len(cases),
             valid_count=valid_count,
@@ -186,9 +206,9 @@ class ProblemTestCaseStorageClient:
         )
 
     @staticmethod
-    def _empty_summary() -> TestCaseSummary:
-        from app.services.problem import TestCaseSummary
-        return TestCaseSummary(
+    def _empty_summary() -> TestCaseStorageSummary:
+
+        return TestCaseStorageSummary(
             status="empty",
             total_count=0,
             valid_count=0,
@@ -303,11 +323,7 @@ class ProblemTestCaseStorageClient:
 
         normalized = PurePosixPath(member_name.replace("\\", "/"))
         windows_path = PureWindowsPath(member_name)
-        if (
-            normalized.is_absolute()
-            or windows_path.is_absolute()
-            or windows_path.drive
-        ):
+        if normalized.is_absolute() or windows_path.is_absolute() or windows_path.drive:
             raise InvalidStateError("ZIP 中包含绝对路径")
         if ".." in normalized.parts:
             raise InvalidStateError("ZIP 中包含非法上级路径")

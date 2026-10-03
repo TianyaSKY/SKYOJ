@@ -1,12 +1,10 @@
 """题目测试点管理 API 测试。"""
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_problem_service
 from app.services.auth import AuthUserInfo
-from app.services.problem import (
-    TestCaseItem as ProblemTestCaseItem,
-    TestCaseSummary as ProblemTestCaseSummary,
-)
-from app.utils.auth_tools import AuthContext, get_current_auth
+from app.services.problem import TestCaseItem as ProblemTestCaseItem
+from app.services.problem import TestCaseSummary as ProblemTestCaseSummary
 
 
 class FakeProblemService:

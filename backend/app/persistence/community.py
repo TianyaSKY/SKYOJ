@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
 from sqlalchemy import (
     Boolean,
     Column,
@@ -18,28 +20,91 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Session, relationship, selectinload
-from typing import Optional, TYPE_CHECKING
+
+from app.persistence.database import Base
+from app.persistence.user import UserRecord
+
+
+@dataclass
+class ProblemSolutionRecord:
+    """ProblemSolution 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    problem_id: int
+    author_id: int
+    title: str
+    content: str
+    language: str | None
+    is_official: bool
+    status: str
+    vote_count: int
+    comment_count: int
+    view_count: int
+    favorite_count: int
+    created_at: datetime | None
+    updated_at: datetime
+    author: UserRecord | None
+    likes: list[ProblemSolutionLikeRecord]
+    favorites: list[ProblemSolutionFavoriteRecord]
+
+
+@dataclass
+class ProblemSolutionCommentRecord:
+    """ProblemSolutionComment 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    solution_id: int
+    user_id: int
+    content: str
+    created_at: datetime
+    user: UserRecord | None
+
+
+@dataclass
+class ProblemSolutionLikeRecord:
+    """ProblemSolutionLike 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    solution_id: int
+    user_id: int
+    created_at: datetime | None
+
+
+@dataclass
+class ProblemSolutionFavoriteRecord:
+    """ProblemSolutionFavorite 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    solution_id: int
+    user_id: int
+    created_at: datetime | None
+
+
+@dataclass
+class ProblemTagRecord:
+    """ProblemTag 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    slug: str
+    name: str
+    category: str | None
+    description: str | None
+    created_at: datetime | None
+
+
+@dataclass
+class ProblemTagMapRecord:
+    """ProblemTagMap 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    problem_id: int
+    tag_id: int
+    approved: bool
+    created_at: datetime | None
 
 
 if TYPE_CHECKING:
-    from app.services.problem import ProblemRecord
-    from app.services.community import (
-        ProblemSolutionRecord,
-        ProblemSolutionCommentRecord,
-        ProblemSolutionLikeRecord,
-        ProblemSolutionFavoriteRecord,
-        ProblemTagRecord,
-        ProblemTagMapRecord,
-    )
-
-
-if TYPE_CHECKING:
-    from app.services.community import (
-        CommentDetail,
-        SolutionDetail,
-        SolutionListItem,
-        TagDetail,
-    )
+    from app.persistence.problem import ProblemRecord
 
 
 class ProblemTag(Base):
@@ -246,7 +311,6 @@ class ProblemSolutionComment(Base):
 class ProblemCommunityRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def save_solution(self, record: ProblemSolutionRecord) -> ProblemSolutionRecord:
         """将业务修改写回题解行，事务由服务控制。"""
@@ -479,8 +543,7 @@ class ProblemCommunityRepository:
 
     def get_problem_exists(self, problem_id: int) -> Optional[ProblemRecord]:
 
-        from app.persistence.problem import _to_problem_record
-        from app.persistence.problem import Problem
+        from app.persistence.problem import Problem, _to_problem_record
 
         return _to_problem_record(self._db.get(Problem, problem_id))
 
@@ -529,89 +592,10 @@ class ProblemCommunityRepository:
         return [r[0] for r in rows]
 
 
-def to_solution_detail(solution, *, viewer_id: int | None = None) -> SolutionDetail:
-    """题解 ORM → 详情；liked_by_me / favorited_by_me 视调用方预取的 viewer_id 是否点赞/收藏决定。"""
-
-    from app.services.community import SolutionDetail
-
-    liked_by_me = False
-    favorited_by_me = False
-    if viewer_id is not None and solution.likes is not None:
-        liked_by_me = any(like.user_id == viewer_id for like in solution.likes)
-    if viewer_id is not None and solution.favorites is not None:
-        favorited_by_me = any(fav.user_id == viewer_id for fav in solution.favorites)
-    return SolutionDetail(
-        id=solution.id,
-        problem_id=solution.problem_id,
-        author_id=solution.author_id,
-        author_username=solution.author.username if solution.author else "Unknown",
-        title=solution.title,
-        content=solution.content,
-        language=solution.language,
-        is_official=bool(solution.is_official),
-        status=solution.status,
-        vote_count=solution.vote_count or 0,
-        comment_count=solution.comment_count or 0,
-        view_count=solution.view_count or 0,
-        created_at=solution.created_at,
-        updated_at=solution.updated_at,
-        liked_by_me=liked_by_me,
-        favorited_by_me=favorited_by_me,
-        favorite_count=solution.favorite_count or 0,
-    )
-
-
-def to_solution_list_item(solution) -> SolutionListItem:
-    """题解 ORM → 列表项（不含正文）。"""
-
-    from app.services.community import SolutionListItem
-
-    return SolutionListItem(
-        id=solution.id,
-        problem_id=solution.problem_id,
-        author_id=solution.author_id,
-        author_username=solution.author.username if solution.author else "Unknown",
-        title=solution.title,
-        language=solution.language,
-        is_official=bool(solution.is_official),
-        vote_count=solution.vote_count or 0,
-        comment_count=solution.comment_count or 0,
-        created_at=solution.created_at,
-    )
-
-
-def to_comment_detail(comment) -> CommentDetail:
-
-    from app.services.community import CommentDetail
-
-    return CommentDetail(
-        id=comment.id,
-        solution_id=comment.solution_id,
-        user_id=comment.user_id,
-        username=comment.user.username if comment.user else "Unknown",
-        content=comment.content,
-        created_at=comment.created_at,
-    )
-
-
-def to_tag_detail(tag) -> TagDetail:
-
-    from app.services.community import TagDetail
-
-    return TagDetail(
-        id=tag.id,
-        slug=tag.slug,
-        name=tag.name,
-        category=tag.category,
-        description=tag.description,
-    )
-
-
 def _to_problem_solution_record(
     row: ProblemSolution | None,
 ) -> ProblemSolutionRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.community import ProblemSolutionRecord
     from app.persistence.user import _to_user_record
 
     if row is None or isinstance(row, ProblemSolutionRecord):
@@ -643,7 +627,6 @@ def _to_problem_solution_comment_record(
     row: ProblemSolutionComment | None,
 ) -> ProblemSolutionCommentRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.community import ProblemSolutionCommentRecord
     from app.persistence.user import _to_user_record
 
     if row is None or isinstance(row, ProblemSolutionCommentRecord):
@@ -662,7 +645,6 @@ def _to_problem_solution_like_record(
     row: ProblemSolutionLike | None,
 ) -> ProblemSolutionLikeRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.community import ProblemSolutionLikeRecord
 
     if row is None or isinstance(row, ProblemSolutionLikeRecord):
         return row
@@ -678,7 +660,6 @@ def _to_problem_solution_favorite_record(
     row: ProblemSolutionFavorite | None,
 ) -> ProblemSolutionFavoriteRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.community import ProblemSolutionFavoriteRecord
 
     if row is None or isinstance(row, ProblemSolutionFavoriteRecord):
         return row
@@ -692,7 +673,6 @@ def _to_problem_solution_favorite_record(
 
 def _to_problem_tag_record(row: ProblemTag | None) -> ProblemTagRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.community import ProblemTagRecord
 
     if row is None or isinstance(row, ProblemTagRecord):
         return row
@@ -708,7 +688,6 @@ def _to_problem_tag_record(row: ProblemTag | None) -> ProblemTagRecord | None:
 
 def _to_problem_tag_map_record(row: ProblemTagMap | None) -> ProblemTagMapRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.community import ProblemTagMapRecord
 
     if row is None or isinstance(row, ProblemTagMapRecord):
         return row

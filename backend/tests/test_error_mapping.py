@@ -1,8 +1,8 @@
 """错误映射单轨化测试：业务异常统一由全局 handler 映射，信封键为 error。"""
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_llm_facade_service
 from app.core.errors import ExternalServiceError, LlmConfigError
-from app.utils.auth_tools import AuthContext, get_current_auth
 
 
 class _FakeUser:

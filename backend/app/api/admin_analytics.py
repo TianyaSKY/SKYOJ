@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter, Depends
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_submission_service
 from app.api.schemas.analytics import PlatformAnalyticsResponse
 from app.services.submission import SubmissionService
-from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 

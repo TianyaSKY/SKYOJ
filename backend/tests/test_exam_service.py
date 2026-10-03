@@ -2,19 +2,18 @@
 
 from datetime import datetime, timedelta
 
+import app.persistence  # noqa: F401
 import pytest
+from app.persistence.database import Base
+from app.persistence.exam import Exam, ExamProblem, ExamRepository
+from app.persistence.problem import Problem
+from app.persistence.submission import Submission
+from app.persistence.unit_of_work import UnitOfWork
+from app.persistence.user import User
+from app.services.exam import ExamService
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app.persistence.database import Base
-import app.persistence  # noqa: F401
-from app.persistence.exam import Exam, ExamProblem
-from app.persistence.problem import Problem
-from app.persistence.submission import Submission
-from app.persistence.user import User
-from app.persistence.exam import ExamRepository
-from app.services.exam import ExamService
 
 T0 = datetime(2026, 1, 1, 9, 0, 0)
 
@@ -77,7 +76,7 @@ def seeded():
     wa_bob = add_submission(bob, p1, "Wrong Answer", 0, 120)
     session.commit()
 
-    service = ExamService(ExamRepository(session))
+    service = ExamService(ExamRepository(session), uow=UnitOfWork(session))
     yield {
         "session": session,
         "service": service,

@@ -4,10 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
-from app.services.submission import SubmitParams
-from app.services.user import UploadAvatarParams
-from app.services.submission import SubmissionService
-from app.services.user import UserService
+from app.services.submission import SubmissionService, SubmitParams
+from app.services.user import UploadAvatarParams, UserService
 
 
 class FakeSubmissionRepository:
@@ -70,7 +68,9 @@ class FakeSubmissionStorage:
 def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
     repository = FakeSubmissionRepository()
     job_service = FakeJobService()
-    service = SubmissionService(repository, job_service, FakeSubmissionStorage())
+    service = SubmissionService(
+        repository, job_service, FakeSubmissionStorage(), uow=MagicMock()
+    )
 
     result = service.submit(
         SubmitParams(
@@ -94,14 +94,18 @@ def test_submission_service_stores_uploaded_file_and_enqueues_judge() -> None:
 
 
 def test_submission_service_rejects_unknown_problem() -> None:
-    service = SubmissionService(FakeSubmissionRepository(), FakeJobService())
+    service = SubmissionService(
+        FakeSubmissionRepository(), FakeJobService(), uow=MagicMock()
+    )
 
     with pytest.raises(ResourceNotFoundError):
         service.submit(SubmitParams(1, 99, "code", "python"), requester_role="student")
 
 
 def test_submission_service_rejects_exam_submit_without_session() -> None:
-    service = SubmissionService(FakeSubmissionRepository(), FakeJobService())
+    service = SubmissionService(
+        FakeSubmissionRepository(), FakeJobService(), uow=MagicMock()
+    )
 
     with pytest.raises(PermissionDeniedError):
         service.submit(
@@ -113,7 +117,9 @@ def test_submission_service_rejects_exam_submit_without_session() -> None:
 def test_submission_service_uses_active_exam_session_when_body_omits_id() -> None:
     repository = FakeSubmissionRepository()
     job_service = FakeJobService()
-    service = SubmissionService(repository, job_service, FakeSubmissionStorage())
+    service = SubmissionService(
+        repository, job_service, FakeSubmissionStorage(), uow=MagicMock()
+    )
 
     result = service.submit(
         SubmitParams(
@@ -131,7 +137,7 @@ def test_submission_service_uses_active_exam_session_when_body_omits_id() -> Non
 
 
 def test_user_service_blocks_student_listing_other_submissions() -> None:
-    service = UserService(FakeUserRepository(), FakeAvatarStorage())
+    service = UserService(FakeUserRepository(), FakeAvatarStorage(), uow=MagicMock())
 
     with pytest.raises(PermissionDeniedError):
         service.list_submissions(2, "student", 1)
@@ -175,7 +181,7 @@ class FakeAvatarStorage:
 
 
 def test_user_service_enforces_teacher_access_and_updates_avatar() -> None:
-    service = UserService(FakeUserRepository(), FakeAvatarStorage())
+    service = UserService(FakeUserRepository(), FakeAvatarStorage(), uow=MagicMock())
 
     with pytest.raises(PermissionDeniedError):
         service.list_users("student")

@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING, BinaryIO, Optional
+
+from app.clients.dataset_storage_client import DatasetStorageClient
 from app.core.errors import (
     InvalidStateError,
     PermissionDeniedError,
     ResourceNotFoundError,
 )
-from dataclasses import dataclass
-from datetime import datetime
+from app.persistence.dataset import DatasetRecord
+from app.persistence.unit_of_work import UnitOfWork
 from loguru import logger
-from typing import BinaryIO, Optional, TYPE_CHECKING
-
 
 if TYPE_CHECKING:
     from app.persistence.dataset import DatasetRepository
@@ -90,18 +93,6 @@ class PaginatedDatasets:
     datasets: list[DatasetListItem]
 
 
-@dataclass(frozen=True)
-class DatasetRecord(DatasetDetail):
-    """数据集持久化快照，包含文件任务所需状态。"""
-
-    temp_path: Optional[str] = None
-    file_hash: Optional[str] = None
-    error_message: Optional[str] = None
-
-
-from app.clients.dataset_storage_client import DatasetStorageClient
-
-
 class DatasetService:
     """编排数据集记录和文件的业务流程。"""
 
@@ -110,7 +101,10 @@ class DatasetService:
         dataset_repository: DatasetRepository,
         storage_client: DatasetStorageClient,
         job_service: AsyncJobService,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._dataset_repository = dataset_repository
         self._storage_client = storage_client
         self._job_service = job_service
@@ -120,6 +114,7 @@ class DatasetService:
     ) -> list[DatasetListItem] | PaginatedDatasets:
         """查询数据集列表。"""
         items, total = self._dataset_repository.list_all(page=page, page_size=page_size)
+        items = [to_dataset_list_item(item) for item in items]
         if page is None or page_size is None:
             return items
         return PaginatedDatasets(
@@ -147,13 +142,13 @@ class DatasetService:
                 temp_path=temporary_path,
                 status="pending",
             )
-            self._dataset_repository.unit_of_work.commit()
             self._job_service.enqueue_finalize_dataset(dataset.id)
         except Exception:
+            self._uow.rollback()
             if temporary_path:
                 self._storage_client.remove_staged(temporary_path)
             raise
-        return dataset
+        return to_dataset_detail(dataset)
 
     def upload_dataset(self, params: UploadDatasetParams) -> DatasetDetail:
         """校验上传权限、大小和文件路径后创建数据集。"""
@@ -177,7 +172,7 @@ class DatasetService:
 
     def get_dataset(self, dataset_id: int) -> DatasetDetail:
         """获取数据集详情。"""
-        return self._require_dataset(dataset_id)
+        return to_dataset_detail(self._require_dataset(dataset_id))
 
     def delete_dataset(self, requester_role: str, dataset_id: int) -> None:
         """删除数据集文件和记录。"""
@@ -189,7 +184,7 @@ class DatasetService:
             if callable(remove_staged):
                 remove_staged(dataset.temp_path)
         self._dataset_repository.delete(dataset)
-        self._dataset_repository.unit_of_work.commit()
+        self._uow.commit()
 
     def dataset_file_exists(self, dataset_id: int) -> DatasetDetail:
         """确认数据集及其文件均存在。"""
@@ -217,7 +212,7 @@ class DatasetService:
         if dataset is None:
             raise ValueError(f"数据集不存在: {dataset_id}")
         if dataset.status == "ready" and self._storage_client.exists(dataset.file_path):
-            return dataset
+            return to_dataset_detail(dataset)
         try:
             if not dataset.temp_path:
                 raise ValueError(f"数据集缺少临时文件: {dataset_id}")
@@ -234,15 +229,15 @@ class DatasetService:
             )
             if dataset is None:
                 raise ResourceNotFoundError("数据集不存在")
-            self._dataset_repository.unit_of_work.commit()
+            self._uow.commit()
             logger.info(
                 "数据集文件落盘完成 dataset_id={} sha256={}", dataset.id, file_hash
             )
-            return dataset
+            return to_dataset_detail(dataset)
         except Exception as exc:
-            self._dataset_repository.unit_of_work.rollback()
+            self._uow.rollback()
             self._dataset_repository.mark_failed(dataset_id, str(exc))
-            self._dataset_repository.unit_of_work.commit()
+            self._uow.commit()
             raise
 
     def _require_dataset(self, dataset_id: int) -> DatasetRecord:
@@ -263,3 +258,34 @@ class DatasetService:
         if size_bytes < 1024 * 1024:
             return f"{size_bytes / 1024:.2f} KB"
         return f"{size_bytes / (1024 * 1024):.2f} MB"
+
+
+def to_dataset_list_item(dataset: DatasetRecord) -> DatasetListItem:
+    """数据集 快照 → 列表项。"""
+
+    return DatasetListItem(
+        id=dataset.id,
+        name=dataset.name,
+        description=dataset.description or "",
+        uploader=dataset.uploader,
+        file_size=dataset.file_size or "",
+        created_at=dataset.created_at,
+        status=getattr(dataset, "status", "ready") or "ready",
+        download_url=f"/api/datasets/{dataset.id}/download",
+    )
+
+
+def to_dataset_detail(dataset: DatasetRecord) -> DatasetDetail:
+    """数据集 快照 → 详情。"""
+
+    return DatasetDetail(
+        id=dataset.id,
+        name=dataset.name,
+        description=dataset.description or "",
+        file_path=dataset.file_path,
+        file_size=dataset.file_size or "",
+        uploader_id=dataset.uploader_id,
+        uploader=dataset.uploader,
+        created_at=dataset.created_at,
+        status=getattr(dataset, "status", "ready") or "ready",
+    )

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
-
-from app.core.time import utcnow
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
+
 from sqlalchemy import (
+    JSON,
     Column,
     DateTime,
     Enum,
@@ -16,7 +16,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     case,
@@ -24,19 +23,86 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.orm import Session, relationship, selectinload
-from typing import Optional, TYPE_CHECKING
+
+from app.core.json import JsonValue
+from app.core.time import utcnow
+from app.persistence.database import Base
+from app.persistence.problem import ProblemRecord
+from app.persistence.user import UserRecord
 
 
-if TYPE_CHECKING:
-    from app.services.submission import SubmissionRecord
-    from app.services.debug import DebugRunRecord
-    from app.services.plagiarism import PlagiarismReportRecord
+@dataclass
+class SubmissionRecord:
+    """Submission 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    problem_id: int
+    exam_id: int | None
+    code_path: str | None
+    code_content: str | None
+    language: str | None
+    status: str | None
+    score: float | None
+    output_log: str | None
+    case_results: list[dict[str, JsonValue]] | None
+    created_at: datetime | None
+    user: UserRecord | None
+    problem: ProblemRecord | None
 
 
-if TYPE_CHECKING:
-    from app.services.submission import DailySubmissionCount, ProblemSubmissionCounts
-    from app.services.debug import DebugRunDetail
-    from app.services.submission import SubmissionDetail, SubmissionListItem
+@dataclass
+class DebugRunRecord:
+    """DebugRun 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    problem_id: int
+    exam_id: int | None
+    language: str
+    code_content: str
+    status: str
+    case_name: str | None
+    input: str | None
+    expected_output: str | None
+    actual_output: str | None
+    error_output: str | None
+    time_used_ms: int | None
+    memory_used_kb: int | None
+    created_at: datetime
+    finished_at: datetime | None
+
+
+@dataclass
+class PlagiarismReportRecord:
+    """PlagiarismReport 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    problem_id: int
+    submission_a_id: int
+    submission_b_id: int
+    similarity_score: float | None
+    matched_blocks: list[dict[str, JsonValue]] | None
+    status: str | None
+    jplag_result_id: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    submission_a: SubmissionRecord | None
+    submission_b: SubmissionRecord | None
+
+
+@dataclass(frozen=True)
+class ProblemSubmissionCounts:
+    problem_id: int
+    title: str
+    total: int
+    accepted: int
+
+
+@dataclass(frozen=True)
+class DailySubmissionCount:
+    date: str
+    count: int
 
 
 class Submission(Base):
@@ -190,21 +256,16 @@ class SubmissionRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_problem(self, problem_id: int):
         """查询题目。"""
-        from app.persistence.problem import _to_problem_record
-
-        from app.persistence.problem import Problem
+        from app.persistence.problem import Problem, _to_problem_record
 
         return _to_problem_record(self._db.get(Problem, problem_id))
 
     def get_active_exam(self, exam_id: int, now: datetime):
         """查询当前处于开放时间内的考试。"""
-        from app.persistence.exam import _to_exam_record
-
-        from app.persistence.exam import Exam
+        from app.persistence.exam import Exam, _to_exam_record
 
         return _to_exam_record(
             self._db.query(Exam)
@@ -214,9 +275,7 @@ class SubmissionRepository:
 
     def get_exam_problem(self, exam_id: int, problem_id: int):
         """查询考试是否包含指定题目。"""
-        from app.persistence.exam import _to_exam_problem_record
-
-        from app.persistence.exam import ExamProblem
+        from app.persistence.exam import ExamProblem, _to_exam_problem_record
 
         return _to_exam_problem_record(
             self._db.query(ExamProblem)
@@ -348,7 +407,6 @@ class SubmissionRepository:
 
     def get_problem_submission_counts(self) -> list[ProblemSubmissionCounts]:
 
-        from app.services.submission import ProblemSubmissionCounts
         from app.persistence.problem import Problem
 
         rows = (
@@ -372,8 +430,6 @@ class SubmissionRepository:
         self, since: datetime
     ) -> list[DailySubmissionCount]:
 
-        from app.services.submission import DailySubmissionCount
-
         day = func.date(Submission.created_at)
         rows = (
             self._db.query(day, func.count(Submission.id))
@@ -390,7 +446,6 @@ class DebugRunRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def create(
         self,
@@ -472,7 +527,6 @@ class DebugRunRepository:
 class PlagiarismRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, report_id: int) -> PlagiarismReportRecord | None:
         return _to_plagiarism_report_record(self._db.get(PlagiarismReport, report_id))
@@ -556,88 +610,10 @@ class PlagiarismRepository:
         ]
 
 
-def to_submission_list_item(submission) -> SubmissionListItem:
-    """提交 ORM → 列表项（username 取 submission.user.username，调用方须预取）。"""
-
-    from app.services.submission import SubmissionListItem
-
-    return SubmissionListItem(
-        id=submission.id,
-        user_id=submission.user_id,
-        username=submission.user.username,
-        problem_id=submission.problem_id,
-        exam_id=submission.exam_id,
-        status=submission.status,
-        score=submission.score,
-        language=submission.language,
-        created_at=submission.created_at,
-    )
-
-
-def to_submission_detail(submission) -> SubmissionDetail:
-    """提交 ORM → 详情（code=code_content，log=output_log，case_results=JSON 列）。"""
-
-    from app.services.submission import CaseResult, SubmissionDetail
-    from app.services.submission import CaseResult
-
-    raw_cases = submission.case_results or []
-    case_results = [
-        CaseResult(
-            case_name=str(item.get("case_name", "")),
-            status=str(item.get("status", "unknown")),
-            time_used_ms=item.get("time_used_ms"),
-            memory_used_kb=item.get("memory_used_kb"),
-            input_data=item.get("input_data"),
-            expected_output=item.get("expected_output"),
-            actual_output=item.get("actual_output"),
-            error_output=item.get("error_output"),
-        )
-        for item in raw_cases
-        if isinstance(item, dict)
-    ]
-
-    return SubmissionDetail(
-        id=submission.id,
-        status=submission.status,
-        score=submission.score,
-        log=submission.output_log,
-        code=submission.code_content,
-        language=submission.language,
-        exam_id=submission.exam_id,
-        created_at=submission.created_at,
-        case_results=case_results,
-    )
-
-
-def to_debug_run_detail(row) -> DebugRunDetail:
-    """调试运行 ORM → 详情。"""
-
-    from app.services.debug import DebugRunDetail
-
-    return DebugRunDetail(
-        id=row.id,
-        status=row.status,
-        language=row.language,
-        case_name=row.case_name,
-        input=row.input,
-        expected_output=row.expected_output,
-        actual_output=row.actual_output,
-        error_output=row.error_output,
-        time_used_ms=row.time_used_ms,
-        memory_used_kb=row.memory_used_kb,
-        created_at=row.created_at,
-        finished_at=row.finished_at,
-        problem_id=row.problem_id,
-        user_id=row.user_id,
-        exam_id=row.exam_id,
-    )
-
-
 def _to_submission_record(row: Submission | None) -> SubmissionRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.submission import SubmissionRecord
-    from app.persistence.user import _to_user_record
     from app.persistence.problem import _to_problem_record
+    from app.persistence.user import _to_user_record
 
     if row is None or isinstance(row, SubmissionRecord):
         return row
@@ -661,7 +637,6 @@ def _to_submission_record(row: Submission | None) -> SubmissionRecord | None:
 
 def _to_debug_run_record(row: DebugRun | None) -> DebugRunRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.debug import DebugRunRecord
 
     if row is None or isinstance(row, DebugRunRecord):
         return row
@@ -689,7 +664,6 @@ def _to_plagiarism_report_record(
     row: PlagiarismReport | None,
 ) -> PlagiarismReportRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.plagiarism import PlagiarismReportRecord
 
     if row is None or isinstance(row, PlagiarismReportRecord):
         return row

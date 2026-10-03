@@ -3,9 +3,11 @@
 import os
 import re
 from dataclasses import dataclass
+
 from loguru import logger
+
+from app.judging.sandbox import SandboxRunner, time_limit_seconds
 from app.persistence.problem import ProblemRepository
-from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
 
 
 def natural_sort_key(value: str) -> list[int | str]:
@@ -56,7 +58,9 @@ def _prepare_and_run_case(
 
         runner.put_file("input.txt", input_data)
         time_limit_s = time_limit_seconds(time_limit_ms)
-        run_cmd = f"sh -c 'timeout {time_limit_s}s {lang_config['run']} < /app/input.txt'"
+        run_cmd = (
+            f"sh -c 'timeout {time_limit_s}s {lang_config['run']} < /app/input.txt'"
+        )
         exit_code, output = runner.exec_run(run_cmd)
         output = output.strip() if output else ""
 
@@ -187,9 +191,7 @@ def _prepare_container(lang_config, user_code, memory_limit):
         )
         runner.put_file(lang_config["src"], user_code)
         if lang_config["compile"]:
-            exit_code, output = runner.exec_run(
-                f"timeout 30s {lang_config['compile']}"
-            )
+            exit_code, output = runner.exec_run(f"timeout 30s {lang_config['compile']}")
             if exit_code != 0:
                 runner.stop()
                 return None, "compile", output
@@ -197,6 +199,7 @@ def _prepare_container(lang_config, user_code, memory_limit):
     except Exception as exc:
         runner.stop()
         return None, "system", str(exc)
+
 
 _ACM_LANG_CONFIGS = {
     "c": {"src": "main.c", "compile": "gcc main.c -o main", "run": "./main"},
@@ -398,8 +401,15 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         case_name = in_file[: -len(".in")]
         out_file = os.path.join(test_case_dir, f"{case_name}.out")
         if not os.path.exists(out_file):
-            return "System Error", 0, f"Missing output file for test case: {case_name}.out", []
-        with open(os.path.join(test_case_dir, in_file), "r", encoding="utf-8") as source:
+            return (
+                "System Error",
+                0,
+                f"Missing output file for test case: {case_name}.out",
+                [],
+            )
+        with open(
+            os.path.join(test_case_dir, in_file), "r", encoding="utf-8"
+        ) as source:
             input_data = source.read()
         with open(out_file, "r", encoding="utf-8") as source:
             expected_output = source.read().strip()

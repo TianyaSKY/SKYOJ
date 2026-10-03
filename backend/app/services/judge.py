@@ -5,14 +5,15 @@ from __future__ import annotations
 import os
 import time as time_module
 from dataclasses import dataclass
-from loguru import logger
 from typing import Optional
+
+from app.judging.acm import run_acm_judge
+from app.judging.kaggle import run_kaggle_judge
+from app.judging.oop import run_oop_judge
 from app.persistence.jobs import AsyncJobRepository
 from app.persistence.submission import SubmissionRepository
-from app.services.acm import run_acm_judge
-from app.services.kaggle import run_kaggle_judge
-from app.services.oop import run_oop_judge
-
+from app.persistence.unit_of_work import UnitOfWork
+from loguru import logger
 
 # 提交状态常量
 STATUS_PENDING = "Pending"
@@ -99,13 +100,13 @@ def judge_submission(submission_id: int, db) -> None:
     final_log = ""
     problem_type = str(submission.problem.type or "acm").lower()
 
+    problem_id = submission.problem_id
+    case_results: list[dict] = []
     judge_start = time_module.perf_counter()
 
     try:
         user_code = submission.code_content or ""
-        problem_id = submission.problem_id
         language = submission.language or "python"
-        case_results: list[dict] = []
         if problem_type == "acm":
             status, score, log, case_results = run_acm_judge(
                 submission_id, user_code, problem_id, language, db=db
@@ -130,7 +131,7 @@ def judge_submission(submission_id: int, db) -> None:
     finally:
         duration = time_module.perf_counter() - judge_start
         try:
-            from app.utils.metrics import judge_duration, submissions_total
+            from app.middleware.metrics import judge_duration, submissions_total
 
             judge_duration.labels(problem_type=problem_type).observe(duration)
             submissions_total.labels(
@@ -139,33 +140,24 @@ def judge_submission(submission_id: int, db) -> None:
         except Exception:
             logger.exception("记录判题指标失败 submission_id={}", submission_id)
 
-    repository.update_result(
-        submission_id,
-        status=final_status,
-        score=final_score,
-        output_log=final_log,
-        case_results=case_results,
-    )
-    repository.unit_of_work.commit()
+    from app.persistence.user import WrongBookRepository
+    from app.services.wrong_book import WrongBookService
 
-    # === 错题本更新 ===
-    if submission is not None:
-        try:
-            from app.services.wrong_book import WrongBookService
-
-            from app.persistence.user import WrongBookRepository
-
-            wb = WrongBookService(WrongBookRepository(db))
-            wb.on_judge_complete(
-                user_id=submission.user_id,
-                problem_id=problem_id,
-                submission_id=submission_id,
-                status=final_status,
-            )
-        except Exception as exc:
-            logger.warning(
-                "错题本更新失败 submission_id={} error={}", submission_id, exc
-            )
+    uow = UnitOfWork(db)
+    with uow.transaction():
+        repository.update_result(
+            submission_id,
+            status=final_status,
+            score=final_score,
+            output_log=final_log,
+            case_results=case_results,
+        )
+        WrongBookService(WrongBookRepository(db), uow=uow).record_judge_result(
+            user_id=submission.user_id,
+            problem_id=problem_id,
+            submission_id=submission_id,
+            status=final_status,
+        )
 
     _publish_realtime_result(submission_id, final_status, final_score, final_log)
 
@@ -173,17 +165,25 @@ def judge_submission(submission_id: int, db) -> None:
         _invalidate_exam_cache(submission.exam_id)
 
     if final_status == "Accepted":
-        _enqueue_plagiarism_scan(db, problem_id)
+        _enqueue_plagiarism_scan(db, problem_id, submission_id)
 
 
 def _publish_realtime_result(
     submission_id: int, status: str, score: float, output_log: str
 ) -> None:
-    """判题完成后发布实时通知。失败静默，不影响主流程。"""
+    """判题完成后发布实时通知。失败记录日志，不影响主流程。"""
     try:
-        from app.utils.realtime import publish_submission_result
+        from app.clients.redis_client import redis_client
 
-        publish_submission_result(submission_id, status, score, output_log)
+        redis_client.publish(
+            f"skyoj:submission:{submission_id}",
+            {
+                "submission_id": submission_id,
+                "status": status,
+                "score": score,
+                "output_log": output_log or "",
+            },
+        )
     except Exception as exc:
         logger.warning("实时推送失败 submission_id={} error={}", submission_id, exc)
 
@@ -191,28 +191,27 @@ def _publish_realtime_result(
 def _invalidate_exam_cache(exam_id: int) -> None:
     """考试中提交判题后，失效排行榜缓存以保证下一位用户看到最新结果。"""
     try:
-        from app.utils.exam_cache import invalidate_rank_cache
+        from app.services.exam import invalidate_rank_cache
 
         invalidate_rank_cache(exam_id)
     except Exception as exc:
         logger.warning("失效考试缓存失败 exam_id={} error={}", exam_id, exc)
 
 
-def _enqueue_plagiarism_scan(db, problem_id: int) -> None:
+def _enqueue_plagiarism_scan(db, problem_id: int, submission_id: int) -> None:
     """判题完成后触发异步查重扫描。"""
     try:
-        from app.services.async_job import CreateAsyncJobParams
         from app.messaging.queues import JUDGE_QUEUE
         from app.messaging.task_names import SCAN_PLAGIARISM_TASK
-        from app.services.async_job import AsyncJobService
+        from app.services.async_job import AsyncJobService, CreateAsyncJobParams
 
-        job_service = AsyncJobService(AsyncJobRepository(db))
+        job_service = AsyncJobService(AsyncJobRepository(db), uow=UnitOfWork(db))
         job_service.enqueue(
             CreateAsyncJobParams(
                 task_name=SCAN_PLAGIARISM_TASK,
                 queue=JUDGE_QUEUE,
                 payload={"problem_id": problem_id, "min_similarity": 0.3},
-                dedupe_key=f"plagiarism-scan:{problem_id}",
+                dedupe_key=f"plagiarism-scan:{problem_id}:{submission_id}",
                 max_attempts=1,
             )
         )

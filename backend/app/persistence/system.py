@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
 from datetime import datetime
+
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Session, relationship
-from typing import TYPE_CHECKING
+
+from app.persistence.database import Base
 
 
-if TYPE_CHECKING:
-    from app.services.system import SystemStatistics
+@dataclass(frozen=True)
+class SystemStatisticsRecord:
+    today_submissions: int
+    total_problems: int
+    total_users: int
+    exams_in_period: int
 
 
 class SysDict(Base):
@@ -49,7 +54,6 @@ class SystemRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_config(self) -> dict[str, str]:
         return {item.key: item.val for item in self._db.query(SysDict).all()}
@@ -73,15 +77,14 @@ class SystemRepository:
 
     def statistics(
         self, today_start: datetime, period_start: datetime, period_end: datetime
-    ) -> SystemStatistics:
+    ) -> SystemStatisticsRecord:
 
-        from app.services.system import SystemStatistics
         from app.persistence.exam import Exam
         from app.persistence.problem import Problem
         from app.persistence.submission import Submission
         from app.persistence.user import User
 
-        return SystemStatistics(
+        return SystemStatisticsRecord(
             today_submissions=self._db.query(Submission)
             .filter(Submission.created_at >= today_start)
             .count(),

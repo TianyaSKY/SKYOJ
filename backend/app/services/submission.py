@@ -2,21 +2,24 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Optional
+
+from app.clients.submission_storage_client import SubmissionStorageClient
 from app.core.errors import (
     InvalidStateError,
     PermissionDeniedError,
     ResourceNotFoundError,
 )
-from app.core.json import JsonValue
 from app.core.time import utcnow
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Optional, TYPE_CHECKING
-
-
-if TYPE_CHECKING:
-    from app.services.user import UserRecord
-    from app.services.problem import ProblemRecord
+from app.persistence.submission import (
+    DailySubmissionCount,
+    SubmissionRecord,
+    SubmissionRepository,
+)
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.async_job import AsyncJobService
 
 
 @dataclass(frozen=True)
@@ -123,14 +126,6 @@ class CaseResult:
 
 
 @dataclass(frozen=True)
-class ProblemSubmissionCounts:
-    problem_id: int
-    title: str
-    total: int
-    accepted: int
-
-
-@dataclass(frozen=True)
 class ProblemPassRate:
     problem_id: int
     title: str
@@ -147,12 +142,6 @@ class ProblemDifficulty:
 
 
 @dataclass(frozen=True)
-class DailySubmissionCount:
-    date: str
-    count: int
-
-
-@dataclass(frozen=True)
 class PlatformAnalytics:
     total_submissions: int
     total_accepted: int
@@ -163,35 +152,6 @@ class PlatformAnalytics:
     daily_submissions: list[DailySubmissionCount]
 
 
-@dataclass
-class SubmissionRecord:
-    """Submission 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    user_id: int
-    problem_id: int
-    exam_id: int | None
-    code_path: str | None
-    code_content: str | None
-    language: str | None
-    status: str | None
-    score: float | None
-    output_log: str | None
-    case_results: list[dict[str, JsonValue]] | None
-    created_at: datetime | None
-    user: UserRecord | None
-    problem: ProblemRecord | None
-
-
-from app.clients.submission_storage_client import SubmissionStorageClient
-from app.persistence.submission import (
-    SubmissionRepository,
-    to_submission_detail,
-    to_submission_list_item,
-)
-from app.services.async_job import AsyncJobService
-
-
 class SubmissionService:
     """处理提交创建、考试关联和判题任务投递。"""
 
@@ -200,7 +160,10 @@ class SubmissionService:
         submission_repository: SubmissionRepository,
         job_service: AsyncJobService,
         storage_client: SubmissionStorageClient | None = None,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._submission_repository = submission_repository
         self._job_service = job_service
         self._storage_client = storage_client or SubmissionStorageClient()
@@ -227,11 +190,14 @@ class SubmissionService:
             code = self._storage_client.save(
                 params.user_id, params.problem_id, params.filename, params.file_content
             )
-        submission = self._submission_repository.create(
-            params.user_id, params.problem_id, exam_id, params.language, code
-        )
-        self._submission_repository.unit_of_work.commit()
-        self._job_service.enqueue_judge_submission(submission.id)
+        try:
+            submission = self._submission_repository.create(
+                params.user_id, params.problem_id, exam_id, params.language, code
+            )
+            self._job_service.enqueue_judge_submission(submission.id)
+        except Exception:
+            self._uow.rollback()
+            raise
         return SubmitResult(
             submission_id=submission.id, status="Pending", exam_id=exam_id
         )
@@ -323,3 +289,51 @@ class SubmissionService:
                 utcnow() - timedelta(days=30)
             ),
         )
+
+
+def to_submission_list_item(submission: SubmissionRecord) -> SubmissionListItem:
+    """提交 快照 → 列表项（username 取 submission.user.username，调用方须预取）。"""
+
+    return SubmissionListItem(
+        id=submission.id,
+        user_id=submission.user_id,
+        username=submission.user.username,
+        problem_id=submission.problem_id,
+        exam_id=submission.exam_id,
+        status=submission.status,
+        score=submission.score,
+        language=submission.language,
+        created_at=submission.created_at,
+    )
+
+
+def to_submission_detail(submission: SubmissionRecord) -> SubmissionDetail:
+    """提交 快照 → 详情（code=code_content，log=output_log，case_results=JSON 列）。"""
+
+    raw_cases = submission.case_results or []
+    case_results = [
+        CaseResult(
+            case_name=str(item.get("case_name", "")),
+            status=str(item.get("status", "unknown")),
+            time_used_ms=item.get("time_used_ms"),
+            memory_used_kb=item.get("memory_used_kb"),
+            input_data=item.get("input_data"),
+            expected_output=item.get("expected_output"),
+            actual_output=item.get("actual_output"),
+            error_output=item.get("error_output"),
+        )
+        for item in raw_cases
+        if isinstance(item, dict)
+    ]
+
+    return SubmissionDetail(
+        id=submission.id,
+        status=submission.status,
+        score=submission.score,
+        log=submission.output_log,
+        code=submission.code_content,
+        language=submission.language,
+        exam_id=submission.exam_id,
+        created_at=submission.created_at,
+        case_results=case_results,
+    )

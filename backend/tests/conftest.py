@@ -6,7 +6,6 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("CELERY_BROKER_URL", "memory://")
@@ -19,7 +18,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 @pytest.fixture(scope="session")
 def engine():
     """SQLite 内存引擎，所有测试共享同一 schema。"""
-    from app import persistence  # noqa: F401
     from app.persistence.database import Base
 
     eng = create_engine(
@@ -41,7 +39,9 @@ def db_session(engine):
     # SQLite 的 BEGIN 默认延迟到写入；显式开启外层事务，保证保存点释放不泄漏数据。
     connection.exec_driver_sql("BEGIN")
     session = Session(
-        bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
     )
     yield session
     session.close()
@@ -58,7 +58,7 @@ def client(db_session, monkeypatch):
 
     from unittest.mock import MagicMock, patch
 
-    with patch("app.services.sandbox_runner.client") as mock_client:
+    with patch("app.judging.sandbox.client") as mock_client:
         mock_container = MagicMock()
         mock_container.id = "test-container-123"
         mock_container.attrs = {}

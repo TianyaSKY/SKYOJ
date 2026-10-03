@@ -1,17 +1,16 @@
 """通过命令行创建教师账号。"""
 
+import sys
 from getpass import getpass
 from pathlib import Path
-import sys
-
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.persistence.database import SessionLocal  # noqa: E402
-from app.persistence.user import User  # noqa: E402
-from app.utils.passwords import hash_password  # noqa: E402
+from app.core.passwords import hash_password
+from app.persistence.database import SessionLocal
+from app.persistence.user import User
 
 
 def main() -> None:

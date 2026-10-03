@@ -4,10 +4,10 @@ from dataclasses import FrozenInstanceError
 from unittest.mock import MagicMock
 
 import pytest
-
 from app.api.deps import get_dataset_service
-from app.persistence.dataset import Dataset, DatasetRepository
-from app.services.dataset import DatasetRecord, DatasetService, PaginatedDatasets
+from app.persistence.dataset import DatasetRecord, DatasetRepository
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.dataset import DatasetService, PaginatedDatasets
 
 
 def create_dataset(repository, uploader_id):
@@ -45,25 +45,31 @@ def test_service_lists_and_deletes_snapshots(db_session, teacher_user):
     repository = DatasetRepository(db_session)
     record = create_dataset(repository, teacher_user.id)
     storage = MagicMock()
-    service = DatasetService(repository, storage, MagicMock())
+    service = DatasetService(
+        repository, storage, MagicMock(), uow=UnitOfWork(db_session)
+    )
     result = service.list_datasets(page=1, page_size=1)
     assert isinstance(result, PaginatedDatasets)
     assert result.total == 1
     assert result.datasets[0].uploader == teacher_user.username
     assert service.list_datasets(page=2, page_size=1).datasets == []
-    assert service.get_dataset(record.id).temp_path == "tmp/data.pending"
+    assert repository.get_by_id(record.id).temp_path == "tmp/data.pending"
     service.delete_dataset("teacher", record.id)
     storage.delete.assert_called_once_with(record.file_path, record.id)
     storage.remove_staged.assert_called_once_with(record.temp_path)
     assert repository.get_by_id(record.id) is None
 
 
-def test_dataset_api_keeps_list_and_download_contracts(client, teacher_token, db_session, teacher_user):
+def test_dataset_api_keeps_list_and_download_contracts(
+    client, teacher_token, db_session, teacher_user
+):
     repository = DatasetRepository(db_session)
     record = create_dataset(repository, teacher_user.id)
     repository.mark_ready(record.id, file_size="2 KB", file_hash="abc")
-    repository.unit_of_work.commit()
-    service = DatasetService(repository, MagicMock(), MagicMock())
+    UnitOfWork(db_session).commit()
+    service = DatasetService(
+        repository, MagicMock(), MagicMock(), uow=UnitOfWork(db_session)
+    )
     from app.main import app
 
     app.dependency_overrides[get_dataset_service] = lambda: service
@@ -82,4 +88,7 @@ def test_dataset_api_keeps_list_and_download_contracts(client, teacher_token, db
     deleted = client.delete(f"/api/datasets/{record.id}", headers=headers)
     assert deleted.status_code == 200
     assert deleted.json() == {"message": "Dataset deleted successfully"}
-    assert client.get(f"/api/datasets/{record.id}/download", headers=headers).status_code == 404
+    assert (
+        client.get(f"/api/datasets/{record.id}/download", headers=headers).status_code
+        == 404
+    )

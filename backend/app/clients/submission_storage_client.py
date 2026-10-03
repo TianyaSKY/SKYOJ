@@ -2,7 +2,7 @@
 
 import os
 
-from app.utils.files import secure_filename
+from app.core.files import secure_filename
 
 
 class SubmissionStorageClient:
@@ -11,9 +11,7 @@ class SubmissionStorageClient:
     def __init__(self, base_dir: str = "uploads/submissions") -> None:
         self._base_dir = base_dir
 
-    def save(
-        self, user_id: int, problem_id: int, filename: str, content: bytes
-    ) -> str:
+    def save(self, user_id: int, problem_id: int, filename: str, content: bytes) -> str:
         """保存附件并返回判题服务可使用的本地路径。"""
         safe_name = secure_filename(filename)
         if not safe_name:

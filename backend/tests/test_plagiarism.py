@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from app.clients.jplag_client import JPlagClient
 from app.services.plagiarism import MatchedBlock, SimilarityPair
 
@@ -102,6 +101,7 @@ class TestPlagiarismService:
             service = PlagiarismService(
                 plagiarism_repo=mock_plagiarism_repo,
                 submission_repo=mock_submission_repo,
+                uow=MagicMock(),
             )
             service._job_service = mock_job_service
             job_id = service.trigger_scan(problem_id=5)
@@ -160,6 +160,7 @@ class TestPlagiarismService:
             plagiarism_repo=mock_plagiarism_repo,
             submission_repo=mock_submission_repo,
             jplag_client=mock_jplag,
+            uow=MagicMock(),
         )
 
         with patch.object(
@@ -202,6 +203,7 @@ class TestPlagiarismService:
             plagiarism_repo=mock_plagiarism_repo,
             submission_repo=mock_submission_repo,
             jplag_client=mock_jplag,
+            uow=MagicMock(),
         )
 
         with patch.object(
@@ -269,8 +271,7 @@ class TestPlagiarismRepository:
         mock_report.created_at = None
 
         service = PlagiarismService(
-            plagiarism_repo=MagicMock(),
-            submission_repo=MagicMock(),
+            plagiarism_repo=MagicMock(), submission_repo=MagicMock(), uow=MagicMock()
         )
         result = service._report_to_item(mock_report)
 

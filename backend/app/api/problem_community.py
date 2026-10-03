@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_solution_service, get_tag_service
 from app.api.schemas.problem_community import (
     AttachTagRequest,
@@ -21,7 +22,6 @@ from app.api.schemas.problem_community import (
     UpdateSolutionRequest,
 )
 from app.services.community import SolutionService, TagService
-from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter(prefix="/problems", tags=["community"])
 

@@ -1,6 +1,6 @@
 """判题时限换算回归测试。"""
 
-from app.services.sandbox_runner import time_limit_seconds
+from app.judging.sandbox import time_limit_seconds
 
 
 def test_time_limit_seconds_converts_milliseconds() -> None:

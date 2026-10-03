@@ -5,7 +5,7 @@ import uuid
 
 from app.core.config import BACKEND_ROOT
 from app.core.errors import ResourceNotFoundError
-from app.utils.files import secure_filename
+from app.core.files import secure_filename
 
 
 class AvatarStorageClient:

@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from app.core.errors import PermissionDeniedError, ResourceNotFoundError
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Optional
+
+from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
+from app.clients.redis_client import redis_client
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.persistence.community import ProblemCommunityRepository
+from app.persistence.problem import ProblemRecord, ProblemRepository
+from app.persistence.unit_of_work import UnitOfWork
 
 
 @dataclass(frozen=True)
@@ -110,32 +116,6 @@ class PaginatedProblems:
     problems: list[ProblemListItem]
 
 
-@dataclass
-class ProblemRecord:
-    """Problem 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    title: str
-    content: str
-    type: str
-    language: str
-    time_limit: int | None
-    memory_limit: int | None
-    test_case_path: str | None
-    template_code: str | None
-    created_at: datetime | None
-
-
-from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
-from app.persistence.community import ProblemCommunityRepository
-from app.persistence.problem import ProblemRepository, to_problem_result
-from app.utils.problem_cache import (
-    get_detail_cache,
-    invalidate_detail_cache,
-    set_detail_cache,
-)
-
-
 class ProblemService:
     """编排题目的创建、查询、更新和删除业务。"""
 
@@ -144,7 +124,10 @@ class ProblemService:
         problem_repository: ProblemRepository,
         test_case_storage: ProblemTestCaseStorageClient | None = None,
         community_repository: ProblemCommunityRepository | None = None,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._problem_repository = problem_repository
         self._community_repository = community_repository
         self._test_case_storage = test_case_storage or ProblemTestCaseStorageClient()
@@ -163,7 +146,7 @@ class ProblemService:
             memory_limit=params.memory_limit,
             template_code=params.template_code,
         )
-        self._problem_repository.unit_of_work.commit()
+        self._uow.commit()
         detail = to_problem_result(problem, with_content=True)
         # 新建题目的详情立即可缓存（首次读取必然命中）。
         set_detail_cache(detail.id, self._detail_to_dict(detail))
@@ -237,7 +220,6 @@ class ProblemService:
         if cached is not None:
             return self._detail_from_dict(cached)
         problem = self._require_problem(problem_id)
-        self._problem_repository.unit_of_work.commit()
         detail = to_problem_result(problem, with_content=True)
         set_detail_cache(detail.id, self._detail_to_dict(detail))
         return detail
@@ -263,7 +245,7 @@ class ProblemService:
         updated = to_problem_result(
             self._problem_repository.update(problem), with_content=True
         )
-        self._problem_repository.unit_of_work.commit()
+        self._uow.commit()
         # 写后失效：避免下次读取到陈旧内容。
         invalidate_detail_cache(problem_id)
         return updated
@@ -274,7 +256,7 @@ class ProblemService:
         problem = self._require_problem(problem_id)
         self._test_case_storage.delete_problem_directory(problem_id)
         self._problem_repository.delete(problem)
-        self._problem_repository.unit_of_work.commit()
+        self._uow.commit()
         invalidate_detail_cache(problem_id)
 
     def upload_test_cases(
@@ -305,7 +287,27 @@ class ProblemService:
         """读取题目的测试点状态，仅供教师管理页面使用。"""
         self._require_teacher(requester_role)
         self._require_problem(problem_id)
-        return self._test_case_storage.summarize(problem_id)
+        summary = self._test_case_storage.summarize(problem_id)
+        return TestCaseSummary(
+            status=summary.status,
+            total_count=summary.total_count,
+            valid_count=summary.valid_count,
+            invalid_count=summary.invalid_count,
+            file_count=summary.file_count,
+            total_size=summary.total_size,
+            ignored_files=summary.ignored_files,
+            cases=[
+                TestCaseItem(
+                    case.name,
+                    case.input_file,
+                    case.output_file,
+                    case.input_size,
+                    case.output_size,
+                    case.status,
+                )
+                for case in summary.cases
+            ],
+        )
 
     def _with_test_case_status(self, item: ProblemListItem) -> ProblemListItem:
         summary = self._test_case_storage.summarize(item.id)
@@ -362,3 +364,46 @@ class ProblemService:
             test_case_path=payload.get("test_case_path"),
             created_at=created_at,
         )
+
+
+def to_problem_result(
+    problem: ProblemRecord, *, with_content: bool = False
+) -> ProblemListItem | ProblemDetail:
+    """题目 快照 → 列表项或详情。"""
+
+    if with_content:
+        return ProblemDetail(
+            id=problem.id,
+            title=problem.title,
+            content=problem.content,
+            problem_type=problem.type,
+            language=problem.language,
+            time_limit=problem.time_limit,
+            memory_limit=problem.memory_limit,
+            template_code=problem.template_code or "",
+            test_case_path=problem.test_case_path,
+            created_at=problem.created_at,
+        )
+    return ProblemListItem(
+        id=problem.id,
+        title=problem.title,
+        problem_type=problem.type,
+        language=problem.language,
+        time_limit=problem.time_limit,
+        memory_limit=problem.memory_limit,
+    )
+
+
+def get_detail_cache(problem_id: int) -> dict | None:
+    """读取problem缓存。"""
+    return redis_client.get_json(f"skyoj:problem:{problem_id}:detail")
+
+
+def set_detail_cache(problem_id: int, payload: dict) -> None:
+    """写入problem缓存，保持现有有效期。"""
+    redis_client.set_json(f"skyoj:problem:{problem_id}:detail", payload, ttl=300)
+
+
+def invalidate_detail_cache(problem_id: int) -> None:
+    """业务写入后失效缓存。"""
+    redis_client.delete(f"skyoj:problem:{problem_id}:detail")

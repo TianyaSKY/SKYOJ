@@ -6,13 +6,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.defaults import sys_dict_kv
+from app.core.passwords import hash_password
+from app.persistence import Exam, ExamProblem, Problem, Submission, SysDict, User
+from app.persistence.database import Base, SessionLocal, engine
 from loguru import logger
 from sqlalchemy import select
-
-from app.persistence.database import Base, SessionLocal, engine
-from app.persistence import Exam, ExamProblem, Problem, Submission, SysDict, User
-from app.utils.passwords import hash_password
-from app.utils.sys_dict import sys_dict_kv
 
 
 def seed() -> None:

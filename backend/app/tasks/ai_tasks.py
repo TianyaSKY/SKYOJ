@@ -5,12 +5,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.clients.llm_client import LlmClient
-from app.persistence.database import SessionLocal
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import GENERATE_PROBLEM_TASK, GENERATE_TEST_SCRIPT_TASK
-from app.persistence.jobs import AiDraftRepository
-from app.persistence.jobs import AsyncJobRepository
+from app.persistence.database import SessionLocal
+from app.persistence.jobs import AiDraftRepository, AsyncJobRepository
 from app.persistence.problem import ProblemRepository
+from app.persistence.unit_of_work import UnitOfWork
 from app.services.ai_draft import AiDraftService
 from app.services.async_job import AsyncJobService
 from app.tasks.base import run_job
@@ -40,11 +40,13 @@ def generate_test_script(job_id: int) -> None:
 
 def _build_service(db: Session) -> AiDraftService:
     """Worker 内构造 AI 草稿服务（与 api/deps.get_ai_draft_service 同构）。"""
+    uow = UnitOfWork(db)
     return AiDraftService(
         draft_repository=AiDraftRepository(db),
         problem_repository=ProblemRepository(db),
-        job_service=AsyncJobService(AsyncJobRepository(db)),
+        job_service=AsyncJobService(AsyncJobRepository(db), uow=uow),
         llm_client=LlmClient(),
+        uow=uow,
     )
 
 

@@ -8,14 +8,15 @@
 - judge_duration_seconds      Histogram 判题耗时（秒）。
 """
 
+from fastapi import FastAPI
+from fastapi.responses import Response
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
     Counter,
     Gauge,
     Histogram,
     generate_latest,
-    CONTENT_TYPE_LATEST,
 )
-
 
 # ---------------------------------------------------------------------------
 # HTTP 请求指标（由 FastAPI 中间件写入）
@@ -88,7 +89,9 @@ def refresh_celery_queue_depth() -> None:
                                     queue_counts[q] = 0
         # 写入 Gauge（即使全是 0 也更新）。
         for queue_name in ("celery", "ai_tasks", "file_tasks"):
-            celery_queue_depth.labels(queue=queue_name).set(queue_counts.get(queue_name, 0))
+            celery_queue_depth.labels(queue=queue_name).set(
+                queue_counts.get(queue_name, 0)
+            )
     except Exception:
         for queue_name in ("celery", "ai_tasks", "file_tasks"):
             celery_queue_depth.labels(queue=queue_name).set(-1)
@@ -101,3 +104,32 @@ def get_metrics() -> bytes:
 
 def get_metrics_content_type() -> str:
     return CONTENT_TYPE_LATEST
+
+
+def register_metrics(application: FastAPI) -> None:
+    # Prometheus HTTP 指标中间件。
+    import time as time_module
+
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request as StarletteRequest
+
+    class PrometheusMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: StarletteRequest, call_next):
+            path = request.url.path
+            method = request.method
+            start = time_module.perf_counter()
+            response = await call_next(request)
+            duration = time_module.perf_counter() - start
+            http_requests_total.labels(
+                method=method, path=path, status=response.status_code
+            ).inc()
+            http_request_duration.labels(method=method, path=path).observe(duration)
+            return response
+
+    application.add_middleware(PrometheusMiddleware)
+
+    @application.get("/metrics")
+    def metrics_endpoint():
+        """Prometheus 抓取端点。"""
+        refresh_celery_queue_depth()
+        return Response(content=get_metrics(), media_type=get_metrics_content_type())

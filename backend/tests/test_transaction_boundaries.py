@@ -1,21 +1,16 @@
 """验证跨仓储的原子提交、回滚与发布前的持久化。"""
 
-from app.persistence.jobs import AsyncJobRepository
-
 import json
 from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
 from app.persistence.database import Base
-from app.services.ai_draft import TASK_PROBLEM_GENERATION
-from app.services.async_job import CreateAsyncJobParams
-from app.persistence.jobs import AiDraft
-from app.persistence.problem import Problem
-from app.persistence.jobs import AiDraftRepository
-from app.persistence.problem import ProblemRepository
-from app.services.ai_draft import AiDraftService
-from app.services.async_job import AsyncJobService
+from app.persistence.jobs import AiDraft, AiDraftRepository, AsyncJobRepository
+from app.persistence.problem import Problem, ProblemRepository
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.ai_draft import TASK_PROBLEM_GENERATION, AiDraftService
+from app.services.async_job import AsyncJobService, CreateAsyncJobParams
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -35,7 +30,9 @@ def test_apply_draft_rolls_back_problem_if_consumption_fails(monkeypatch):
         db.commit()
         draft_id = draft.id
         repo = AiDraftRepository(db)
-        service = AiDraftService(repo, ProblemRepository(db), MagicMock())
+        service = AiDraftService(
+            repo, ProblemRepository(db), MagicMock(), uow=UnitOfWork(db)
+        )
 
         def fail(_):
             raise RuntimeError("consumption failed")
@@ -58,7 +55,7 @@ def test_enqueue_is_committed_before_publish(tmp_path, monkeypatch):
     engine = create_engine(f"sqlite:///{tmp_path / 'queue.db'}")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        service = AsyncJobService(AsyncJobRepository(db))
+        service = AsyncJobService(AsyncJobRepository(db), uow=UnitOfWork(db))
         published = []
 
         def publish(job):
@@ -86,7 +83,7 @@ def test_worker_can_record_failure_after_database_flush_error(monkeypatch):
     sessions = sessionmaker(bind=engine)
     monkeypatch.setattr(base, "SessionLocal", sessions)
     with sessions() as seed:
-        service = AsyncJobService(AsyncJobRepository(seed))
+        service = AsyncJobService(AsyncJobRepository(seed), uow=UnitOfWork(seed))
         job = service.enqueue(
             CreateAsyncJobParams(
                 task_name="test", queue="judge", payload={}, dedupe_key="duplicate"

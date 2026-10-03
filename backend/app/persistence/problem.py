@@ -2,19 +2,30 @@
 
 from __future__ import annotations
 
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
 from sqlalchemy import Column, DateTime, Enum, Integer, String, Text, func
 from sqlalchemy.orm import Session, relationship
-from typing import Optional, TYPE_CHECKING
+
+from app.persistence.database import Base
 
 
-if TYPE_CHECKING:
-    from app.services.problem import ProblemRecord
+@dataclass
+class ProblemRecord:
+    """Problem 的数据库快照；不携带 ORM 或 Session。"""
 
-
-if TYPE_CHECKING:
-    from app.services.problem import ProblemDetail, ProblemListItem
+    id: int
+    title: str
+    content: str
+    type: str
+    language: str
+    time_limit: int | None
+    memory_limit: int | None
+    test_case_path: str | None
+    template_code: str | None
+    created_at: datetime | None
 
 
 class Problem(Base):
@@ -65,7 +76,6 @@ class ProblemRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, problem_id: int) -> Optional[ProblemRecord]:
         """按主键查询题目。"""
@@ -131,39 +141,8 @@ class ProblemRepository:
         self._db.flush()
 
 
-def to_problem_result(
-    problem, *, with_content: bool = False
-) -> ProblemListItem | ProblemDetail:
-    """题目 ORM → 列表项或详情。"""
-
-    from app.services.problem import ProblemDetail, ProblemListItem
-
-    if with_content:
-        return ProblemDetail(
-            id=problem.id,
-            title=problem.title,
-            content=problem.content,
-            problem_type=problem.type,
-            language=problem.language,
-            time_limit=problem.time_limit,
-            memory_limit=problem.memory_limit,
-            template_code=problem.template_code or "",
-            test_case_path=problem.test_case_path,
-            created_at=problem.created_at,
-        )
-    return ProblemListItem(
-        id=problem.id,
-        title=problem.title,
-        problem_type=problem.type,
-        language=problem.language,
-        time_limit=problem.time_limit,
-        memory_limit=problem.memory_limit,
-    )
-
-
 def _to_problem_record(row: Problem | None) -> ProblemRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.problem import ProblemRecord
 
     if row is None or isinstance(row, ProblemRecord):
         return row

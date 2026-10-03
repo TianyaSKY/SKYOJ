@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_exam_service
 from app.api.schemas.common import MessageResponse
 from app.api.schemas.exam import (
@@ -24,14 +25,14 @@ from app.api.schemas.exam import (
     RankResponse,
     UpdateExamBody,
 )
+from app.core.auth_tokens import encode_auth_token
 from app.services.exam import (
     AddExamProblemParams,
     CreateExamParams,
     EnterExamParams,
+    ExamService,
     UpdateExamParams,
 )
-from app.services.exam import ExamService
-from app.utils.auth_tools import AuthContext, encode_auth_token, get_current_auth
 
 router = APIRouter()
 

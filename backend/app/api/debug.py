@@ -9,12 +9,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import ValidationError
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_debug_service
 from app.api.schemas.debug import DebugCodeBody
 from app.api.schemas.debug_run import CreateDebugRunResponse, DebugRunResponse
-from app.services.debug import CreateDebugRunParams
-from app.services.debug import DebugService
-from app.utils.auth_tools import AuthContext, get_current_auth
+from app.services.debug import CreateDebugRunParams, DebugService
 
 router = APIRouter()
 

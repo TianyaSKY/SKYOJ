@@ -6,9 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
-from app.services.exam import EnterExamParams
-from app.services.exam import ExamService
 from app.core.time import utcnow
+from app.services.exam import EnterExamParams, ExamService
 
 
 class FakeExamRepository:
@@ -65,7 +64,9 @@ def _problem():
 
 
 def test_hidden_exam_is_not_discoverable_to_students() -> None:
-    service = ExamService(FakeExamRepository(_exam(visible=False), [_problem()]))
+    service = ExamService(
+        FakeExamRepository(_exam(visible=False), [_problem()]), uow=MagicMock()
+    )
 
     with pytest.raises(ResourceNotFoundError):
         service.get_detail(8, "student", -1)
@@ -78,7 +79,8 @@ def test_hidden_exam_is_not_discoverable_to_students() -> None:
 def test_password_exam_hides_problems_until_entered() -> None:
     hashed = ExamService._hash_password("secret")
     service = ExamService(
-        FakeExamRepository(_exam(visible=True, password=hashed), [_problem()])
+        FakeExamRepository(_exam(visible=True, password=hashed), [_problem()]),
+        uow=MagicMock(),
     )
 
     preview = service.get_detail(8, "student", -1)
@@ -94,6 +96,8 @@ def test_password_exam_hides_problems_until_entered() -> None:
 
 
 def test_teacher_can_read_hidden_exam_detail() -> None:
-    service = ExamService(FakeExamRepository(_exam(visible=False), [_problem()]))
+    service = ExamService(
+        FakeExamRepository(_exam(visible=False), [_problem()]), uow=MagicMock()
+    )
     detail = service.get_detail(8, "teacher", -1)
     assert [item.problem_id for item in detail.problems] == [3]

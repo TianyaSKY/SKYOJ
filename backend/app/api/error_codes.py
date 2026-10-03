@@ -10,8 +10,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 # 认证域
 AUTH_REQUIRED = "AUTH_REQUIRED"
 AUTH_TOKEN_EXPIRED = "AUTH_TOKEN_EXPIRED"

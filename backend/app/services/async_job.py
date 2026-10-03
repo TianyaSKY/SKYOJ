@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
-from app.core.json import JsonValue
-from app.core.time import utcnow
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from loguru import logger
-from sqlalchemy.exc import IntegrityError
 from typing import Optional
 
+from app.core.json import JsonValue
+from app.core.time import utcnow
+from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
+from app.messaging.task_names import (
+    DEBUG_SUBMISSION_TASK,
+    EXECUTE_TEST_DATA_TASK,
+    FINALIZE_DATASET_TASK,
+    GENERATE_PROBLEM_TASK,
+    GENERATE_TEST_SCRIPT_TASK,
+    JUDGE_SUBMISSION_TASK,
+)
+from app.persistence.jobs import AsyncJobRecord, AsyncJobRepository
+from app.persistence.unit_of_work import UnitOfWork
+from loguru import logger
+from sqlalchemy.exc import IntegrityError
 
 JOB_PENDING = "pending"
 JOB_RUNNING = "running"
@@ -56,47 +67,19 @@ class AsyncJobResult:
     updated_at: Optional[datetime]
 
 
-@dataclass
-class AsyncJobRecord:
-    """AsyncJob 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    task_name: str
-    queue: str
-    payload: str
-    status: str
-    dedupe_key: str | None
-    attempts: int
-    max_attempts: int
-    lease_until: datetime | None
-    available_at: datetime
-    started_at: datetime | None
-    finished_at: datetime | None
-    last_error: str | None
-    created_at: datetime
-    updated_at: datetime
-
-
-from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
-from app.messaging.task_names import (
-    DEBUG_SUBMISSION_TASK,
-    EXECUTE_TEST_DATA_TASK,
-    FINALIZE_DATASET_TASK,
-    GENERATE_PROBLEM_TASK,
-    GENERATE_TEST_SCRIPT_TASK,
-    JUDGE_SUBMISSION_TASK,
-)
-from app.persistence.jobs import AsyncJobRepository, to_async_job_result
-
-
 class AsyncJobService:
     """编排数据库任务状态与 RabbitMQ 发布。"""
 
-    def __init__(self, repository: AsyncJobRepository) -> None:
+    def __init__(self, repository: AsyncJobRepository, *, uow: UnitOfWork) -> None:
+        self._uow = uow
         self._repository = repository
 
     def enqueue(self, params: CreateAsyncJobParams) -> AsyncJobResult:
-        """创建任务并直接投递给 RabbitMQ；重复幂等键直接返回原任务。"""
+        """与当前业务写入一起提交任务，再投递；投递失败保留任务供恢复器重试。
+
+        调用者与任务仓储必须共享同一 UoW，禁止在此调用前提交业务记录。
+        async_jobs 同时作为持久化投递日志，恢复器负责补发未消费的 pending 任务。
+        """
         if params.dedupe_key:
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is not None:
@@ -112,15 +95,18 @@ class AsyncJobService:
                 max_attempts=params.max_attempts,
                 available_at=available_at,
             )
-            self._repository.unit_of_work.commit()
+            self._uow.commit()
         except IntegrityError:
-            self._repository.unit_of_work.rollback()
+            self._uow.rollback()
             if not params.dedupe_key:
                 raise
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is None:
                 raise
             return to_async_job_result(existing)
+        except Exception:
+            self._uow.rollback()
+            raise
         logger.info(
             "已创建异步任务 job_id={} task={} queue={}",
             job.id,
@@ -130,11 +116,12 @@ class AsyncJobService:
         try:
             self._publish(job)
         except Exception as exc:
-            # 投递失败即撤销任务记录，客户端可重试（dedupe 键不复用僵尸任务）
-            self._repository.delete(job)
-            self._repository.unit_of_work.commit()
-            logger.exception("发布异步任务失败 job_id={} queue={}", job.id, job.queue)
-            raise
+            logger.exception(
+                "发布异步任务失败，保留已提交任务等待恢复 job_id={} queue={} error={}",
+                job.id,
+                job.queue,
+                exc,
+            )
         return to_async_job_result(job)
 
     def _publish(self, job, *, countdown: int | None = None) -> None:
@@ -222,13 +209,13 @@ class AsyncJobService:
             now=now,
             lease_until=now + timedelta(seconds=max(1, lease_seconds)),
         )
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         return to_async_job_result(job) if job is not None else None
 
     def complete_job(self, job_id: int) -> AsyncJobResult | None:
         """标记任务成功。"""
         job = self._repository.mark_succeeded(job_id, now=utcnow())
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         return to_async_job_result(job) if job is not None else None
 
     def fail_job(
@@ -252,7 +239,7 @@ class AsyncJobService:
             now=now,
             retry_at=retry_at,
         )
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         if failed is not None:
             logger.warning(
                 "异步任务失败 job_id={} retry={} status={} error={}",
@@ -265,7 +252,7 @@ class AsyncJobService:
                 delay = max(0, int((retry_at - now).total_seconds()))
                 try:
                     self._publish(failed, countdown=delay)
-                except Exception as exc:
+                except Exception:
                     logger.exception(
                         "重新投递失败任务 job_id={} queue={}",
                         job_id,
@@ -276,11 +263,11 @@ class AsyncJobService:
     def recover_expired_jobs(self, *, limit: int = 100) -> int:
         """恢复过期租约任务并重新投递。"""
         jobs = self._repository.recover_expired(now=utcnow(), limit=limit)
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         for job in jobs:
             try:
                 self._publish(job)
-            except Exception as exc:
+            except Exception:
                 logger.exception("重新投递过期任务失败 job_id={}", job.id)
         if jobs:
             logger.warning("已恢复过期异步任务数量={}", len(jobs))
@@ -295,3 +282,19 @@ class AsyncJobService:
     def parse_payload(raw: str) -> dict[str, JsonValue]:
         """解析任务 JSON 参数。"""
         return AsyncJobRepository.parse_payload(raw)
+
+
+def to_async_job_result(job: AsyncJobRecord) -> AsyncJobResult:
+    """异步任务 快照 → 对外快照。"""
+
+    return AsyncJobResult(
+        id=job.id,
+        task_name=job.task_name,
+        queue=job.queue,
+        status=job.status,
+        attempts=job.attempts,
+        max_attempts=job.max_attempts,
+        lease_until=job.lease_until,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )

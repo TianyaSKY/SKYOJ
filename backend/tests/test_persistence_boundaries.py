@@ -4,20 +4,17 @@ from dataclasses import fields, is_dataclass
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
-from app.persistence.database import Base
-
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
 from app.persistence.community import (
     ProblemCommunityRepository,
     ProblemSolution,
     ProblemSolutionLike,
 )
+from app.persistence.database import Base
 from app.persistence.jobs import AiDraftRepository
 from app.persistence.problem import ProblemRepository
 from app.persistence.submission import SubmissionRepository
+from app.persistence.unit_of_work import UnitOfWork
 from app.persistence.user import UserRepository, WrongBook, WrongBookRepository
 from app.services.community import (
     AttachTagParams,
@@ -29,6 +26,9 @@ from app.services.community import (
     UpdateSolutionParams,
 )
 from app.services.wrong_book import WrongBookService
+from sqlalchemy import create_engine, inspect
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def test_community_mutations_persist_snapshots_and_counts(
     db_session, student_user, teacher_user, sample_problem
 ):
     repo = ProblemCommunityRepository(db_session)
-    service = SolutionService(repo)
+    service = SolutionService(repo, uow=UnitOfWork(db_session))
     created = service.create(
         CreateSolutionParams(
             sample_problem.id, student_user.id, "题解", "旧解法", "python"
@@ -132,7 +132,7 @@ def test_like_and_counter_roll_back_together(
     db_session, student_user, sample_problem, monkeypatch
 ):
     repo = ProblemCommunityRepository(db_session)
-    service = SolutionService(repo)
+    service = SolutionService(repo, uow=UnitOfWork(db_session))
     created = service.create(
         CreateSolutionParams(sample_problem.id, student_user.id, "题解", "解法")
     )
@@ -149,7 +149,7 @@ def test_tag_approval_persists_and_problem_filter_uses_injected_repository(
     db_session, teacher_user, sample_problem
 ):
     repo = ProblemCommunityRepository(db_session)
-    service = TagService(repo)
+    service = TagService(repo, uow=UnitOfWork(db_session))
     tag = service.create(CreateTagParams("teacher", "arrays", "数组"))
     service.attach(AttachTagParams(sample_problem.id, tag.id, False, "student"))
     assert repo.list_problem_ids_by_tag(tag.id) == []
@@ -158,7 +158,9 @@ def test_tag_approval_persists_and_problem_filter_uses_injected_repository(
     assert service.list_for_problem(sample_problem.id)[0].id == tag.id
     from app.services.problem import ProblemService
 
-    problem_service = ProblemService(ProblemRepository(db_session), MagicMock(), repo)
+    problem_service = ProblemService(
+        ProblemRepository(db_session), MagicMock(), repo, uow=UnitOfWork(db_session)
+    )
     assert [
         item.id for item in problem_service.list_problems("teacher", tag_id=tag.id)
     ] == [sample_problem.id]
@@ -173,7 +175,7 @@ def test_wrong_book_checks_owner_before_writing_and_updates_stats(
         student_user.id, sample_problem.id, None, "python", "print(1)"
     )
     repo = WrongBookRepository(db_session)
-    service = WrongBookService(repo)
+    service = WrongBookService(repo, uow=UnitOfWork(db_session))
     service.on_judge_complete(
         student_user.id, sample_problem.id, submission.id, "Wrong Answer"
     )

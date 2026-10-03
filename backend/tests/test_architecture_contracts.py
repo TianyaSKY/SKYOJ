@@ -137,3 +137,38 @@ def test_persistence_registry_has_all_expected_tables():
         "problem_solution_favorites",
         "problem_solution_comments",
     }
+
+
+def test_persistence_and_clients_do_not_depend_on_services_or_api():
+    """包括局部导入和类型检查导入，基础设施不得反向引用业务或 HTTP。"""
+    for directory in ("persistence", "clients"):
+        for path in (APP / directory).rglob("*.py"):
+            for node in ast.walk(ast.parse(path.read_text())):
+                modules = []
+                if isinstance(node, ast.ImportFrom):
+                    modules = [node.module or ""]
+                elif isinstance(node, ast.Import):
+                    modules = [alias.name for alias in node.names]
+                assert not any(
+                    module.startswith(("app.services", "app.api")) for module in modules
+                ), path
+
+
+def test_repositories_do_not_own_unit_of_work():
+    for path in (APP / "persistence").glob("*.py"):
+        for cls in ast.parse(path.read_text()).body:
+            if isinstance(cls, ast.ClassDef) and cls.name.endswith("Repository"):
+                assert not any(
+                    isinstance(node, ast.Attribute) and node.attr == "unit_of_work"
+                    for node in ast.walk(cls)
+                ), path
+
+
+def test_utils_and_judge_engine_compatibility_modules_stay_removed():
+    assert not (APP / "utils").exists()
+    for name in ("acm", "oop", "kaggle", "sandbox_runner", "test_gen"):
+        assert not (APP / "services" / f"{name}.py").exists()
+    for path in (APP / "services").glob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.ImportFrom):
+                assert not (node.module or "").startswith("app.api"), path

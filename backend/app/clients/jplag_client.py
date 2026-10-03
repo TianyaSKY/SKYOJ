@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.services.plagiarism import MatchedBlock, SimilarityPair
-
-
 import os
 import time
 from dataclasses import dataclass
 
 import requests
 from loguru import logger
+
+
+@dataclass(frozen=True)
+class JPlagMatchedBlock:
+    start_a: int
+    end_a: int
+    start_b: int
+    end_b: int
+    code_a: str
+    code_b: str
+
+
+@dataclass(frozen=True)
+class JPlagSimilarityPair:
+    submission_a_id: int
+    submission_b_id: int
+    score: float
+    matched_blocks: list[JPlagMatchedBlock]
 
 
 JPLAG_BASE_URL = os.getenv("JPLAG_URL", "http://localhost:25678")
@@ -52,7 +64,7 @@ class JPlagClient:
         language: str | None = None,
         base_code: str | None = None,
         min_match_length: int = 8,
-    ) -> list[SimilarityPair]:
+    ) -> list[JPlagSimilarityPair]:
         """向 JPlag 提交比对任务，等待完成并返回相似对列表。"""
         if len(submissions) < 2:
             return []
@@ -65,13 +77,14 @@ class JPlagClient:
         payload: dict = {
             "language": resolved_lang,
             "files": [
-                {"name": f"sub_{s['id']}.py", "data": s["code"]}
-                for s in submissions
+                {"name": f"sub_{s['id']}.py", "data": s["code"]} for s in submissions
             ],
             "submission-title-mapping": {
                 f"sub_{s['id']}.py": str(s["id"]) for s in submissions
             },
-            "basecode": {"files": [{"name": "base.py", "data": base_code}]} if base_code else None,
+            "basecode": {"files": [{"name": "base.py", "data": base_code}]}
+            if base_code
+            else None,
             "parameters": {
                 "minimum-match-length": min_match_length,
                 "maximum-gap": 3,
@@ -107,7 +120,9 @@ class JPlagClient:
         _, dot_ext = ext.rsplit(".", 1) if "." in ext else ("", "py")
         return LANGUAGE_MAP.get(dot_ext.lower(), "python3")
 
-    def _poll_result(self, result_id: str, submissions: list[dict]) -> list[SimilarityPair]:
+    def _poll_result(
+        self, result_id: str, submissions: list[dict]
+    ) -> list[JPlagSimilarityPair]:
         max_wait = JPLAG_TIMEOUT
         interval = 2
         elapsed = 0
@@ -134,9 +149,9 @@ class JPlagClient:
 
     def _parse_matches(
         self, data: dict, submissions: list[dict]
-    ) -> list[SimilarityPair]:
-        from app.services.plagiarism import MatchedBlock, SimilarityPair
-        pairs: list[SimilarityPair] = []
+    ) -> list[JPlagSimilarityPair]:
+
+        pairs: list[JPlagSimilarityPair] = []
         submission_ids = {f"sub_{s['id']}.py": s["id"] for s in submissions}
         id_to_code = {s["id"]: s["code"] for s in submissions}
 
@@ -157,21 +172,29 @@ class JPlagClient:
             similarity = match.get("similarity", 0.0)
             raw_blocks = match.get("submatches", match.get("blocks", []))
 
-            blocks: list[MatchedBlock] = []
+            blocks: list[JPlagMatchedBlock] = []
             for rb in raw_blocks:
-                sa, ea = rb.get("start_in_submission_a", 0), rb.get("end_in_submission_a", 0)
-                sb, eb = rb.get("start_in_submission_b", 0), rb.get("end_in_submission_b", 0)
+                sa, ea = (
+                    rb.get("start_in_submission_a", 0),
+                    rb.get("end_in_submission_a", 0),
+                )
+                sb, eb = (
+                    rb.get("start_in_submission_b", 0),
+                    rb.get("end_in_submission_b", 0),
+                )
                 blocks.append(
-                    MatchedBlock(
-                        start_a=sa, end_a=ea,
-                        start_b=sb, end_b=eb,
+                    JPlagMatchedBlock(
+                        start_a=sa,
+                        end_a=ea,
+                        start_b=sb,
+                        end_b=eb,
                         code_a=self._extract_lines(id_to_code.get(s1_id, ""), sa, ea),
                         code_b=self._extract_lines(id_to_code.get(s2_id, ""), sb, eb),
                     )
                 )
 
             pairs.append(
-                SimilarityPair(
+                JPlagSimilarityPair(
                     submission_a_id=min(s1_id, s2_id),
                     submission_b_id=max(s1_id, s2_id),
                     score=float(similarity),

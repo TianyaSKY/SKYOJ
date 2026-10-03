@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from app.core.errors import PermissionDeniedError, ResourceNotFoundError
-from app.core.json import JsonValue
 from dataclasses import asdict, dataclass
 from datetime import datetime
+
+from app.clients.jplag_client import JPlagAPIError, JPlagClient
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.messaging.queues import JUDGE_QUEUE
+from app.messaging.task_names import SCAN_PLAGIARISM_TASK
+from app.persistence.submission import PlagiarismRepository, SubmissionRepository
+from app.persistence.unit_of_work import UnitOfWork
+from app.services.async_job import AsyncJobService, CreateAsyncJobParams
 from loguru import logger
-from typing import TYPE_CHECKING
-
-
-if TYPE_CHECKING:
-    from app.services.submission import SubmissionRecord
 
 
 @dataclass(frozen=True)
@@ -66,31 +67,6 @@ class PaginatedPlagiarismReports:
     reports: list[PlagiarismReportItem]
 
 
-@dataclass
-class PlagiarismReportRecord:
-    """PlagiarismReport 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    problem_id: int
-    submission_a_id: int
-    submission_b_id: int
-    similarity_score: float | None
-    matched_blocks: list[dict[str, JsonValue]] | None
-    status: str | None
-    jplag_result_id: str | None
-    created_at: datetime | None
-    updated_at: datetime | None
-    submission_a: SubmissionRecord | None
-    submission_b: SubmissionRecord | None
-
-
-from app.clients.jplag_client import JPlagAPIError, JPlagClient
-from app.messaging.queues import JUDGE_QUEUE
-from app.messaging.task_names import SCAN_PLAGIARISM_TASK
-from app.persistence.submission import PlagiarismRepository, SubmissionRepository
-from app.services.async_job import AsyncJobService, CreateAsyncJobParams
-
-
 class PlagiarismService:
     def __init__(
         self,
@@ -98,7 +74,10 @@ class PlagiarismService:
         submission_repo: SubmissionRepository,
         jplag_client: JPlagClient | None = None,
         job_service: AsyncJobService | None = None,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._plagiarism_repo = plagiarism_repo
         self._submission_repo = submission_repo
         self._jplag_client = jplag_client or JPlagClient()
@@ -113,7 +92,8 @@ class PlagiarismService:
                 task_name=SCAN_PLAGIARISM_TASK,
                 queue=JUDGE_QUEUE,
                 payload={"problem_id": problem_id, "min_similarity": 0.3},
-                dedupe_key=f"plagiarism-scan:{problem_id}",
+                # 手动扫描允许重复触发，不能命中已完成的历史任务。
+                dedupe_key=None,
                 max_attempts=1,
             )
         )
@@ -160,7 +140,7 @@ class PlagiarismService:
             raise
 
         high_risk: list[SimilarityPair] = []
-        with self._plagiarism_repo.unit_of_work.transaction():
+        with self._uow.transaction():
             for pair in similarity_pairs:
                 if pair.score < min_similarity:
                     continue
@@ -172,7 +152,24 @@ class PlagiarismService:
                     blocks=[asdict(b) for b in pair.matched_blocks],
                     status="completed",
                 )
-                high_risk.append(pair)
+                high_risk.append(
+                    SimilarityPair(
+                        pair.submission_a_id,
+                        pair.submission_b_id,
+                        pair.score,
+                        [
+                            MatchedBlock(
+                                b.start_a,
+                                b.end_a,
+                                b.start_b,
+                                b.end_b,
+                                b.code_a,
+                                b.code_b,
+                            )
+                            for b in pair.matched_blocks
+                        ],
+                    )
+                )
 
         logger.info(
             "题目 #{} 查重完成，共 {} 对提交，发现 {} 对高相似度",

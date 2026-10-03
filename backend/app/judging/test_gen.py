@@ -6,8 +6,8 @@ import io
 import os
 import shutil
 import tarfile
-from app.services.sandbox_runner import SandboxRunner
 
+from app.judging.sandbox import SandboxRunner
 
 # 使用专门的生成沙箱镜像
 GEN_IMAGE_NAME = "skyoj-generator"
@@ -23,7 +23,7 @@ def run_test_generation(problem_id, code):
 
             # 将生成脚本上传到容器
             # 假设脚本是 Python 编写的
-            runner.put_file('generator.py', code)
+            runner.put_file("generator.py", code)
 
             # 创建输出目录 (在 Dockerfile 中已授权给 generator 用户)
             runner.exec_run("mkdir -p /app/output")
@@ -38,7 +38,7 @@ def run_test_generation(problem_id, code):
                 return False, f"Execution Error: {output}"
 
             # 从容器中获取生成的测试文件
-            bits, stat = runner.get_archive('/app/output')
+            bits, stat = runner.get_archive("/app/output")
 
             # 准备宿主机存储路径
             problem_dir = os.path.join("uploads/problems", str(problem_id))
@@ -56,10 +56,13 @@ def run_test_generation(problem_id, code):
                 tar.extractall(path=problem_dir)
 
             # get_archive 会包含 'output' 这一层目录，我们需要把里面的文件移出来
-            extracted_output_dir = os.path.join(problem_dir, 'output')
+            extracted_output_dir = os.path.join(problem_dir, "output")
             if os.path.exists(extracted_output_dir):
                 for filename in os.listdir(extracted_output_dir):
-                    shutil.move(os.path.join(extracted_output_dir, filename), os.path.join(problem_dir, filename))
+                    shutil.move(
+                        os.path.join(extracted_output_dir, filename),
+                        os.path.join(problem_dir, filename),
+                    )
                 os.rmdir(extracted_output_dir)
 
             return True, "Test cases generated and saved successfully."

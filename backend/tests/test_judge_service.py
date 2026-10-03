@@ -1,11 +1,12 @@
 """判题子系统重构测试：分发→update_result、SandboxRunner 参数透传、无 import 环。"""
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
-import pytest
-
-from app.services import acm, judge, sandbox_runner
+from app.judging import acm
+from app.judging import sandbox as sandbox_runner
 from app.persistence.unit_of_work import UnitOfWork
+from app.services import judge
 
 
 class _StubSubmission:
@@ -45,7 +46,9 @@ def make_repo_factory(problem_type):
         def update_result(
             self, submission_id, *, status, score, output_log, case_results=None
         ):
-            self.updates.append((submission_id, status, score, output_log, case_results))
+            self.updates.append(
+                (submission_id, status, score, output_log, case_results)
+            )
 
     return _FakeSubmissionRepository
 
@@ -61,11 +64,14 @@ def test_judge_submission_dispatches_acm_and_updates_result(monkeypatch):
     monkeypatch.setattr(judge, "run_acm_judge", fake_acm_judge)
     monkeypatch.setattr(judge, "SubmissionRepository", repo_factory)
 
+    monkeypatch.setattr("app.persistence.user.WrongBookRepository", MagicMock())
     db = _StubDb()
     judge.judge_submission(7, db)
 
     assert calls["args"] == (7, "print(1)", 1, "python", db)
-    assert repo_factory.last.updates == [(7, "Accepted", 100.0, "Test Case 1: Passed", [])]
+    assert repo_factory.last.updates == [
+        (7, "Accepted", 100.0, "Test Case 1: Passed", [])
+    ]
     assert db.committed == 1
 
 
@@ -73,10 +79,13 @@ def test_judge_submission_unsupported_type_marks_system_error(monkeypatch):
     repo_factory = make_repo_factory("text")
     monkeypatch.setattr(judge, "SubmissionRepository", repo_factory)
 
+    monkeypatch.setattr("app.persistence.user.WrongBookRepository", MagicMock())
     db = _StubDb()
     judge.judge_submission(7, db)
 
-    assert repo_factory.last.updates == [(7, "System Error", 0, "Unsupported problem type", [])]
+    assert repo_factory.last.updates == [
+        (7, "System Error", 0, "Unsupported problem type", [])
+    ]
 
 
 def test_judge_submission_marks_system_error_on_exception(monkeypatch):
@@ -87,6 +96,7 @@ def test_judge_submission_marks_system_error_on_exception(monkeypatch):
     monkeypatch.setattr(judge, "run_acm_judge", boom)
     monkeypatch.setattr(judge, "SubmissionRepository", repo_factory)
 
+    monkeypatch.setattr("app.persistence.user.WrongBookRepository", MagicMock())
     db = _StubDb()
     judge.judge_submission(7, db)
 
@@ -115,6 +125,7 @@ def test_judge_submission_missing_submission_skips(monkeypatch):
 
     monkeypatch.setattr(judge, "SubmissionRepository", _EmptyRepo)
 
+    monkeypatch.setattr("app.persistence.user.WrongBookRepository", MagicMock())
     db = _StubDb()
     judge.judge_submission(7, db)
 
@@ -278,7 +289,9 @@ def test_sandbox_runner_context_manager_stops(monkeypatch):
         def run(self, image, command, **kwargs):
             return FakeContainer()
 
-    monkeypatch.setattr(sandbox_runner, "client", SimpleNamespace(containers=FakeContainers()))
+    monkeypatch.setattr(
+        sandbox_runner, "client", SimpleNamespace(containers=FakeContainers())
+    )
 
     with sandbox_runner.SandboxRunner() as runner:
         runner.launch()
@@ -292,10 +305,10 @@ def test_no_import_cycle_between_judge_modules():
     """judge 与模式模块可以以任意顺序导入。"""
     import importlib
 
-    for module_name in ("app.services.acm", "app.services.judge"):
+    for module_name in ("app.judging.acm", "app.services.judge"):
         importlib.import_module(module_name)
+    import app.judging.acm  # noqa: F401
+    import app.judging.kaggle  # noqa: F401
+    import app.judging.oop  # noqa: F401
+    import app.judging.test_gen  # noqa: F401
     import app.services.judge  # noqa: F401
-    import app.services.acm  # noqa: F401
-    import app.services.oop  # noqa: F401
-    import app.services.kaggle  # noqa: F401
-    import app.services.test_gen  # noqa: F401

@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 from app.clients.dataset_storage_client import DatasetStorageClient
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import FINALIZE_DATASET_TASK
-from app.persistence.jobs import AsyncJobRepository
 from app.persistence.dataset import DatasetRepository
+from app.persistence.jobs import AsyncJobRepository
+from app.persistence.unit_of_work import UnitOfWork
 from app.services.async_job import AsyncJobService
 from app.services.dataset import DatasetService
 from app.tasks.base import run_job
@@ -26,10 +27,12 @@ def finalize_dataset(job_id: int) -> None:
 
 def _handle_finalize_dataset(db: Session, payload: dict[str, Any]):
     """在 File Worker 中执行数据集落盘。"""
+    uow = UnitOfWork(db)
     service = DatasetService(
         dataset_repository=DatasetRepository(db),
         storage_client=DatasetStorageClient(),
-        job_service=AsyncJobService(AsyncJobRepository(db)),
+        job_service=AsyncJobService(AsyncJobRepository(db), uow=uow),
+        uow=uow,
     )
     return service.finalize_dataset(int(payload["dataset_id"]))
 

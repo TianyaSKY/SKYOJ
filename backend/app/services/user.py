@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from app.core.errors import PermissionDeniedError, ResourceNotFoundError
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
+
+from app.clients.avatar_storage_client import AvatarStorageClient
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.persistence.submission import SubmissionRecord
+from app.persistence.unit_of_work import UnitOfWork
+from app.persistence.user import UserRecord, UserRepository
 
 
 @dataclass(frozen=True)
@@ -48,25 +53,6 @@ class UploadAvatarParams:
     content: bytes
 
 
-@dataclass
-class UserRecord:
-    """User 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    username: str
-    password_hash: str
-    role: str | None
-    avatar: str | None
-
-
-from app.clients.avatar_storage_client import AvatarStorageClient
-from app.persistence.user import (
-    UserRepository,
-    to_user_profile,
-    to_user_submission_item,
-)
-
-
 class UserService:
     """编排用户资料、头像和提交记录业务。"""
 
@@ -74,7 +60,10 @@ class UserService:
         self,
         user_repository: UserRepository,
         avatar_storage_client: AvatarStorageClient,
+        *,
+        uow: UnitOfWork,
     ) -> None:
+        self._uow = uow
         self._user_repository = user_repository
         self._avatar_storage_client = avatar_storage_client
 
@@ -94,7 +83,7 @@ class UserService:
         user = self._require_user(params.user_id)
         avatar = self._avatar_storage_client.save(params.filename, params.content)
         updated = to_user_profile(self._user_repository.update_avatar(user, avatar))
-        self._user_repository.unit_of_work.commit()
+        self._uow.commit()
         return updated
 
     def get_avatar_path(self, filename: str) -> str:
@@ -123,3 +112,29 @@ class UserService:
     def _require_teacher(role: str) -> None:
         if role != "teacher":
             raise PermissionDeniedError("没有教师权限")
+
+
+def to_user_profile(user: UserRecord) -> UserProfile:
+    """用户 快照 → 公开资料。"""
+
+    return UserProfile(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        avatar=user.avatar,
+    )
+
+
+def to_user_submission_item(submission: SubmissionRecord) -> UserSubmissionItem:
+    """提交 快照 → 用户提交项（problem_title 取 submission.problem.title，调用方须预取）。"""
+
+    return UserSubmissionItem(
+        id=submission.id,
+        problem_id=submission.problem_id,
+        problem_title=submission.problem.title if submission.problem else "Unknown",
+        status=submission.status,
+        score=submission.score,
+        language=submission.language,
+        created_at=submission.created_at,
+        exam_id=submission.exam_id,
+    )

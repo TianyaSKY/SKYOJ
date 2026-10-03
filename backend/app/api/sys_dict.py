@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_system_service
 from app.api.schemas.common import MessageResponse
 from app.api.schemas.sys_dict import (
@@ -14,9 +15,7 @@ from app.api.schemas.sys_dict import (
     UpdateSysConfigResponse,
 )
 from app.persistence.database import get_db
-from app.services.system import UpdateSystemConfigParams
-from app.services.system import SystemService
-from app.utils.auth_tools import AuthContext, get_current_auth
+from app.services.system import SystemService, UpdateSystemConfigParams
 
 router = APIRouter()
 

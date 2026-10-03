@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from sqlalchemy import (
     Boolean,
     Column,
@@ -16,17 +18,46 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Session, joinedload, relationship, selectinload
-from typing import TYPE_CHECKING
+
+from app.persistence.database import Base
+from app.persistence.problem import ProblemRecord
+
+
+@dataclass
+class ExamRecord:
+    """Exam 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    title: str
+    description: str | None
+    start_time: datetime
+    end_time: datetime
+    contest_type: str
+    freeze_minutes: int | None
+    password: str | None
+    is_visible: bool | None
+    created_by: int | None
+
+
+@dataclass
+class ExamProblemRecord:
+    """ExamProblem 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    exam_id: int
+    problem_id: int
+    display_id: str | None
+    score: int | None
+    problem: ProblemRecord | None
+
 
 if TYPE_CHECKING:
-    from app.services.user import UserRecord
-    from app.services.submission import SubmissionRecord
-    from app.services.exam import ExamRecord, ExamProblemRecord
+    from app.persistence.submission import SubmissionRecord
+    from app.persistence.user import UserRecord
 
 
 if TYPE_CHECKING:
     from app.persistence.submission import Submission
-    from app.services.exam import ExamDetail, ExamListItem
 
 
 class Exam(Base):
@@ -78,7 +109,6 @@ class ExamRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def create(self, **values) -> ExamRecord:
         exam = Exam(**values)
@@ -164,8 +194,7 @@ class ExamRepository:
 
     def get_latest_submission(self, exam_id: int, user_id: int, problem_id: int):
 
-        from app.persistence.submission import _to_submission_record
-        from app.persistence.submission import Submission
+        from app.persistence.submission import Submission, _to_submission_record
 
         return _to_submission_record(
             self._db.query(Submission)
@@ -178,8 +207,7 @@ class ExamRepository:
         self, exam_id: int, problem_ids: list[int] | None = None
     ) -> list[SubmissionRecord]:
 
-        from app.persistence.submission import _to_submission_record
-        from app.persistence.submission import Submission
+        from app.persistence.submission import Submission, _to_submission_record
 
         query = self._db.query(Submission).filter(Submission.exam_id == exam_id)
         if problem_ids is not None:
@@ -215,9 +243,7 @@ class ExamRepository:
         problem_ids: list[int] | None = None,
     ) -> dict[tuple[int, int], SubmissionRecord]:
         """一次查询拉全量提交，按 created_at 降序，返回每个 (user_id, problem_id) 的最新提交。"""
-        from app.persistence.submission import _to_submission_record
-
-        from app.persistence.submission import Submission
+        from app.persistence.submission import Submission, _to_submission_record
 
         query = self._db.query(Submission).filter(Submission.exam_id == exam_id)
         if user_ids is not None:
@@ -231,9 +257,7 @@ class ExamRepository:
 
     def list_users(self, user_ids: list[int]) -> dict[int, UserRecord]:
         """一次查询取用户，返回 id→User 字典。"""
-        from app.persistence.user import _to_user_record
-
-        from app.persistence.user import User
+        from app.persistence.user import User, _to_user_record
 
         return {
             key: _to_user_record(row)
@@ -270,63 +294,13 @@ class ExamRepository:
 
     def get_user(self, user_id: int):
 
-        from app.persistence.user import _to_user_record
-        from app.persistence.user import User
+        from app.persistence.user import User, _to_user_record
 
         return _to_user_record(self._db.get(User, user_id))
 
 
-def to_exam_list_item(
-    exam, *, problem_count: int, submission_count: int
-) -> ExamListItem:
-    """考试 ORM → 列表项（题目/提交数由调用方从批量方法取得）。"""
-
-    from app.services.exam import ExamListItem
-
-    return ExamListItem(
-        id=exam.id,
-        title=exam.title,
-        description=exam.description or "",
-        start_time=exam.start_time,
-        end_time=exam.end_time,
-        contest_type=exam.contest_type or "icpc",
-        freeze_minutes=exam.freeze_minutes,
-        is_visible=exam.is_visible,
-        created_by=exam.created_by,
-        problem_count=problem_count,
-        submission_count=submission_count,
-        has_password=bool(exam.password),
-    )
-
-
-def to_exam_detail(exam, problems) -> ExamDetail:
-    """考试 ORM + 题目列表 → 详情（problems 需已预取 problem 关系）。"""
-
-    from app.services.exam import ExamDetail, ExamProblemItem
-
-    return ExamDetail(
-        id=exam.id,
-        title=exam.title,
-        description=exam.description or "",
-        start_time=exam.start_time,
-        end_time=exam.end_time,
-        contest_type=exam.contest_type or "icpc",
-        freeze_minutes=exam.freeze_minutes,
-        is_visible=exam.is_visible,
-        created_by=exam.created_by,
-        has_password=bool(exam.password),
-        problems=[
-            ExamProblemItem(
-                item.problem_id, item.display_id, item.score, item.problem.title
-            )
-            for item in problems
-        ],
-    )
-
-
 def _to_exam_record(row: Exam | None) -> ExamRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.exam import ExamRecord
 
     if row is None or isinstance(row, ExamRecord):
         return row
@@ -346,7 +320,6 @@ def _to_exam_record(row: Exam | None) -> ExamRecord | None:
 
 def _to_exam_problem_record(row: ExamProblem | None) -> ExamProblemRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.exam import ExamProblemRecord
     from app.persistence.problem import _to_problem_record
 
     if row is None or isinstance(row, ExamProblemRecord):

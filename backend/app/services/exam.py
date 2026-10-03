@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Optional
+
+from app.clients.redis_client import redis_client
 from app.core.config import SECRET_KEY
 from app.core.errors import (
     InvalidStateError,
@@ -10,14 +15,9 @@ from app.core.errors import (
     ResourceNotFoundError,
 )
 from app.core.time import utcnow
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from app.persistence.exam import ExamProblemRecord, ExamRecord, ExamRepository
+from app.persistence.unit_of_work import UnitOfWork
 from loguru import logger
-from typing import Optional, TYPE_CHECKING
-
-
-if TYPE_CHECKING:
-    from app.services.problem import ProblemRecord
 
 
 @dataclass(frozen=True)
@@ -262,41 +262,11 @@ class ExamScoreRow:
     total_score: float
 
 
-@dataclass
-class ExamRecord:
-    """Exam 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    title: str
-    description: str | None
-    start_time: datetime
-    end_time: datetime
-    contest_type: str
-    freeze_minutes: int | None
-    password: str | None
-    is_visible: bool | None
-    created_by: int | None
-
-
-@dataclass
-class ExamProblemRecord:
-    """ExamProblem 的数据库快照；不携带 ORM 或 Session。"""
-
-    id: int
-    exam_id: int
-    problem_id: int
-    display_id: str | None
-    score: int | None
-    problem: ProblemRecord | None
-
-
-from app.persistence.exam import ExamRepository, to_exam_detail, to_exam_list_item
-
-
 class ExamService:
     """编排考试管理、考试状态和成绩统计业务。"""
 
-    def __init__(self, repository: ExamRepository) -> None:
+    def __init__(self, repository: ExamRepository, *, uow: UnitOfWork) -> None:
+        self._uow = uow
         self._repository = repository
 
     def create_exam(self, requester_role: str, params: CreateExamParams) -> ExamDetail:
@@ -313,7 +283,7 @@ class ExamService:
             is_visible=params.is_visible,
             created_by=params.created_by,
         )
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         return to_exam_detail(exam, [])
 
     def list_exams(self, requester_role: str) -> list[ExamListItem]:
@@ -411,13 +381,13 @@ class ExamService:
         if params.password is not None:
             exam.password = self._hash_password(params.password)
         self._repository.update(exam)
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         return to_exam_detail(exam, self._repository.list_problems(exam_id))
 
     def delete_exam(self, requester_role: str, exam_id: int) -> None:
         self._require_teacher(requester_role)
         self._repository.delete(self._require_exam(exam_id))
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
 
     def add_problem(
         self, requester_role: str, exam_id: int, params: AddExamProblemParams
@@ -427,7 +397,7 @@ class ExamService:
         self._repository.add_problem(
             exam_id, params.problem_id, params.display_id, params.score
         )
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
 
     def remove_problem(
         self, requester_role: str, exam_id: int, problem_id: int
@@ -437,7 +407,7 @@ class ExamService:
         if item is None:
             raise ResourceNotFoundError("考试题目不存在")
         self._repository.delete_exam_problem(item)
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
 
     def monitor(self, requester_role: str, exam_id: int) -> MonitorResult:
         self._require_teacher(requester_role)
@@ -491,7 +461,6 @@ class ExamService:
         - exam.freeze_minutes: ICPC 比赛结束前 N 分钟封榜。
           封榜期间所有未 Accepted 提交在 scoreboard 上显示为 '?'。
         """
-        from app.utils.exam_cache import get_rank_cache, set_rank_cache
 
         exam = self._require_exam(exam_id)
         self._assert_exam_discoverable(requester_role, exam, session_exam_id)
@@ -640,3 +609,62 @@ class ExamService:
             if password
             else None
         )
+
+
+def to_exam_list_item(
+    exam: ExamRecord, *, problem_count: int, submission_count: int
+) -> ExamListItem:
+    """考试 快照 → 列表项（题目/提交数由调用方从批量方法取得）。"""
+
+    return ExamListItem(
+        id=exam.id,
+        title=exam.title,
+        description=exam.description or "",
+        start_time=exam.start_time,
+        end_time=exam.end_time,
+        contest_type=exam.contest_type or "icpc",
+        freeze_minutes=exam.freeze_minutes,
+        is_visible=exam.is_visible,
+        created_by=exam.created_by,
+        problem_count=problem_count,
+        submission_count=submission_count,
+        has_password=bool(exam.password),
+    )
+
+
+def to_exam_detail(exam: ExamRecord, problems: list[ExamProblemRecord]) -> ExamDetail:
+    """考试 ORM + 题目列表 → 详情（problems 需已预取 problem 关系）。"""
+
+    return ExamDetail(
+        id=exam.id,
+        title=exam.title,
+        description=exam.description or "",
+        start_time=exam.start_time,
+        end_time=exam.end_time,
+        contest_type=exam.contest_type or "icpc",
+        freeze_minutes=exam.freeze_minutes,
+        is_visible=exam.is_visible,
+        created_by=exam.created_by,
+        has_password=bool(exam.password),
+        problems=[
+            ExamProblemItem(
+                item.problem_id, item.display_id, item.score, item.problem.title
+            )
+            for item in problems
+        ],
+    )
+
+
+def get_rank_cache(exam_id: int) -> dict | None:
+    """读取exam缓存。"""
+    return redis_client.get_json(f"skyoj:exam:{exam_id}:rank")
+
+
+def set_rank_cache(exam_id: int, payload: dict) -> None:
+    """写入exam缓存，保持现有有效期。"""
+    redis_client.set_json(f"skyoj:exam:{exam_id}:rank", payload, ttl=60)
+
+
+def invalidate_rank_cache(exam_id: int) -> None:
+    """业务写入后失效缓存。"""
+    redis_client.delete(f"skyoj:exam:{exam_id}:rank")

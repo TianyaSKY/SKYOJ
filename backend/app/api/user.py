@@ -3,15 +3,19 @@
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_user_service
 from app.api.schemas.user import (
     UploadAvatarResponse,
     UserProfileResponse,
     UserSubmissionResponse,
 )
-from app.services.user import UploadAvatarParams, UserProfile, UserSubmissionItem
-from app.services.user import UserService
-from app.utils.auth_tools import AuthContext, get_current_auth
+from app.services.user import (
+    UploadAvatarParams,
+    UserProfile,
+    UserService,
+    UserSubmissionItem,
+)
 
 router = APIRouter()
 

@@ -47,7 +47,9 @@ def _problems():
 
 def test_search_student_filters_out_problems_without_test_cases() -> None:
     service = SearchFacadeService(
-        FakeSearchRepository(_problems()), test_case_storage=FakeTestCaseStorage()
+        FakeSearchRepository(_problems()),
+        test_case_storage=FakeTestCaseStorage(),
+        uow=MagicMock(),
     )
 
     results = service.search(1, "题目", 10, "student")
@@ -57,7 +59,9 @@ def test_search_student_filters_out_problems_without_test_cases() -> None:
 
 def test_search_teacher_sees_all_problems() -> None:
     service = SearchFacadeService(
-        FakeSearchRepository(_problems()), test_case_storage=FakeTestCaseStorage()
+        FakeSearchRepository(_problems()),
+        test_case_storage=FakeTestCaseStorage(),
+        uow=MagicMock(),
     )
 
     results = service.search(1, "题目", 10, "teacher")

@@ -2,16 +2,33 @@
 
 from __future__ import annotations
 
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
+
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Session, relationship
-from typing import Optional, TYPE_CHECKING
+
+from app.persistence.database import Base
 
 
-if TYPE_CHECKING:
-    from app.services.dataset import DatasetDetail, DatasetListItem, DatasetRecord
+@dataclass(frozen=True)
+class DatasetRecord:
+    """数据集持久化快照，包含文件任务所需状态。"""
+
+    id: int
+    name: str
+    description: str
+    file_path: str
+    file_size: str
+    uploader_id: int
+    uploader: str
+    created_at: Optional[datetime]
+    status: str = "ready"
+
+    temp_path: Optional[str] = None
+    file_hash: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class Dataset(Base):
@@ -37,7 +54,6 @@ class DatasetRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def get_by_id(self, dataset_id: int) -> Optional[DatasetRecord]:
         """按主键查询数据集。"""
@@ -46,14 +62,14 @@ class DatasetRepository:
 
     def list_all(
         self, page: int | None = None, page_size: int | None = None
-    ) -> tuple[list[DatasetListItem], int | None]:
+    ) -> tuple[list[DatasetRecord], int | None]:
         """倒序查询数据集，必要时在数据库侧分页。"""
         query = self._db.query(Dataset).order_by(Dataset.id.desc())
         if page is None or page_size is None:
-            return [to_dataset_list_item(dataset) for dataset in query.all()], None
+            return [_to_dataset_record(dataset) for dataset in query.all()], None
         total = query.count()
         datasets = query.offset((page - 1) * page_size).limit(page_size).all()
-        return [to_dataset_list_item(dataset) for dataset in datasets], total
+        return [_to_dataset_record(dataset) for dataset in datasets], total
 
     def create(
         self,
@@ -119,29 +135,10 @@ class DatasetRepository:
         return _to_dataset_record(dataset)
 
 
-def to_dataset_list_item(dataset) -> DatasetListItem:
-    """数据集 ORM → 列表项。"""
+def _to_dataset_record(dataset: Dataset) -> DatasetRecord:
+    """ORM → 不依赖 Session 的数据集快照。"""
 
-    from app.services.dataset import DatasetListItem
-
-    return DatasetListItem(
-        id=dataset.id,
-        name=dataset.name,
-        description=dataset.description or "",
-        uploader=dataset.uploader.username if dataset.uploader else "Unknown",
-        file_size=dataset.file_size or "",
-        created_at=dataset.created_at,
-        status=getattr(dataset, "status", "ready") or "ready",
-        download_url=f"/api/datasets/{dataset.id}/download",
-    )
-
-
-def to_dataset_detail(dataset) -> DatasetDetail:
-    """数据集 ORM → 详情。"""
-
-    from app.services.dataset import DatasetDetail
-
-    return DatasetDetail(
+    return DatasetRecord(
         id=dataset.id,
         name=dataset.name,
         description=dataset.description or "",
@@ -150,26 +147,7 @@ def to_dataset_detail(dataset) -> DatasetDetail:
         uploader_id=dataset.uploader_id,
         uploader=dataset.uploader.username if dataset.uploader else "Unknown",
         created_at=dataset.created_at,
-        status=getattr(dataset, "status", "ready") or "ready",
-    )
-
-
-def _to_dataset_record(dataset: Dataset) -> DatasetRecord:
-    """ORM → 不依赖 Session 的数据集快照。"""
-
-    from app.services.dataset import DatasetRecord
-
-    detail = to_dataset_detail(dataset)
-    return DatasetRecord(
-        id=detail.id,
-        name=detail.name,
-        description=detail.description,
-        file_path=detail.file_path,
-        file_size=detail.file_size,
-        uploader_id=detail.uploader_id,
-        uploader=detail.uploader,
-        created_at=detail.created_at,
-        status=detail.status,
+        status=dataset.status or "ready",
         temp_path=dataset.temp_path,
         file_hash=dataset.file_hash,
         error_message=dataset.error_message,

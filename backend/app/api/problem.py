@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_problem_service
 from app.api.schemas.common import MessageResponse
 from app.api.schemas.problem import (
@@ -18,11 +19,10 @@ from app.api.schemas.problem import (
 from app.services.problem import (
     CreateProblemParams,
     PaginatedProblems,
+    ProblemService,
     UpdateProblemParams,
     UploadTestCasesParams,
 )
-from app.services.problem import ProblemService
-from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()
 

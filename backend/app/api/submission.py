@@ -1,9 +1,6 @@
-import json
-import os
 from typing import Optional
 
 import jwt
-import redis as redis_lib
 from fastapi import (
     APIRouter,
     Depends,
@@ -19,6 +16,7 @@ from fastapi import (
 from loguru import logger
 from pydantic import ValidationError
 
+from app.api.auth_context import AuthContext, get_current_auth
 from app.api.deps import get_submission_service
 from app.api.schemas.submission import (
     PaginatedSubmissionsResponse,
@@ -26,22 +24,12 @@ from app.api.schemas.submission import (
     SubmitCodeBody,
     SubmitCodeResponse,
 )
+from app.clients.redis_client import redis_client
 from app.core.config import SECRET_KEY
-from app.services.submission import SubmissionQuery, SubmitParams
 from app.middleware.rate_limit import enforce
-from app.services.submission import SubmissionService
-from app.utils.auth_tools import AuthContext, get_current_auth
+from app.services.submission import SubmissionQuery, SubmissionService, SubmitParams
 
 router = APIRouter()
-
-_REDIS_URL = os.getenv("REDIS_URL") or ""
-_PUBSUB_CHANNEL_PREFIX = "skyoj:submission:"
-
-
-def _redis_client():
-    if _REDIS_URL:
-        return redis_lib.from_url(_REDIS_URL, decode_responses=True)
-    return None
 
 
 @router.websocket("/ws/{submission_id}")
@@ -56,15 +44,15 @@ async def submission_websocket(
     推送消息：{"status": "...", "score": 100.0, "output_log": "..."}
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
     except jwt.PyJWTError:
         await ws.close(code=4001, reason="Invalid token")
         return
 
-    client = _redis_client()
+    client = redis_client.get_client()
     pubsub = None
     if client:
-        channel = f"{_PUBSUB_CHANNEL_PREFIX}{submission_id}"
+        channel = f"skyoj:submission:{submission_id}"
         pubsub = client.pubsub()
         pubsub.subscribe(channel)
 

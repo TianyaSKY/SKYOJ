@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.persistence.database import SessionLocal
 from app.persistence.jobs import AsyncJobRepository
+from app.persistence.unit_of_work import UnitOfWork
 from app.services.async_job import AsyncJobService
 
 
@@ -28,8 +29,9 @@ def run_job(
     重复投递（start_job 返回 None）或永久失败时返回 None。
     """
     db = SessionLocal()
+    uow = UnitOfWork(db)
     try:
-        service = AsyncJobService(AsyncJobRepository(db))
+        service = AsyncJobService(AsyncJobRepository(db), uow=uow)
         if (
             service.start_job(job_id, lease_seconds=service.lease_seconds(task_name))
             is None

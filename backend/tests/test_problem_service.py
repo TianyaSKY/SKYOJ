@@ -2,23 +2,20 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from app.services.auth import LoginParams, RegisterParams
 from app.core.errors import (
     AuthenticationError,
     InvalidStateError,
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.services.auth import AuthService, LoginParams, RegisterParams
 from app.services.problem import (
     CreateProblemParams,
     PaginatedProblems,
+    ProblemService,
     UpdateProblemParams,
 )
-from app.services.problem import (
-    TestCaseSummary as ProblemTestCaseSummary,
-)
-from app.services.auth import AuthService
-from app.services.problem import ProblemService
+from app.services.problem import TestCaseSummary as ProblemTestCaseSummary
 
 
 class FakeProblemRepository:
@@ -93,7 +90,9 @@ class FakeTestCaseStorage:
 
 def _service_with_three_problems() -> ProblemService:
     service = ProblemService(
-        FakeProblemRepository(), test_case_storage=FakeTestCaseStorage()
+        FakeProblemRepository(),
+        test_case_storage=FakeTestCaseStorage(),
+        uow=MagicMock(),
     )
     for title in ("A", "B", "C"):
         service.create_problem(
@@ -152,7 +151,7 @@ def test_problem_service_test_case_summary_requires_teacher_and_problem() -> Non
 
 
 def test_problem_service_create_update_and_paginate() -> None:
-    service = ProblemService(FakeProblemRepository())
+    service = ProblemService(FakeProblemRepository(), uow=MagicMock())
     created = service.create_problem(
         "teacher",
         CreateProblemParams(
@@ -187,7 +186,7 @@ def test_problem_service_create_update_and_paginate() -> None:
 
 
 def test_problem_service_raises_for_unknown_problem() -> None:
-    service = ProblemService(FakeProblemRepository())
+    service = ProblemService(FakeProblemRepository(), uow=MagicMock())
 
     with pytest.raises(ResourceNotFoundError):
         service.get_problem(999)
@@ -202,6 +201,7 @@ def test_auth_service_registers_public_student_and_logs_in() -> None:
             password_hash == f"hashed:{password}"
         ),
         token_encoder=lambda user_id, role: f"token:{user_id}:{role}",
+        uow=MagicMock(),
     )
 
     registered = service.register(RegisterParams("student", "secret"))
@@ -219,6 +219,7 @@ def test_auth_service_rejects_duplicate_and_invalid_credentials() -> None:
         password_hasher=lambda password: password,
         password_checker=lambda password_hash, password: password_hash == password,
         token_encoder=lambda user_id, role: "token",
+        uow=MagicMock(),
     )
     service.register(RegisterParams("student", "secret"))
 

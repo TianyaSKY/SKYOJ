@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
+from datetime import timedelta
+
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
 from app.core.json import JsonObjectResult, JsonValue
 from app.core.time import utcnow
-from dataclasses import dataclass
-from datetime import timedelta
+from app.persistence.system import SystemRepository
+from app.persistence.unit_of_work import UnitOfWork
 
 
 @dataclass(frozen=True)
@@ -45,15 +48,13 @@ class UpdateConfigParams:
     val: str
 
 
-from app.persistence.system import SystemRepository
-
-
 class SystemService:
     """编排系统配置与仪表盘统计。"""
 
     _blocked_keys = {"llm_api_key", "llm_api_url", "llm_model_name"}
 
-    def __init__(self, repository: SystemRepository) -> None:
+    def __init__(self, repository: SystemRepository, *, uow: UnitOfWork) -> None:
+        self._uow = uow
         self._repository = repository
 
     def get_config(self, *, include_llm_endpoint: bool = False) -> JsonObjectResult:
@@ -90,7 +91,7 @@ class SystemService:
                     str(value).lower() if isinstance(value, bool) else str(value)
                 )
         self._repository.save_config(allowed)
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
         return UpdateSystemConfigResult(list(allowed), skipped)
 
     def delete_config(self, requester_role: str, key: str) -> None:
@@ -98,16 +99,22 @@ class SystemService:
         self._require_teacher(requester_role)
         if not self._repository.delete_config(key):
             raise ResourceNotFoundError("配置项不存在")
-        self._repository.unit_of_work.commit()
+        self._uow.commit()
 
     def statistics(self, requester_role: str) -> SystemStatistics:
         """获取系统统计，只有教师可以执行。"""
         self._require_teacher(requester_role)
         now = utcnow()
-        return self._repository.statistics(
+        record = self._repository.statistics(
             now.replace(hour=0, minute=0, second=0, microsecond=0),
             now - timedelta(days=365),
             now + timedelta(days=180),
+        )
+        return SystemStatistics(
+            record.today_submissions,
+            record.total_problems,
+            record.total_users,
+            record.exams_in_period,
         )
 
     @staticmethod

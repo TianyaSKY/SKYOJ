@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-from app.core.time import utcnow
-from app.persistence.database import Base
-from app.persistence.unit_of_work import UnitOfWork
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Optional
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -21,17 +21,54 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.orm import Session, relationship
-from typing import Any, Optional, TYPE_CHECKING
+
+from app.core.time import utcnow
+from app.persistence.database import Base
 
 
-if TYPE_CHECKING:
-    from app.services.async_job import AsyncJobRecord
-    from app.services.ai_draft import AiDraftRecord
+@dataclass
+class AiDraftRecord:
+    """AiDraft 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    task_type: str
+    status: str
+    title: str
+    problem_id: int | None
+    request_payload: str | None
+    result_payload: str | None
+    error_message: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    consumed_at: datetime | None
 
 
-if TYPE_CHECKING:
-    from app.services.ai_draft import AiDraftDetail, AiDraftSummary
-    from app.services.async_job import AsyncJobResult
+@dataclass
+class AsyncJobRecord:
+    """AsyncJob 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    task_name: str
+    queue: str
+    payload: str
+    status: str
+    dedupe_key: str | None
+    attempts: int
+    max_attempts: int
+    lease_until: datetime | None
+    available_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    last_error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+JOB_PENDING = "pending"
+JOB_RUNNING = "running"
+JOB_SUCCEEDED = "succeeded"
+JOB_FAILED = "failed"
 
 
 class AsyncJob(Base):
@@ -108,7 +145,6 @@ class AsyncJobRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def create(
         self,
@@ -121,8 +157,6 @@ class AsyncJobRepository:
         available_at: datetime,
     ) -> AsyncJobRecord:
         """创建任务记录。"""
-
-        from app.services.async_job import JOB_PENDING
 
         job = AsyncJob(
             task_name=task_name,
@@ -157,13 +191,6 @@ class AsyncJobRepository:
         self, job_id: int, *, now: datetime, lease_until: datetime
     ) -> Optional[AsyncJobRecord]:
         """以单进程任务语义领取任务；重复投递时只允许一个执行者继续。"""
-
-        from app.services.async_job import (
-            JOB_FAILED,
-            JOB_PENDING,
-            JOB_RUNNING,
-            JOB_SUCCEEDED,
-        )
 
         job = self._db.get(AsyncJob, job_id)
         if job is None:
@@ -214,8 +241,6 @@ class AsyncJobRepository:
     def mark_succeeded(self, job_id: int, *, now: datetime) -> Optional[AsyncJobRecord]:
         """标记任务成功。"""
 
-        from app.services.async_job import JOB_SUCCEEDED
-
         job = self._db.get(AsyncJob, job_id)
         if job is None:
             return None
@@ -238,8 +263,6 @@ class AsyncJobRepository:
     ) -> Optional[AsyncJobRecord]:
         """记录失败；仍有次数时将任务重新置为待处理。"""
 
-        from app.services.async_job import JOB_FAILED, JOB_PENDING
-
         job = self._db.get(AsyncJob, job_id)
         if job is None:
             return None
@@ -261,8 +284,6 @@ class AsyncJobRepository:
         """恢复失联任务：RUNNING 租约过期置回待处理，PENDING 且已到
         available_at 的任务重新投递（消息可能发布时被丢弃或提前到达被
         claim 拒收）。重复投递由 claim 的原子领取吸收。"""
-
-        from app.services.async_job import JOB_FAILED, JOB_PENDING, JOB_RUNNING
 
         jobs = (
             self._db.query(AsyncJob)
@@ -318,7 +339,6 @@ class AiDraftRepository:
 
     def __init__(self, db: Session) -> None:
         self._db = db
-        self.unit_of_work = UnitOfWork(db)
 
     def create(
         self,
@@ -470,61 +490,8 @@ class AiDraftRepository:
             return {"raw": raw}
 
 
-def to_ai_draft_result(
-    draft, *, detail: bool = False
-) -> AiDraftSummary | AiDraftDetail:
-    """AI 草稿 ORM → 列表项或详情。"""
-
-    from app.services.ai_draft import AiDraftDetail, AiDraftSummary
-
-    if detail:
-        return AiDraftDetail(
-            id=draft.id,
-            task_type=draft.task_type,
-            status=draft.status,
-            title=draft.title or "",
-            problem_id=draft.problem_id,
-            request_payload=AiDraftRepository.parse_json_field(draft.request_payload),
-            result_payload=AiDraftRepository.parse_json_field(draft.result_payload),
-            error_message=draft.error_message,
-            created_at=draft.created_at,
-            updated_at=draft.updated_at,
-            consumed_at=draft.consumed_at,
-        )
-    return AiDraftSummary(
-        id=draft.id,
-        task_type=draft.task_type,
-        status=draft.status,
-        title=draft.title or "",
-        problem_id=draft.problem_id,
-        error_message=draft.error_message,
-        created_at=draft.created_at,
-        updated_at=draft.updated_at,
-        consumed_at=draft.consumed_at,
-    )
-
-
-def to_async_job_result(job) -> AsyncJobResult:
-    """异步任务 ORM → 对外快照。"""
-
-    from app.services.async_job import AsyncJobResult
-
-    return AsyncJobResult(
-        id=job.id,
-        task_name=job.task_name,
-        queue=job.queue,
-        status=job.status,
-        attempts=job.attempts,
-        max_attempts=job.max_attempts,
-        lease_until=job.lease_until,
-        created_at=job.created_at,
-        updated_at=job.updated_at,
-    )
-
-
 def _to_async_job_record(row: AsyncJob | None) -> AsyncJobRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.async_job import AsyncJobRecord
 
     if row is None or isinstance(row, AsyncJobRecord):
         return row
@@ -549,7 +516,6 @@ def _to_async_job_record(row: AsyncJob | None) -> AsyncJobRecord | None:
 
 def _to_ai_draft_record(row: AiDraft | None) -> AiDraftRecord | None:
     """在数据库边界复制字段和必要关系。"""
-    from app.services.ai_draft import AiDraftRecord
 
     if row is None or isinstance(row, AiDraftRecord):
         return row
