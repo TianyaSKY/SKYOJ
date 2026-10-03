@@ -97,3 +97,26 @@ def test_disjoint_edits_from_same_old_snapshot_both_survive(community, student_u
     service.update(UpdateSolutionParams(solution_id, student_user.id, 'student', title='新标题'))
     updated = service.update(UpdateSolutionParams(solution_id, student_user.id, 'student', content='新正文'))
     assert (updated.title, updated.content) == ('新标题', '新正文')
+
+@pytest.mark.parametrize('kind', ['like', 'favorite'])
+def test_repeated_removal_using_old_relation_does_not_remove_other_users_count(
+    kind, community, student_user, teacher_user, monkeypatch,
+):
+    repo, service, solution_id = community
+    toggle = service.toggle_like if kind == 'like' else service.toggle_favorite
+    lookup = repo.get_like if kind == 'like' else repo.get_favorite
+    toggle(solution_id, student_user.id)
+    toggle(solution_id, teacher_user.id)
+    stale = lookup(solution_id, student_user.id)
+    toggle(solution_id, student_user.id)
+    monkeypatch.setattr(repo, 'get_like' if kind == 'like' else 'get_favorite', lambda *args: stale)
+    result = toggle(solution_id, student_user.id)
+    current = repo.get_solution_by_id(solution_id)
+    if kind == 'like':
+        assert result.liked is False and result.vote_count == 1
+        assert current.vote_count == 1
+        assert repo.list_likers(solution_id) == [teacher_user.id]
+    else:
+        assert result.favorited is False
+        assert current.favorite_count == 1
+        assert lookup(solution_id, teacher_user.id) is not None

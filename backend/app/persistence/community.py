@@ -461,9 +461,13 @@ class ProblemCommunityRepository:
         self._db.flush()
         return _to_problem_solution_like_record(like)
 
-    def remove_like(self, like: ProblemSolutionLikeRecord) -> None:
-        self._db.delete(self._db.get(ProblemSolutionLike, like.id))
+    def remove_like(self, like: ProblemSolutionLikeRecord) -> bool:
+        """按关系 ID 条件删除，重复取消不能重复扣减计数。"""
+        removed = self._db.query(ProblemSolutionLike).filter(
+            ProblemSolutionLike.id == like.id
+        ).delete(synchronize_session="fetch")
         self._db.flush()
+        return removed == 1
 
     def list_likers(self, solution_id: int) -> list[int]:
         rows = (
@@ -495,9 +499,13 @@ class ProblemCommunityRepository:
         self._db.flush()
         return _to_problem_solution_favorite_record(fav)
 
-    def remove_favorite(self, fav: ProblemSolutionFavoriteRecord) -> None:
-        self._db.delete(self._db.get(ProblemSolutionFavorite, fav.id))
+    def remove_favorite(self, fav: ProblemSolutionFavoriteRecord) -> bool:
+        """按关系 ID 条件删除，只有实际删除后才扣减收藏计数。"""
+        removed = self._db.query(ProblemSolutionFavorite).filter(
+            ProblemSolutionFavorite.id == fav.id
+        ).delete(synchronize_session="fetch")
         self._db.flush()
+        return removed == 1
 
     def list_favorites_for_user(self, user_id: int) -> list[ProblemSolutionFavorite]:
         return (

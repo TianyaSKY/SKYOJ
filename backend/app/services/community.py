@@ -244,8 +244,10 @@ class SolutionService:
                 return ToggleLikeResult(
                     solution_id=solution_id, liked=True, vote_count=solution.vote_count
                 )
-            self._repo.remove_like(existing)
-            solution.vote_count = self._repo.adjust_vote_count(solution_id, -1)
+            removed = self._repo.remove_like(existing)
+            solution.vote_count = self._repo.adjust_vote_count(
+                solution_id, -1 if removed else 0
+            )
             return ToggleLikeResult(
                 solution_id=solution_id, liked=False, vote_count=solution.vote_count
             )
@@ -260,8 +262,8 @@ class SolutionService:
                 self._repo.add_favorite(solution_id, user_id)
                 self._repo.adjust_favorite_count(solution_id, 1)
                 return ToggleFavoriteResult(solution_id=solution_id, favorited=True)
-            self._repo.remove_favorite(existing)
-            self._repo.adjust_favorite_count(solution_id, -1)
+            if self._repo.remove_favorite(existing):
+                self._repo.adjust_favorite_count(solution_id, -1)
             return ToggleFavoriteResult(solution_id=solution_id, favorited=False)
 
     # -- 评论 --
