@@ -4,11 +4,12 @@
  * 教师可挂 / 摘标签；普通用户可建议。
  *
  * 数据流：
- * - onMounted 同时拉题目已贴标签 / 全站可选标签。
+ * - 题目变化时同时拉题目已贴标签 / 全站可选标签，忽略旧请求响应。
  * - 教师贴：approved=true 立即生效；普通用户：approved=false 进入审批。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
@@ -21,28 +22,43 @@ const attached = ref([])        // 当前题目已贴标签
 const all = ref([])              // 全站标签
 const attachDialogVisible = ref(false)
 const selectedTagId = ref(null)
+let scopeVersion = 0
+let loadVersion = 0
+let disposed = false
+const isCurrentScope = version => !disposed && version === scopeVersion
 
 const userStore = useUserStore()
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 async function load () {
+  const scope = scopeVersion
+  const requestId = ++loadVersion
+  const isCurrent = () => isCurrentScope(scope) && requestId === loadVersion
   loading.value = true
   try {
     const [a, b] = await Promise.all([
       request({ url: `/tags/problems/${props.problemId}`, method: 'get' }),
       request({ url: `/tags`, method: 'get' })
     ])
+    if (!isCurrent()) return
     attached.value = a || []
     all.value = b || []
   } catch (e) {
-    ElMessage.error(e.message || '加载标签失败')
+    if (isCurrent()) ElMessage.error(e.message || '加载标签失败')
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
 
-watch(() => props.problemId, () => load(), { immediate: false })
-onMounted(load)
+watch(() => props.problemId, () => {
+  scopeVersion += 1
+  attached.value = []
+  all.value = []
+  selectedTagId.value = null
+  attachDialogVisible.value = false
+  load()
+}, { immediate: true })
+onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
 
 function openAttach () {
   selectedTagId.value = null
@@ -50,35 +66,42 @@ function openAttach () {
 }
 
 async function confirmAttach () {
+  const scope = scopeVersion
+  const problemId = props.problemId
   if (!selectedTagId.value) {
     ElMessage.warning('请选择标签')
     return
   }
   try {
     await request({
-      url: `/tags/problems/${props.problemId}/attach`,
+      url: `/tags/problems/${problemId}/attach`,
       method: 'post',
       data: { tag_id: selectedTagId.value, approved: isTeacher.value }
     })
+    if (!isCurrentScope(scope)) return
     ElMessage.success(isTeacher.value ? '标签已挂上' : '已提交建议，等待教师审核')
     attachDialogVisible.value = false
     load()
   } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    if (isCurrentScope(scope)) ElMessage.error(e.message || '操作失败')
   }
 }
 
 async function detach (tag) {
+  const scope = scopeVersion
+  const problemId = props.problemId
   try {
     await ElMessageBox.confirm(`从该题目移除标签「${tag.name}」？`, '确认移除', { type: 'warning' })
+    if (!isCurrentScope(scope)) return
     await request({
-      url: `/tags/problems/${props.problemId}/${tag.id}`,
+      url: `/tags/problems/${problemId}/${tag.id}`,
       method: 'delete'
     })
+    if (!isCurrentScope(scope)) return
     ElMessage.success('已移除')
     load()
   } catch (e) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
+    if (isCurrentScope(scope) && e !== 'cancel' && e?.message !== 'cancel') {
       ElMessage.error(e.message || '移除失败')
     }
   }
