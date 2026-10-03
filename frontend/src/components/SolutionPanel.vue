@@ -32,6 +32,8 @@ const page = ref(1)
 const pageSize = 20
 
 const writeDialogVisible = ref(false)
+const savingSolution = ref(false)
+let writeVersion = 0
 const editing = ref(null)  // null 表示新建；非空表示编辑
 const form = ref({ title: '', content: '', language: '' })
 
@@ -46,6 +48,8 @@ let commentsVersion = 0
 let commentRequestVersion = 0
 let disposed = false
 const isCurrentScope = version => !disposed && version === scopeVersion
+const isCurrentWrite = (scope, version) =>
+  isCurrentScope(scope) && version === writeVersion && writeDialogVisible.value
 const isCurrentComments = (scope, version, item) =>
   isCurrentScope(scope) && version === commentsVersion && commentsDialog.value && currentSolution.value === item
 
@@ -99,6 +103,12 @@ watch(commentsDialog, visible => {
     newComment.value = ''
   }
 })
+watch(writeDialogVisible, visible => {
+  if (!visible) {
+    writeVersion += 1
+    savingSolution.value = false
+  }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
 
 function renderMarkdown (text) {
@@ -107,6 +117,8 @@ function renderMarkdown (text) {
 }
 
 function openWrite (item = null) {
+  writeVersion += 1
+  savingSolution.value = false
   editing.value = item
   form.value = item
     ? { title: item.title, content: item.content, language: item.language || '' }
@@ -115,34 +127,33 @@ function openWrite (item = null) {
 }
 
 async function submitSolution () {
+  if (!writeDialogVisible.value || savingSolution.value) return
   const scope = scopeVersion
+  const version = writeVersion
   const parsed = solutionFormSchema.safeParse(form.value)
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查题解输入')
     return
   }
+  const editingId = editing.value?.id
+  const problemId = props.problemId
+  savingSolution.value = true
   try {
-    if (editing.value) {
-      await request({
-        url: `/problems/solutions/${editing.value.id}`,
-        method: 'put',
-        data: parsed.data
-      })
-      if (!isCurrentScope(scope)) return
-      ElMessage.success('题解已更新')
-    } else {
-      await request({
-        url: `/problems/${props.problemId}/solutions`,
-        method: 'post',
-        data: parsed.data
-      })
-      if (!isCurrentScope(scope)) return
-      ElMessage.success('题解已发布')
-    }
-    writeDialogVisible.value = false
+    await request({
+      url: editingId ? `/problems/solutions/${editingId}` : `/problems/${problemId}/solutions`,
+      method: editingId ? 'put' : 'post',
+      data: parsed.data
+    })
+    if (!isCurrentScope(scope)) return
+    // 保存已生效时刷新当前题目列表，但不能干扰后来打开的编辑窗口。
     load()
+    if (!isCurrentWrite(scope, version)) return
+    ElMessage.success(editingId ? '题解已更新' : '题解已发布')
+    writeDialogVisible.value = false
   } catch (e) {
-    if (isCurrentScope(scope)) ElMessage.error(e.message || '操作失败')
+    if (isCurrentWrite(scope, version)) ElMessage.error(e.message || '操作失败')
+  } finally {
+    if (isCurrentWrite(scope, version)) savingSolution.value = false
   }
 }
 
@@ -355,7 +366,7 @@ async function deleteComment (commentId) {
       </el-form>
       <template #footer>
         <el-button @click="writeDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitSolution">{{ editing ? '保存' : '发布' }}</el-button>
+        <el-button type="primary" :loading="savingSolution" :disabled="savingSolution" @click="submitSolution">{{ editing ? '保存' : '发布' }}</el-button>
       </template>
     </el-dialog>
 

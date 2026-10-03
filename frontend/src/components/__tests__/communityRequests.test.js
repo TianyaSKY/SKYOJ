@@ -213,6 +213,7 @@ describe('社区组件的 API 请求路径', () => {
   ])('题解无效字段在发请求前被拦截：%s', async (label, patch) => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
+    wrapper.vm.openWrite()
     wrapper.vm.form = {title: '题解', content: '正文', language: '', ...patch}
     await wrapper.vm.submitSolution()
     expect(writes).toEqual([])
@@ -223,6 +224,7 @@ describe('社区组件的 API 请求路径', () => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
     const content = '    ' + 'x'.repeat(19995) + '\n'
+    wrapper.vm.openWrite()
     wrapper.vm.form = {title: 'x'.repeat(200), content, language: 'x'.repeat(50)}
     await wrapper.vm.submitSolution()
     expect(writes).toHaveLength(1)

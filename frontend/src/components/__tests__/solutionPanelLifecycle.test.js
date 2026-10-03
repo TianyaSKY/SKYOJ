@@ -96,3 +96,51 @@ it.each(['close','unmount'])('评论请求在 %s 后失败不弹出旧错误', a
   comments.reject(new Error('old error')); await loading
   expect(ElMessage.error).not.toHaveBeenCalled()
 })
+it('重复点击发布只发送一次写入请求', async () => {
+  const post = deferred()
+  request.mockImplementation(config => config.method === 'post' ? post.promise : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  wrapper.vm.openWrite({ ...solution(1), title: 'valid title' })
+  wrapper.vm.editing = null
+  const first = wrapper.vm.submitSolution(), second = wrapper.vm.submitSolution()
+  post.resolve({}); await Promise.all([first, second])
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(1)
+})
+it('旧保存完成不能关闭后来打开的编辑窗口', async () => {
+  const put = deferred()
+  request.mockImplementation(config => config.method === 'put' ? put.promise : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  wrapper.vm.openWrite({ ...solution(1), title: 'valid title' })
+  const first = wrapper.vm.submitSolution()
+  wrapper.vm.openWrite(solution(2))
+  put.resolve({}); await first
+  expect(wrapper.vm.writeDialogVisible).toBe(true)
+  expect(wrapper.vm.editing.id).toBe(2)
+  expect(wrapper.vm.form.title).toBe('2')
+  expect(ElMessage.success).not.toHaveBeenCalled()
+})
+it('旧保存失败不能取消新窗口的保存状态或弹出旧错误', async () => {
+  const old = deferred(), current = deferred()
+  request.mockImplementation(config => config.method === 'put' ? (config.url.endsWith('/1') ? old.promise : current.promise) : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  wrapper.vm.openWrite({ ...solution(1), title: 'first title' })
+  const first = wrapper.vm.submitSolution()
+  wrapper.vm.openWrite({ ...solution(2), title: 'second title' })
+  const second = wrapper.vm.submitSolution()
+  old.reject(new Error('old save failed')); await first
+  expect(wrapper.vm.savingSolution).toBe(true)
+  expect(ElMessage.error).not.toHaveBeenCalled()
+  current.resolve({}); await second
+  expect(wrapper.vm.savingSolution).toBe(false)
+  expect(wrapper.vm.writeDialogVisible).toBe(false)
+})
+it('当前保存失败后可重试且保留题解输入', async () => {
+  request.mockImplementation(config => config.method === 'put' ? Promise.reject(new Error('save failed')) : Promise.resolve({ items: [], total: 0 }))
+  mountPage(); await flushPromises()
+  wrapper.vm.openWrite({ ...solution(1), title: 'valid title' })
+  await wrapper.vm.submitSolution()
+  expect(wrapper.vm.savingSolution).toBe(false)
+  expect(wrapper.vm.writeDialogVisible).toBe(true)
+  expect(wrapper.vm.form.title).toBe('valid title')
+  expect(ElMessage.error).toHaveBeenCalledWith('save failed')
+})
