@@ -60,3 +60,52 @@ def test_json_suffix_content_type_is_parsed(code_client, endpoint):
     response = client.post(endpoint, content='{"problem_id":1,"code":"print(1)","language":"python"}',
                            headers={'Content-Type': 'application/vnd.skyoj+json; charset=utf-8'})
     assert response.status_code == 202
+
+
+@pytest.mark.parametrize('endpoint', ['/api/submissions/submit', '/api/debug'])
+@pytest.mark.parametrize('exam_id', ['invalid', '1.5'])
+def test_invalid_form_exam_id_is_not_replaced_with_practice_mode(code_client, endpoint, exam_id):
+    client, service = code_client
+    response = client.post(endpoint, data={
+        'problem_id': 1, 'code': 'print(1)', 'language': 'python', 'exam_id': exam_id,
+    })
+    assert response.status_code == 422
+    assert response.json()['detail'][0]['loc'] == ['body', 'exam_id']
+    service.submit.assert_not_called()
+    service.create.assert_not_called()
+
+
+@pytest.mark.parametrize('endpoint', ['/api/submissions/submit', '/api/debug'])
+def test_invalid_source_file_encoding_returns_field_error(code_client, endpoint):
+    client, service = code_client
+    response = client.post(endpoint, data={'problem_id': 1, 'language': 'python'},
+                           files={'file': ('solution.py', b'\xff\xff', 'application/octet-stream')})
+    assert response.status_code == 422
+    assert response.json()['detail'][0]['loc'] == ['body', 'file']
+    assert 'UTF-8' in response.json()['detail'][0]['msg']
+    service.submit.assert_not_called()
+    service.create.assert_not_called()
+
+
+@pytest.mark.parametrize('endpoint', ['/api/submissions/submit', '/api/debug'])
+def test_valid_source_upload_and_exam_id_are_preserved(code_client, endpoint):
+    client, service = code_client
+    code = 'print("中文")'
+    response = client.post(endpoint, data={'problem_id': 1, 'language': 'python', 'exam_id': '12'},
+                           files={'file': ('solution.py', code.encode('utf-8'), 'text/plain')})
+    assert response.status_code == 202
+    method = service.submit if endpoint.endswith('submit') else service.create
+    params = method.call_args.args[0]
+    assert params.code == code
+    assert params.exam_id == 12
+
+
+def test_csv_submission_keeps_binary_attachment_content(code_client):
+    client, service = code_client
+    content = b'\xff\xff'
+    response = client.post('/api/submissions/submit', data={'problem_id': 1, 'language': 'csv'},
+                           files={'file': ('prediction.csv', content, 'text/csv')})
+    assert response.status_code == 202
+    params = service.submit.call_args.args[0]
+    assert params.is_file_upload
+    assert params.file_content == content

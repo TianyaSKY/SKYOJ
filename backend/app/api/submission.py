@@ -20,7 +20,12 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.api.auth_context import AuthContext, get_current_auth
-from app.api.validation import is_json_content_type, parse_json_code_body, validate_code_body
+from app.api.validation import (
+    decode_code_file,
+    is_json_content_type,
+    parse_json_code_body,
+    validate_code_body,
+)
 from app.api.deps import get_submission_service
 from app.api.schemas.submission import (
     PaginatedSubmissionsResponse,
@@ -192,17 +197,12 @@ async def submit_code(
                 user_code = "__file_upload__"
             else:
                 raw = await file.read()
-                user_code = raw.decode("utf-8")
+                user_code = decode_code_file(raw)
 
     if not pid or not user_code:
         raise HTTPException(
             status_code=400, detail={"error": "Missing problem_id or code/file"}
         )
-
-    try:
-        exam_id_val = int(exam_id_val)
-    except (ValueError, TypeError):
-        exam_id_val = -1
 
     validated = validate_code_body(
         SubmitCodeBody,

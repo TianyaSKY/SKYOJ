@@ -10,6 +10,17 @@ from pydantic import BaseModel, ValidationError
 BodyModel = TypeVar('BodyModel', bound=BaseModel)
 
 
+def decode_code_file(content: bytes) -> str:
+    """代码文件必须是 UTF-8；编码错误返回字段错误，不回显二进制内容。"""
+    try:
+        return content.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise RequestValidationError([{
+            'type': 'value_error', 'loc': ('body', 'file'),
+            'msg': '代码文件必须使用 UTF-8 编码', 'input': None,
+        }]) from exc
+
+
 def is_json_content_type(content_type: str) -> bool:
     """支持标准 JSON 及 application/*+json 媒体类型。"""
     media_type = content_type.split(';', 1)[0].strip().lower()
