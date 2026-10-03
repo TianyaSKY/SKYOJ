@@ -51,7 +51,9 @@
               </div>
 
               <div class="card-footer">
-                <el-button class="enter-btn" type="primary">进入考试</el-button>
+                <el-button class="enter-btn" type="primary"
+                           :loading="entering && currentExamId === exam.id && !submittingPassword"
+                           :disabled="entering || passwordDialogVisible">进入考试</el-button>
               </div>
             </div>
           </el-card>
@@ -62,7 +64,9 @@
     </div>
 
     <!-- Password Dialog -->
-    <el-dialog v-model="passwordDialogVisible" title="请输入考试密码" width="350px">
+    <el-dialog v-model="passwordDialogVisible" title="请输入考试密码" width="350px"
+               :before-close="handlePasswordClose" :show-close="!submittingPassword"
+               :close-on-click-modal="!submittingPassword" :close-on-press-escape="!submittingPassword">
       <el-input
           v-model="passwordInput"
           placeholder="请输入密码"
@@ -71,8 +75,8 @@
           @keyup.enter="handlePasswordSubmit"
       />
       <template #footer>
-        <el-button @click="passwordDialogVisible = false">取消</el-button>
-        <el-button :loading="submittingPassword" type="primary" @click="handlePasswordSubmit">
+        <el-button :disabled="submittingPassword" @click="passwordDialogVisible = false">取消</el-button>
+        <el-button :loading="submittingPassword" :disabled="submittingPassword" type="primary" @click="handlePasswordSubmit">
           确认
         </el-button>
       </template>
@@ -81,7 +85,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {enterExam, getExamList} from '@/api/exam'
 import {ElMessage} from 'element-plus'
 import {useRouter} from 'vue-router'
@@ -99,7 +103,9 @@ const loading = ref(false)
 const allExams = ref([])
 const router = useRouter()
 
-// Password verification state
+// 进入请求串行执行，密码弹窗在请求完成前保持所属考试不变。
+const entering = ref(false)
+let disposed = false
 const passwordDialogVisible = ref(false)
 const submittingPassword = ref(false)
 const passwordInput = ref('')
@@ -109,11 +115,11 @@ const fetchExams = async () => {
   loading.value = true
   try {
     const data = await getExamList()
-    allExams.value = data
+    if (!disposed) allExams.value = data
   } catch (error) {
-    ElMessage.error('获取考试列表失败')
+    if (!disposed) ElMessage.error('获取考试列表失败')
   } finally {
-    loading.value = false
+    if (!disposed) loading.value = false
   }
 }
 
@@ -148,46 +154,59 @@ const getDuration = (start, end) => {
   return `${hours}小时${minutes}分钟`
 }
 
-const handleEnterExam = async (exam) => {
-  currentExamId.value = exam.id
+const handlePasswordClose = (done) => {
+  if (!submittingPassword.value) done()
+}
+
+const requestEntry = async (examId, password, passwordAttempt) => {
+  entering.value = true
+  submittingPassword.value = passwordAttempt
+  const originalToken = localStorage.getItem('token')
+  const isCurrentSession = () => !disposed && localStorage.getItem('token') === originalToken
   try {
-    // Try to enter without password first
-    const res = await enterExam(exam.id, '')
-    // If successful, update token and navigate
-    if (res.token) {
-      localStorage.setItem('token', res.token)
-    }
-    router.push(`/exam/${exam.id}`)
+    const res = await enterExam(examId, password)
+    if (!isCurrentSession()) return
+    if (res.token) localStorage.setItem('token', res.token)
+    passwordDialogVisible.value = false
+    await router.push(`/exam/${examId}`)
   } catch (error) {
-    if (error.response && error.response.status === 403) {
-      // Password required or incorrect
+    if (!isCurrentSession()) return
+    const message = error.response?.data?.error || error.message
+    if (!passwordAttempt && error.response?.status === 403 && message === '考试密码错误') {
       passwordInput.value = ''
       passwordDialogVisible.value = true
     } else {
-      ElMessage.error('进入考试失败，请稍后重试')
+      ElMessage.error(typeof message === 'string' && message ? message : '进入考试失败，请稍后重试')
+    }
+  } finally {
+    if (!disposed) {
+      entering.value = false
+      submittingPassword.value = false
     }
   }
 }
 
+const handleEnterExam = async (exam) => {
+  if (disposed || entering.value || passwordDialogVisible.value) return
+  const phase = getExamTiming(exam, Date.now()).phase
+  if (phase !== 'ongoing') {
+    ElMessage.warning(phase === 'upcoming' ? '考试尚未开始' : '考试已结束或时间无效')
+    return
+  }
+  currentExamId.value = exam.id
+  await requestEntry(exam.id, '', false)
+}
+
 const handlePasswordSubmit = async () => {
+  if (disposed || entering.value || !passwordDialogVisible.value || currentExamId.value == null) return
   if (!passwordInput.value) {
     ElMessage.warning('请输入密码')
     return
   }
-  submittingPassword.value = true
-  try {
-    const res = await enterExam(currentExamId.value, passwordInput.value)
-    if (res.token) {
-      localStorage.setItem('token', res.token)
-    }
-    passwordDialogVisible.value = false
-    router.push(`/exam/${currentExamId.value}`)
-  } catch (error) {
-    ElMessage.error('密码错误')
-  } finally {
-    submittingPassword.value = false
-  }
+  await requestEntry(currentExamId.value, passwordInput.value, true)
 }
+
+onUnmounted(() => { disposed = true })
 
 onMounted(() => {
   fetchExams()
