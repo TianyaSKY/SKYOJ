@@ -300,7 +300,8 @@ class SolutionService:
     def list_comments(
         self, solution_id: int, page: int = 1, page_size: int = 50
     ) -> tuple[list[CommentDetail], int]:
-        if self._repo.get_solution_by_id(solution_id) is None:
+        solution = self._repo.get_solution_by_id(solution_id)
+        if solution is None or solution.status == "hidden":
             raise ResourceNotFoundError("题解不存在")
         rows, total = self._repo.list_comments(solution_id, page, page_size)
         return [to_comment_detail(row) for row in rows], total
@@ -360,6 +361,8 @@ class TagService:
                 raise PermissionDeniedError("仅教师可正式贴标签")
             existing = self._repo.get_tag_map(params.problem_id, params.tag_id)
             if existing is not None:
+                if params.requester_role != "teacher" and existing.approved:
+                    raise PermissionDeniedError("仅教师可更改已批准的标签")
                 existing.approved = params.approved
                 self._repo.save_tag_map(existing)
             else:
