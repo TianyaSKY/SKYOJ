@@ -1,5 +1,9 @@
 from typing import Optional
 
+import anyio
+from redis import RedisError
+from starlette.concurrency import run_in_threadpool
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -47,13 +51,13 @@ async def submission_websocket(
     推送消息：{"status": "...", "score": 100.0, "output_log": "..."}
     """
     try:
-        auth = get_current_auth(authorization=token, db=db)
+        auth = await run_in_threadpool(get_current_auth, authorization=token, db=db)
     except HTTPException:
         await ws.close(code=4001, reason="Invalid token")
         return
 
     try:
-        service.get_submission(submission_id, auth.user.id, auth.user.role)
+        await run_in_threadpool(service.get_submission, submission_id, auth.user.id, auth.user.role)
     except PermissionDeniedError:
         await ws.close(code=4003, reason="Forbidden")
         return
@@ -61,37 +65,63 @@ async def submission_websocket(
         await ws.close(code=4004, reason="Submission not found")
         return
 
-    client = redis_client.get_client()
     pubsub = None
-    if client:
-        channel = f"skyoj:submission:{submission_id}"
-        pubsub = client.pubsub()
-        pubsub.subscribe(channel)
-
     try:
         await ws.accept()
-        if pubsub is None:
+        client = await run_in_threadpool(redis_client.get_client)
+        if client is None:
             await ws.close(code=1011, reason="Redis not available")
             return
+        pubsub = await run_in_threadpool(client.pubsub)
+        await run_in_threadpool(pubsub.subscribe, f"skyoj:submission:{submission_id}")
 
-        import time
+        async with anyio.create_task_group() as tasks:
+            async def watch_disconnect():
+                # 无消息时也能及时停止订阅，不等待下一次判题推送。
+                while True:
+                    event = await ws.receive()
+                    if event["type"] == "websocket.disconnect":
+                        tasks.cancel_scope.cancel()
+                        return
 
-        start = time.monotonic()
-        timeout = 300.0
-        while (time.monotonic() - start) < timeout:
-            msg = pubsub.get_message(timeout=1.0)
-            if msg and msg["type"] == "message":
-                await ws.send_text(msg["data"])
-                break
+            tasks.start_soon(watch_disconnect)
+            try:
+                with anyio.move_on_after(300) as timeout:
+                    while True:
+                        msg = await run_in_threadpool(
+                            pubsub.get_message, timeout=1.0, ignore_subscribe_messages=True
+                        )
+                        if msg and msg["type"] == "message":
+                            await ws.send_text(msg["data"])
+                            break
+                await ws.close(
+                    code=1000,
+                    reason="Subscription timed out" if timeout.cancel_called else "Result delivered",
+                )
+            except RedisError:
+                logger.exception("读取提交订阅失败 submission_id={}", submission_id)
+                await ws.close(code=1011, reason="Redis not available")
+            except WebSocketDisconnect:
+                pass
+            finally:
+                tasks.cancel_scope.cancel()
+    except RedisError:
+        logger.exception("建立提交订阅失败 submission_id={}", submission_id)
+        await ws.close(code=1011, reason="Redis not available")
     except WebSocketDisconnect:
         pass
     finally:
-        if pubsub:
-            try:
-                pubsub.unsubscribe()
-                pubsub.close()
-            except Exception:
-                logger.exception("关闭提交订阅失败 submission_id={}", submission_id)
+        if pubsub is not None:
+            # 任务取消时仍完成清理；取消订阅失败不能阻止连接关闭。
+            with anyio.CancelScope(shield=True):
+                try:
+                    await run_in_threadpool(pubsub.unsubscribe)
+                except Exception:
+                    logger.exception("取消提交订阅失败 submission_id={}", submission_id)
+                try:
+                    await run_in_threadpool(pubsub.close)
+                except Exception:
+                    logger.exception("关闭提交订阅失败 submission_id={}", submission_id)
 
 
 @router.post("/submit", status_code=202, response_model=SubmitCodeResponse)
