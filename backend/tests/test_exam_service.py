@@ -598,3 +598,23 @@ def test_closed_exam_rejects_writes_before_creating_or_enqueuing(seeded, monkeyp
     assert session.query(DebugRun).count() == initial_debug_runs
     jobs.enqueue_judge_submission.assert_not_called()
     jobs.enqueue_debug_submission.assert_not_called()
+
+
+def test_status_requires_requested_exam_to_match_session_before_queries(seeded, monkeypatch):
+    from app.core.errors import PermissionDeniedError
+    from unittest.mock import MagicMock
+
+    repository = seeded["repository"]
+    list_problems = MagicMock(wraps=repository.list_problems)
+    latest = MagicMock(wraps=repository.list_latest_submissions)
+    monkeypatch.setattr(repository, "list_problems", list_problems)
+    monkeypatch.setattr(repository, "list_latest_submissions", latest)
+    service = ExamService(repository, uow=UnitOfWork(seeded["session"]))
+    with pytest.raises(PermissionDeniedError, match="未进入该考试"):
+        service.get_status(seeded["alice"].id, seeded["exam"].id, requested_exam_id=999)
+    list_problems.assert_not_called()
+    latest.assert_not_called()
+    result = service.get_status(seeded["alice"].id, seeded["exam"].id,
+                                requested_exam_id=seeded["exam"].id)
+    assert len(result) == 2
+    assert result == service.get_status(seeded["alice"].id, seeded["exam"].id)

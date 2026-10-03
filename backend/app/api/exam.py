@@ -5,7 +5,7 @@ import io
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from app.api.auth_context import AuthContext, get_current_auth
@@ -99,6 +99,7 @@ def exit_exam(auth: AuthContext = Depends(get_current_auth)):
 
 @router.get("/status", response_model=list[ExamProblemStatusResponse])
 def get_my_exam_status(
+    exam_id: Optional[int] = Query(None, ge=1),
     auth: AuthContext = Depends(get_current_auth),
     service: ExamService = Depends(get_exam_service),
 ):
@@ -114,7 +115,9 @@ def get_my_exam_status(
             if item.last_submitted_at
             else None,
         }
-        for item in service.get_status(auth.user.id, auth.exam_id)
+        for item in service.get_status(
+            auth.user.id, auth.exam_id, requested_exam_id=exam_id
+        )
     ]
 
 

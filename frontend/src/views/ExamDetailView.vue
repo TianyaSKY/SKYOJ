@@ -182,6 +182,8 @@ const exam = ref(emptyExam())
 
 const problemStatus = ref([])
 const statusLoading = ref(false)
+const sessionConfirmed = ref(false)
+let statusToken = null
 const now = useNow()
 const timing = computed(() => getExamTiming(exam.value, now.value))
 const remainingTime = computed(() => timing.value.remainingSeconds)
@@ -228,8 +230,12 @@ const fetchStatus = async () => {
     token === localStorage.getItem('token')
   statusLoading.value = true
   try {
-    const data = await getMyExamStatus()
-    if (isCurrent()) problemStatus.value = data
+    const data = await getMyExamStatus(examId.value)
+    if (isCurrent()) {
+      problemStatus.value = data
+      statusToken = token
+      sessionConfirmed.value = true
+    }
   } catch (error) {
     if (isCurrent()) {
       console.error('获取考试题目状态失败', error)
@@ -270,11 +276,12 @@ const getStatusLabel = (status) => {
   return map[status] || status
 }
 
-watch(() => timing.value.phase, phase => {
-  if (phase === 'ended' && !disposed) handleExamEnd()
+watch([() => timing.value.phase, sessionConfirmed], ([phase, confirmed]) => {
+  if (phase === 'ended' && confirmed && !disposed) handleExamEnd()
 })
 
 const handleExamEnd = () => {
+  if (!sessionConfirmed.value || statusToken !== localStorage.getItem('token')) return
   const token = localStorage.getItem('token')
   const scope = scopeVersion
   ElMessageBox.alert('考试已结束，系统将自动退出考试模式。', '提示', {
@@ -365,6 +372,8 @@ watch(examId, () => {
   scopeVersion += 1
   exam.value = emptyExam()
   problemStatus.value = []
+  sessionConfirmed.value = false
+  statusToken = null
   statusLoading.value = false
   exiting.value = false
   exitConfirming.value = false

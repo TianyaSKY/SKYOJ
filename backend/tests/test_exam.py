@@ -171,3 +171,36 @@ class TestExamScoreExport:
             headers={"Authorization": f"Bearer {student_token}"},
         )
         assert resp.status_code == 403
+
+
+@pytest.mark.parametrize('requested', [None, 8, 9, 0, -1, 'invalid'])
+def test_status_endpoint_binds_requested_exam_to_authenticated_session(client, student_user, requested):
+    """页面指定的考试必须与令牌会话一致，省略参数兼容既有调用。"""
+    from unittest.mock import MagicMock
+    from app.api.auth_context import AuthContext, get_current_auth
+    from app.api.deps import get_exam_service
+    from app.services.auth import AuthUserInfo
+    from app.services.exam import ExamService
+
+    repository = MagicMock()
+    repository.list_problems.return_value = []
+    repository.list_latest_submissions.return_value = {}
+    service = ExamService(repository, uow=MagicMock())
+    client.app.dependency_overrides[get_current_auth] = lambda: AuthContext(
+        user=AuthUserInfo(id=student_user.id, username=student_user.username, role='student'), exam_id=8)
+    client.app.dependency_overrides[get_exam_service] = lambda: service
+    response = client.get('/api/exams/status', params={} if requested is None else {'exam_id': requested})
+    if requested in (None, 8):
+        assert response.status_code == 200
+        assert response.json() == []
+        repository.list_problems.assert_called_once_with(8)
+    else:
+        assert response.status_code == (403 if requested == 9 else 422)
+        repository.list_problems.assert_not_called()
+        repository.list_latest_submissions.assert_not_called()
+
+
+def test_status_requested_exam_does_not_create_a_session(client, student_token):
+    response = client.get('/api/exams/status', params={'exam_id': 8},
+                          headers={'Authorization': f'Bearer {student_token}'})
+    assert response.status_code == 400

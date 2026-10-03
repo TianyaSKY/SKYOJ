@@ -76,10 +76,11 @@ export function exitExam() {
     })
 }
 
-export function getMyExamStatus() {
+export function getMyExamStatus(examId) {
     return request({
         url: '/exams/status',
-        method: 'get'
+        method: 'get',
+        params: examId == null ? undefined : { exam_id: examId }
     })
 }
 

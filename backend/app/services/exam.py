@@ -338,9 +338,13 @@ class ExamService:
             raise PermissionDeniedError("考试密码错误")
         return exam.id
 
-    def get_status(self, user_id: int, exam_id: int) -> list[ExamProblemStatus]:
+    def get_status(
+        self, user_id: int, exam_id: int, *, requested_exam_id: Optional[int] = None
+    ) -> list[ExamProblemStatus]:
         if exam_id == -1:
             raise InvalidStateError("当前未处于考试会话")
+        if requested_exam_id is not None and requested_exam_id != exam_id:
+            raise PermissionDeniedError("未进入该考试，无法查询题目状态")
         problems = self._repository.list_problems(exam_id)
         latest = self._repository.list_latest_submissions(
             exam_id,
