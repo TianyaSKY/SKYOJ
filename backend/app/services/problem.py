@@ -155,14 +155,16 @@ class ProblemService:
         page: int | None = None,
         page_size: int | None = None,
         tag_id: int | None = None,
+        problem_type: str | None = None,
     ) -> list[ProblemListItem] | PaginatedProblems:
         """查询题目列表，并在指定页码时返回分页结果。
 
         教师可见全部题目；其他角色仅可见已上传测试用例的题目。
-        支持按 tag_id 过滤（仅返回关联该标签且 approved=True 的题目）。
+        支持按题目类型及 tag_id 过滤（仅返回关联该标签且 approved=True 的题目）。
         """
         filters = ProblemQuery(
             tag_id=tag_id,
+            problem_type=problem_type,
             visible_ids=(
                 None
                 if requester_role == "teacher"

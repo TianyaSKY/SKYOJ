@@ -204,16 +204,8 @@ const handleSearch = async () => {
   }
 }
 
-// Filter problems based on search query and type
-const filteredProblems = computed(() => {
-  let result = searchQuery.value ? searchResults.value : problems.value
-
-  if (typeFilter.value) {
-    result = result.filter(p => p.type && p.type.toLowerCase() === typeFilter.value.toLowerCase())
-  }
-
-  return result
-})
+// 类型和知识点过滤均由服务端在计数和分页前完成。
+const filteredProblems = computed(() => searchQuery.value ? searchResults.value : problems.value)
 
 let debounceTimer = null
 watch(searchQuery, (newVal) => {
@@ -243,6 +235,7 @@ const fetchProblems = async () => {
       page: currentPage.value,
       page_size: pageSize.value
     }
+    if (typeFilter.value) params.problem_type = typeFilter.value
     if (tagFilter.value) {
       params.tag_id = tagFilter.value
     }
@@ -281,7 +274,9 @@ const handleTagChange = () => {
 }
 
 const handleTypeChange = () => {
+  currentPage.value = 1
   if (searchQuery.value) return handleSearch()
+  return fetchProblems()
 }
 
 const handleSizeChange = (val) => {

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -57,11 +57,13 @@ def get_problems(
     page: Optional[int] = Query(default=None, ge=1),
     page_size: Optional[int] = Query(default=None, ge=1, le=100),
     tag_id: Optional[int] = Query(default=None),
+    problem_type: Literal["acm", "oop", "kaggle"] | None = Query(default=None),
     auth: AuthContext = Depends(get_current_auth),
     service: ProblemService = Depends(get_problem_service),
 ):
     result = service.list_problems(
-        auth.user.role, page=page, page_size=page_size, tag_id=tag_id
+        auth.user.role, page=page, page_size=page_size, tag_id=tag_id,
+        problem_type=problem_type,
     )
     if isinstance(result, PaginatedProblems):
         return {

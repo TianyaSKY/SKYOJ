@@ -122,3 +122,19 @@ it('旧筛选搜索响应不能覆盖新筛选结果', async () => {
   expect(wrapper.vm.searchResults).toEqual([{ id: 3, type: 'oop' }])
   expect(wrapper.vm.total).toBe(1)
 })
+
+it('列表类型筛选从第一页重新请求，翻页和知识点变化保留类型条件', async () => {
+  mountPage(); await flushPromises()
+  wrapper.vm.currentPage = 3
+  wrapper.vm.typeFilter = 'oop'
+  getProblemList.mockResolvedValue({ problems: [{ id: 8, type: 'oop' }], total: 21 })
+  await wrapper.vm.handleTypeChange()
+  expect(getProblemList).toHaveBeenLastCalledWith({ page: 1, page_size: 20, problem_type: 'oop' })
+  expect(wrapper.vm.total).toBe(21)
+  wrapper.vm.handleCurrentChange(2); await flushPromises()
+  expect(getProblemList).toHaveBeenLastCalledWith({ page: 2, page_size: 20, problem_type: 'oop' })
+  wrapper.vm.tagFilter = 7; await wrapper.vm.handleTagChange()
+  expect(getProblemList).toHaveBeenLastCalledWith({ page: 1, page_size: 20, tag_id: 7, problem_type: 'oop' })
+  wrapper.vm.typeFilter = ''; await wrapper.vm.handleTypeChange()
+  expect(getProblemList).toHaveBeenLastCalledWith({ page: 1, page_size: 20, tag_id: 7 })
+})

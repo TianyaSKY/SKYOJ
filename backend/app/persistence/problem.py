@@ -77,6 +77,7 @@ class ProblemQuery:
 
     tag_id: int | None = None
     visible_ids: frozenset[int] | None = None
+    problem_type: str | None = None
 
 
 class ProblemRepository:
@@ -125,6 +126,8 @@ class ProblemRepository:
         """按创建顺序倒序查询题目，必要时在数据库侧分页。"""
         query = self._db.query(Problem).order_by(Problem.id.desc())
         if filters is not None:
+            if filters.problem_type is not None:
+                query = query.filter(Problem.type == filters.problem_type)
             if filters.tag_id is not None:
                 from app.persistence.community import ProblemTagMap
 
