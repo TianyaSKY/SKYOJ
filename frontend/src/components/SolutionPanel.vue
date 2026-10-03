@@ -45,6 +45,9 @@ const commentsDialog = ref(false)
 const currentSolution = ref(null)
 const comments = ref([])
 const commentsTotal = ref(0)
+const commentsPage = ref(1)
+const commentsPageSize = 50
+const loadingComments = ref(false)
 const newComment = ref('')
 const submittingComment = ref(false)
 let scopeVersion = 0
@@ -62,7 +65,7 @@ const userStore = useUserStore()
 const userInfo = computed(() => userStore.user || {})
 const isTeacher = computed(() => userInfo.value.role === 'teacher')
 
-async function load () {
+async function load (pageNo = page.value) {
   const scope = scopeVersion
   const requestId = ++loadVersion
   const initialReactionVersion = reactionVersion
@@ -72,9 +75,12 @@ async function load () {
     const resp = await request({
       url: `/problems/${props.problemId}/solutions`,
       method: 'get',
-      params: { page: page.value, page_size: pageSize }
+      params: { page: pageNo, page_size: pageSize }
     })
     if (!isCurrent()) return
+    const lastPage = Math.max(1, Math.ceil((resp.total || 0) / pageSize))
+    if (pageNo > lastPage) return await load(lastPage)
+    page.value = pageNo
     solutions.value = (resp.items || []).map(item => {
       // 列表请求发起后完成的操作优先于该请求可能读取到的旧状态。
       for (const update of Object.values(reactionUpdates.get(item.id) || {})) {
@@ -107,6 +113,8 @@ watch(() => props.problemId, () => {
   currentSolution.value = null
   comments.value = []
   commentsTotal.value = 0
+  commentsPage.value = 1
+  loadingComments.value = false
   newComment.value = ''
   submittingComment.value = false
   load()
@@ -117,6 +125,8 @@ watch(commentsDialog, visible => {
     currentSolution.value = null
     comments.value = []
     commentsTotal.value = 0
+    commentsPage.value = 1
+    loadingComments.value = false
     newComment.value = ''
     submittingComment.value = false
   }
@@ -243,28 +253,36 @@ async function openComments (item) {
   currentSolution.value = item
   comments.value = []
   commentsTotal.value = 0
+  commentsPage.value = 1
+  loadingComments.value = false
   commentsDialog.value = true
   newComment.value = ''
   await loadComments()
 }
 
-async function loadComments (pageNo = 1) {
+async function loadComments (pageNo = commentsPage.value) {
   const item = currentSolution.value
   if (!item) return
   const scope = scopeVersion, version = commentsVersion
   const requestId = ++commentRequestVersion
   const isCurrent = () => isCurrentComments(scope, version, item) && requestId === commentRequestVersion
+  loadingComments.value = true
   try {
     const resp = await request({
       url: `/problems/solutions/${item.id}/comments`,
       method: 'get',
-      params: { page: pageNo, page_size: 50 }
+      params: { page: pageNo, page_size: commentsPageSize }
     })
     if (!isCurrent()) return
+    const lastPage = Math.max(1, Math.ceil((resp.total || 0) / commentsPageSize))
+    if (pageNo > lastPage) return await loadComments(lastPage)
+    commentsPage.value = pageNo
     comments.value = resp.items || []
     commentsTotal.value = resp.total || 0
   } catch (e) {
     if (isCurrent()) ElMessage.error(e.message || '加载评论失败')
+  } finally {
+    if (isCurrent()) loadingComments.value = false
   }
 }
 
@@ -289,7 +307,7 @@ async function submitComment () {
     item.comment_count += 1
     if (!isCurrentComments(scope, version, item)) return
     if (newComment.value === content) newComment.value = ''
-    await loadComments()
+    await loadComments(1)
   } catch (e) {
     if (isCurrentComments(scope, version, item)) ElMessage.error(e.message || '评论失败')
   } finally {
@@ -385,6 +403,16 @@ async function deleteComment (commentId) {
       </el-card>
     </div>
 
+    <el-pagination
+      v-if="total > pageSize"
+      :current-page="page"
+      :page-size="pageSize"
+      :total="total"
+      :disabled="loading"
+      layout="prev, pager, next"
+      @current-change="load"
+    />
+
     <!-- 写题解 / 编辑题解 -->
     <el-dialog
       v-model="writeDialogVisible"
@@ -420,7 +448,8 @@ async function deleteComment (commentId) {
         <el-input v-model="newComment" type="textarea" :rows="3" maxlength="1000" placeholder="说点什么…" show-word-limit />
         <el-button type="primary" :loading="submittingComment" :disabled="!newComment.trim() || submittingComment" @click="submitComment">发送</el-button>
       </div>
-      <el-empty v-if="comments.length === 0" description="还没有评论" :image-size="80" />
+      <el-skeleton v-if="loadingComments" :rows="3" animated />
+      <el-empty v-else-if="comments.length === 0" description="还没有评论" :image-size="80" />
       <div v-else class="comment-list">
         <div v-for="c in comments" :key="c.id" class="comment-item">
           <div class="comment-meta">
@@ -439,6 +468,15 @@ async function deleteComment (commentId) {
           <div class="comment-body">{{ c.content }}</div>
         </div>
       </div>
+      <el-pagination
+        v-if="commentsTotal > commentsPageSize"
+        :current-page="commentsPage"
+        :page-size="commentsPageSize"
+        :total="commentsTotal"
+        :disabled="loadingComments"
+        layout="prev, pager, next"
+        @current-change="loadComments"
+      />
     </el-dialog>
   </el-card>
 </template>

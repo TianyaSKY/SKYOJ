@@ -17,9 +17,10 @@ function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no })
   return { promise, resolve, reject }
 }
-function mountPage() {
+function mountPage(renderSlots = false) {
   wrapper = shallowMount(SolutionPanel, { props: { problemId: 1 }, global: {
-    stubs: Object.fromEntries(['el-card','el-tag','el-icon','el-button','el-dialog','el-form','el-form-item','el-input','el-skeleton','el-empty'].map(name => [name,true])),
+    renderStubDefaultSlot: renderSlots,
+    stubs: Object.fromEntries(['el-pagination','el-card','el-tag','el-icon','el-button','el-dialog','el-form','el-form-item','el-input','el-skeleton','el-empty'].map(name => [name,true])),
   } })
 }
 beforeEach(() => { vi.resetAllMocks(); request.mockResolvedValue({ items: [], total: 0 }) })
@@ -273,4 +274,44 @@ it('后续发起的刷新仍可更新其他用户增加的点赞数', async () =
   request.mockResolvedValueOnce({ items: [{ ...solution(1), liked_by_me: true, vote_count: 5 }], total: 1 })
   await wrapper.vm.load()
   expect(wrapper.vm.solutions[0].vote_count).toBe(5)
+})
+
+it('题解与评论分页控件可以读取后续记录', async () => {
+  request.mockImplementation(config => Promise.resolve({ items: [solution(config.params?.page || 1)], total: config.url.endsWith('/comments') ? 51 : 21 }))
+  mountPage(true); await flushPromises()
+  await wrapper.vm.openComments(wrapper.vm.solutions[0]); await nextTick()
+  const pagers = wrapper.findAllComponents('el-pagination-stub')
+  expect(pagers).toHaveLength(2)
+  pagers[0].vm.$emit('current-change', 2)
+  pagers[1].vm.$emit('current-change', 2)
+  await flushPromises()
+  expect(wrapper.vm.page).toBe(2)
+  expect(wrapper.vm.commentsPage).toBe(2)
+  expect(wrapper.vm.solutions[0].id).toBe(2)
+  expect(wrapper.vm.comments[0].id).toBe(2)
+  expect(request.mock.calls).toContainEqual([{ url: '/problems/1/solutions', method: 'get', params: { page: 2, page_size: 20 } }])
+  expect(request.mock.calls).toContainEqual([{ url: '/problems/solutions/1/comments', method: 'get', params: { page: 2, page_size: 50 } }])
+})
+it.each([
+  ['load', 'page', 'solutions', 20],
+  ['loadComments', 'commentsPage', 'comments', 50],
+])('%s 最后一页变空时回退到仍有记录的页面', async (method, pageField, itemsField, total) => {
+  mountPage(); await flushPromises()
+  await wrapper.vm.openComments(solution(1))
+  wrapper.vm[pageField] = 2
+  request.mockImplementation(config => Promise.resolve({ items: config.params.page === 1 ? [solution(10)] : [], total }))
+  await wrapper.vm[method]()
+  expect(wrapper.vm[pageField]).toBe(1)
+  expect(wrapper.vm[itemsField][0].id).toBe(10)
+})
+it.each([
+  ['load', 'page', 'loading'],
+  ['loadComments', 'commentsPage', 'loadingComments'],
+])('%s 翻页失败保留当前页并结束等待状态', async (method, pageField, loadingField) => {
+  mountPage(); await flushPromises()
+  await wrapper.vm.openComments(solution(1))
+  request.mockRejectedValueOnce(new Error('page failed'))
+  await wrapper.vm[method](2)
+  expect(wrapper.vm[pageField]).toBe(1)
+  expect(wrapper.vm[loadingField]).toBe(false)
 })
