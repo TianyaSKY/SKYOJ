@@ -18,6 +18,7 @@ from app.api.validation import (
 from app.api.deps import get_debug_service
 from app.api.schemas.debug import DebugCodeBody
 from app.api.schemas.debug_run import CreateDebugRunResponse, DebugRunResponse
+from app.middleware.rate_limit import enforce
 from app.services.debug import CreateDebugRunParams, DebugService
 
 router = APIRouter()
@@ -35,6 +36,8 @@ async def submit_debug(
     file: Optional[UploadFile] = File(default=None),
 ):
     """接收调试请求；不写入 `submissions`，不计入考试或排行榜。"""
+    # 调试与正式提交共用评测队列及每用户配额，避免交替调用绕过限流。
+    enforce(f"submit:{auth.user.id}", limit=10, window_seconds=60)
 
     content_type = request.headers.get("content-type", "")
     pid = problem_id
