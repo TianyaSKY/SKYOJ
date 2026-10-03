@@ -12,8 +12,8 @@ from pydantic import ValidationError
 from app.api.deps import get_debug_service
 from app.api.schemas.debug import DebugCodeBody
 from app.api.schemas.debug_run import CreateDebugRunResponse, DebugRunResponse
-from app.domain.debug_run import CreateDebugRunParams
-from app.services.debug_service import DebugService
+from app.services.debug import CreateDebugRunParams
+from app.services.debug import DebugService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

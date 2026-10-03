@@ -26,10 +26,10 @@ from app.api.schemas.submission import (
     SubmitCodeBody,
     SubmitCodeResponse,
 )
-from app.config import SECRET_KEY
-from app.domain.submission import SubmissionQuery, SubmitParams
+from app.core.config import SECRET_KEY
+from app.services.submission import SubmissionQuery, SubmitParams
 from app.middleware.rate_limit import enforce
-from app.services.submission_service import SubmissionService
+from app.services.submission import SubmissionService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

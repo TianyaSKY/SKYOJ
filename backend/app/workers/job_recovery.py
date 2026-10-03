@@ -4,9 +4,9 @@ import time
 
 from loguru import logger
 
-from app.config import JOB_RECOVERY_INTERVAL_SECONDS
-from app.database import SessionLocal
-from app.services.async_job_service import AsyncJobService
+from app.core.config import JOB_RECOVERY_INTERVAL_SECONDS
+from app.persistence.database import SessionLocal
+from app.services.async_job import AsyncJobService
 
 
 def recover_once() -> int:

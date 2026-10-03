@@ -7,13 +7,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base
-from app.domain.async_job import CreateAsyncJobParams
+from app.persistence.database import Base
+from app.services.async_job import CreateAsyncJobParams
 from app.messaging.celery_app import celery_app
 from app.messaging.queues import JUDGE_QUEUE
 from app.messaging.task_names import JUDGE_SUBMISSION_TASK
-from app.models.async_job import AsyncJob
-from app.services.async_job_service import AsyncJobService
+from app.persistence.jobs import AsyncJob
+from app.services.async_job import AsyncJobService
 
 
 def make_session():

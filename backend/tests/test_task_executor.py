@@ -1,12 +1,12 @@
 """任务执行骨架 run_job 与 finalize_dataset 下沉测试。"""
 
 import pytest
-from app.database import Base
-from app.domain.async_job import CreateAsyncJobParams
+from app.persistence.database import Base
+from app.services.async_job import CreateAsyncJobParams
 from app.messaging.queues import JUDGE_QUEUE
 from app.messaging.task_names import JUDGE_SUBMISSION_TASK
 from app.persistence.dataset import DatasetRepository
-from app.services.async_job_service import AsyncJobService
+from app.services.async_job import AsyncJobService
 from app.services.dataset import DatasetService
 from app.tasks import base as tasks_base
 from app.tasks.base import run_job

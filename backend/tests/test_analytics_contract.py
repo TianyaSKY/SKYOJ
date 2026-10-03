@@ -4,11 +4,11 @@ from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.errors import PermissionDeniedError
-from app.models.submission import Submission
-from app.repositories.submission_repository import SubmissionRepository
-from app.services.submission_service import SubmissionService
-from app.utils.time import utcnow
+from app.core.errors import PermissionDeniedError
+from app.persistence.submission import Submission
+from app.persistence.submission import SubmissionRepository
+from app.services.submission import SubmissionService
+from app.core.time import utcnow
 
 
 def test_analytics_aggregates_counts_without_loading_source_rows(

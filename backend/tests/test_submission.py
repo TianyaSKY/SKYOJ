@@ -146,7 +146,7 @@ class TestGetSubmission:
     def test_cannot_see_others_submission(self, client, student_token, db_session, sample_problem):
         """用另一个用户提交，学生 token 无法查看。"""
         import bcrypt
-        from app.models.user import User
+        from app.persistence.user import User
 
         other = User(
             username="other_student",

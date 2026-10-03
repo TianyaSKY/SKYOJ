@@ -9,8 +9,8 @@ from app.api.schemas.wrong_book import (
     WrongBookListResponse,
     WrongBookStatsResponse,
 )
-from app.domain.wrong_book import WrongBookItem, WrongBookStats
-from app.services.wrong_book_service import WrongBookService
+from app.services.wrong_book import WrongBookItem, WrongBookStats
+from app.services.wrong_book import WrongBookService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

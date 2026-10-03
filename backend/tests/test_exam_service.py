@@ -7,14 +7,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base
-import app.models  # noqa: F401
-from app.models.exam import Exam, ExamProblem
-from app.models.problem import Problem
-from app.models.submission import Submission
-from app.models.user import User
-from app.repositories.exam_repository import ExamRepository
-from app.services.exam_service import ExamService
+from app.persistence.database import Base
+import app.persistence  # noqa: F401
+from app.persistence.exam import Exam, ExamProblem
+from app.persistence.problem import Problem
+from app.persistence.submission import Submission
+from app.persistence.user import User
+from app.persistence.exam import ExamRepository
+from app.services.exam import ExamService
 
 T0 = datetime(2026, 1, 1, 9, 0, 0)
 

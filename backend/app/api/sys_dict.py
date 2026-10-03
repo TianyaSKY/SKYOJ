@@ -13,9 +13,9 @@ from app.api.schemas.sys_dict import (
     UpdateSysConfigBody,
     UpdateSysConfigResponse,
 )
-from app.database import get_db
-from app.domain.system import UpdateSystemConfigParams
-from app.services.system_service import SystemService
+from app.persistence.database import get_db
+from app.services.system import UpdateSystemConfigParams
+from app.services.system import SystemService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

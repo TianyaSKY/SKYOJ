@@ -9,32 +9,32 @@ from app.clients.jplag_client import JPlagClient
 from app.clients.llm_client import LlmClient
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
 from app.clients.submission_storage_client import SubmissionStorageClient
-from app.database import get_db
-from app.repositories.ai_draft_repository import AiDraftRepository
+from app.persistence.database import get_db
+from app.persistence.jobs import AiDraftRepository
 from app.persistence.dataset import DatasetRepository
-from app.repositories.debug_run_repository import DebugRunRepository
-from app.repositories.exam_repository import ExamRepository
-from app.repositories.plagiarism_repository import PlagiarismRepository
-from app.repositories.problem_repository import ProblemRepository
-from app.repositories.search_repository import SearchRepository
-from app.repositories.submission_repository import SubmissionRepository
-from app.repositories.system_repository import SystemRepository
-from app.repositories.user_repository import UserRepository
-from app.services.ai_draft_service import AiDraftService
-from app.services.async_job_service import AsyncJobService
-from app.services.auth_service import AuthService
+from app.persistence.submission import DebugRunRepository
+from app.persistence.exam import ExamRepository
+from app.persistence.submission import PlagiarismRepository
+from app.persistence.problem import ProblemRepository
+from app.persistence.user import SearchRepository
+from app.persistence.submission import SubmissionRepository
+from app.persistence.system import SystemRepository
+from app.persistence.user import UserRepository
+from app.services.ai_draft import AiDraftService
+from app.services.async_job import AsyncJobService
+from app.services.auth import AuthService
 from app.services.dataset import DatasetService
-from app.services.debug_service import DebugService
-from app.services.exam_service import ExamService
-from app.services.llm_facade_service import LlmFacadeService
-from app.services.plagiarism_service import PlagiarismService
-from app.services.problem_community_service import SolutionService, TagService
-from app.services.problem_service import ProblemService
-from app.services.search_facade_service import SearchFacadeService
-from app.services.submission_service import SubmissionService
-from app.services.system_service import SystemService
-from app.services.user_service import UserService
-from app.services.wrong_book_service import WrongBookService
+from app.services.debug import DebugService
+from app.services.exam import ExamService
+from app.services.llm import LlmFacadeService
+from app.services.plagiarism import PlagiarismService
+from app.services.community import SolutionService, TagService
+from app.services.problem import ProblemService
+from app.services.search import SearchFacadeService
+from app.services.submission import SubmissionService
+from app.services.system import SystemService
+from app.services.user import UserService
+from app.services.wrong_book import WrongBookService
 
 
 def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:

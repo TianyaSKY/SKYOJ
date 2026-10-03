@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 @pytest.fixture(scope="session")
 def engine():
     """SQLite 内存引擎，所有测试共享同一 schema。"""
-    from app import models  # noqa: F401
-    from app.database import Base
+    from app import persistence  # noqa: F401
+    from app.persistence.database import Base
 
     eng = create_engine(
         "sqlite:///:memory:",
@@ -48,9 +48,9 @@ def db_session(engine):
 @pytest.fixture
 def client(db_session, monkeypatch):
     """带内存数据库的 TestClient，mock Docker 调用。"""
-    import app.database
+    import app.persistence.database
 
-    monkeypatch.setattr(app.database, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(app.persistence.database, "SessionLocal", lambda: db_session)
 
     from unittest.mock import MagicMock, patch
 
@@ -73,7 +73,7 @@ def client(db_session, monkeypatch):
 def teacher_user(db_session):
     """创建一个教师用户并返回其 ORM 对象。"""
     import bcrypt
-    from app.models.user import User
+    from app.persistence.user import User
 
     user = User(
         username="test_teacher",
@@ -90,7 +90,7 @@ def teacher_user(db_session):
 def student_user(db_session):
     """创建一个学生用户并返回其 ORM 对象。"""
     import bcrypt
-    from app.models.user import User
+    from app.persistence.user import User
 
     user = User(
         username="test_student",
@@ -126,7 +126,7 @@ def student_token(client, student_user):
 @pytest.fixture
 def sample_problem(db_session):
     """创建一个 ACM 题目用于测试。"""
-    from app.models.problem import Problem
+    from app.persistence.problem import Problem
 
     problem = Problem(
         title="两数之和",

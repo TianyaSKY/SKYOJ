@@ -7,27 +7,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base
-from app.domain.auth import AuthUserInfo
-from app.domain.async_job import AsyncJobResult
+from app.persistence.database import Base
+from app.services.auth import AuthUserInfo
+from app.services.async_job import AsyncJobResult
 from app.services.dataset import DatasetDetail, DatasetListItem
-from app.domain.exam import ExamDetail, ExamListItem
-from app.domain.problem import ProblemDetail, ProblemListItem
-from app.domain.submission import SubmissionDetail, SubmissionListItem
-from app.domain.user import UserProfile, UserSubmissionItem
-from app.mappers import (
-    from_ai_draft_orm,
-    from_async_job_orm,
-    from_exam_detail_orm,
-    from_exam_orm,
-    from_problem_orm,
-    from_submission_detail_orm,
-    from_submission_orm,
-    from_user_orm,
-    from_user_submission_orm,
-)
+from app.services.exam import ExamDetail, ExamListItem
+from app.services.problem import ProblemDetail, ProblemListItem
+from app.services.submission import SubmissionDetail, SubmissionListItem
+from app.services.user import UserProfile, UserSubmissionItem
+from app.persistence.jobs import from_ai_draft_orm, from_async_job_orm
+from app.persistence.exam import from_exam_detail_orm, from_exam_orm
+from app.persistence.problem import from_problem_orm
+from app.persistence.submission import from_submission_detail_orm, from_submission_orm
+from app.persistence.user import from_user_orm, from_user_submission_orm
 from app.persistence.dataset import from_dataset_detail_orm, from_dataset_orm
-from app.models.user import User
+from app.persistence.user import User
 from app.utils.auth_tools import encode_auth_token, get_current_auth
 
 NOW = datetime(2026, 1, 1, 9, 0, 0)

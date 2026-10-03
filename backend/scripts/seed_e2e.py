@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from loguru import logger
 from sqlalchemy import select
 
-from app.database import SessionLocal, engine
-from app.models import Exam, ExamProblem, Problem, Submission, SysDict, User
+from app.persistence.database import SessionLocal, engine
+from app.persistence import Exam, ExamProblem, Problem, Submission, SysDict, User
 from app.utils.passwords import hash_password
 from app.utils.sys_dict import sys_dict_kv
 

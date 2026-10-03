@@ -2,22 +2,16 @@
 
 from __future__ import annotations
 
+from app.core.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, BinaryIO, Optional
-
 from loguru import logger
+from typing import BinaryIO, Optional, TYPE_CHECKING
 
-from app.clients.dataset_storage_client import DatasetStorageClient
-from app.domain.errors import (
-    InvalidStateError,
-    PermissionDeniedError,
-    ResourceNotFoundError,
-)
 
 if TYPE_CHECKING:
     from app.persistence.dataset import DatasetRepository
-    from app.services.async_job_service import AsyncJobService
+    from app.services.async_job import AsyncJobService
 
 
 @dataclass(frozen=True)
@@ -98,6 +92,9 @@ class DatasetRecord(DatasetDetail):
     temp_path: Optional[str] = None
     file_hash: Optional[str] = None
     error_message: Optional[str] = None
+
+
+from app.clients.dataset_storage_client import DatasetStorageClient
 
 
 class DatasetService:

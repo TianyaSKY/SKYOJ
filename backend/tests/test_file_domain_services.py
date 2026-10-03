@@ -2,10 +2,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
-from app.domain.problem import UploadTestCasesParams
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.services.problem import UploadTestCasesParams
 from app.services.dataset import DatasetRecord, DatasetService, UploadDatasetParams
-from app.services.problem_service import ProblemService
+from app.services.problem import ProblemService
 
 
 class FakeDatasetRepository:

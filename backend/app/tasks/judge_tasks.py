@@ -4,18 +4,18 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
-from app.domain.ai_draft import TASK_TEST_DATA_EXECUTION
+from app.persistence.database import SessionLocal
+from app.services.ai_draft import TASK_TEST_DATA_EXECUTION
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import EXECUTE_TEST_DATA_TASK, JUDGE_SUBMISSION_TASK
-from app.repositories.ai_draft_repository import AiDraftRepository
-from app.services.judge_service import (
+from app.persistence.jobs import AiDraftRepository
+from app.services.judge import (
     judge_submission as run_submission_judge,
 )
-from app.services.judge_service import (
+from app.services.judge import (
     save_non_acm_script,
 )
-from app.services.test_gen_service import run_test_generation
+from app.services.test_gen import run_test_generation
 from app.tasks.base import run_job
 
 

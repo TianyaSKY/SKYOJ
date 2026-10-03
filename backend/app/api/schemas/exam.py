@@ -46,7 +46,7 @@ class AddProblemToExamBody(BaseModel):
     score: int = Field(default=100, ge=1)
 
 
-from app.domain.exam import (
+from app.services.exam import (
     ExamProblemItem,
     MonitorEntry,
     MonitorProblemInfo,

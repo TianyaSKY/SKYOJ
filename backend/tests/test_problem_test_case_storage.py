@@ -11,7 +11,7 @@ from app.clients import problem_test_case_storage_client as storage_module
 from app.clients.problem_test_case_storage_client import (
     ProblemTestCaseStorageClient,
 )
-from app.domain.errors import InvalidStateError
+from app.core.errors import InvalidStateError
 
 
 def make_zip(*members: tuple[str, bytes]) -> bytes:

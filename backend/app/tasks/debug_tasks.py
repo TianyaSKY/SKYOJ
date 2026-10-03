@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import DEBUG_SUBMISSION_TASK
-from app.repositories.debug_run_repository import DebugRunRepository
+from app.persistence.submission import DebugRunRepository
 from app.services.acm import run_acm_single_case
-from app.services.debug_service import DebugService
+from app.services.debug import DebugService
 from app.tasks.base import run_job
 
 

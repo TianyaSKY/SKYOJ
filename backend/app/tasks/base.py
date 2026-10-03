@@ -10,9 +10,9 @@ from typing import Any, Callable
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
-from app.repositories.async_job_repository import AsyncJobRepository
-from app.services.async_job_service import AsyncJobService
+from app.persistence.database import SessionLocal
+from app.persistence.jobs import AsyncJobRepository
+from app.services.async_job import AsyncJobService
 
 
 def run_job(

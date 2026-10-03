@@ -9,8 +9,8 @@ from app.api.schemas.user import (
     UserProfileResponse,
     UserSubmissionResponse,
 )
-from app.domain.user import UploadAvatarParams, UserProfile, UserSubmissionItem
-from app.services.user_service import UserService
+from app.services.user import UploadAvatarParams, UserProfile, UserSubmissionItem
+from app.services.user import UserService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

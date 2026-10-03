@@ -1,7 +1,7 @@
+
 import os
 import re
-
-from app.repositories.problem_repository import ProblemRepository
+from app.persistence.problem import ProblemRepository
 from app.services.sandbox_runner import SandboxRunner, time_limit_seconds
 
 
@@ -111,7 +111,7 @@ def run_oop_judge(submission_id, user_code, problem_id, language='python', db=No
         )
 
     if db is None:
-        from app.database import SessionLocal
+        from app.persistence.database import SessionLocal
         _db = SessionLocal()
         try:
             problem = ProblemRepository(_db).get_by_id(problem_id)

@@ -3,11 +3,11 @@
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.errors import PermissionDeniedError
-from app.domain.llm import AskLlmParams
-from app.models.plagiarism import PlagiarismReport
-from app.repositories.submission_repository import SubmissionRepository
-from app.services.llm_facade_service import LlmFacadeService
+from app.core.errors import PermissionDeniedError
+from app.services.llm import AskLlmParams
+from app.persistence.submission import PlagiarismReport
+from app.persistence.submission import SubmissionRepository
+from app.services.llm import LlmFacadeService
 
 
 def test_llm_context_uses_injected_repository_and_preserves_dynamic_result():

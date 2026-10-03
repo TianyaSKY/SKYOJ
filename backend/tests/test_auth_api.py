@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 
-from app.config import SECRET_KEY
+from app.core.config import SECRET_KEY
 
 TEST_SECRET = SECRET_KEY
 

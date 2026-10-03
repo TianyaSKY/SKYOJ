@@ -82,19 +82,3 @@ def test_dataset_api_keeps_list_and_download_contracts(client, teacher_token, db
     assert deleted.status_code == 200
     assert deleted.json() == {"message": "Dataset deleted successfully"}
     assert client.get(f"/api/datasets/{record.id}/download", headers=headers).status_code == 404
-
-
-def test_legacy_paths_share_the_same_classes_and_mapper():
-    from app.domain.dataset import DatasetDetail as LegacyDetail
-    from app.mappers import from_dataset_orm as legacy_mapper
-    from app.models.dataset import Dataset as LegacyModel
-    from app.repositories.dataset_repository import DatasetRepository as LegacyRepository
-    from app.services.dataset_service import DatasetService as LegacyService
-    from app.persistence.dataset import from_dataset_orm
-    from app.services.dataset import DatasetDetail
-
-    assert LegacyDetail is DatasetDetail
-    assert LegacyModel is Dataset
-    assert LegacyRepository is DatasetRepository
-    assert LegacyService is DatasetService
-    assert legacy_mapper is from_dataset_orm

@@ -1,5 +1,13 @@
 """JPlag HTTP API 客户端。"""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.plagiarism import MatchedBlock, SimilarityPair
+
+
 import os
 import time
 from dataclasses import dataclass
@@ -7,7 +15,6 @@ from dataclasses import dataclass
 import requests
 from loguru import logger
 
-from app.domain.plagiarism import MatchedBlock, SimilarityPair
 
 JPLAG_BASE_URL = os.getenv("JPLAG_URL", "http://localhost:25678")
 JPLAG_TIMEOUT = int(os.getenv("JPLAG_TIMEOUT", "120"))
@@ -128,6 +135,7 @@ class JPlagClient:
     def _parse_matches(
         self, data: dict, submissions: list[dict]
     ) -> list[SimilarityPair]:
+        from app.services.plagiarism import MatchedBlock, SimilarityPair
         pairs: list[SimilarityPair] = []
         submission_ids = {f"sub_{s['id']}.py": s["id"] for s in submissions}
         id_to_code = {s["id"]: s["code"] for s in submissions}

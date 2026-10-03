@@ -8,8 +8,8 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from app.database import SessionLocal
-from app.models.audit_log import AuditLog
+from app.persistence.database import SessionLocal
+from app.persistence.system import AuditLog
 
 
 _AUDITED_METHODS = {"POST", "PUT", "DELETE", "PATCH"}

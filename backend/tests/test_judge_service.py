@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services import acm, judge_service, sandbox_runner
+from app.services import acm, judge, sandbox_runner
 
 
 class _StubSubmission:
@@ -26,7 +26,7 @@ class _StubDb:
 
 
 def make_repo_factory(problem_type):
-    """构造注入 judge_service 的假 SubmissionRepository 工厂。"""
+    """构造注入 judge 的假 SubmissionRepository 工厂。"""
 
     class _FakeSubmissionRepository:
         last = None
@@ -56,11 +56,11 @@ def test_judge_submission_dispatches_acm_and_updates_result(monkeypatch):
         return "Accepted", 100.0, "Test Case 1: Passed", []
 
     repo_factory = make_repo_factory("acm")
-    monkeypatch.setattr(judge_service, "run_acm_judge", fake_acm_judge)
-    monkeypatch.setattr(judge_service, "SubmissionRepository", repo_factory)
+    monkeypatch.setattr(judge, "run_acm_judge", fake_acm_judge)
+    monkeypatch.setattr(judge, "SubmissionRepository", repo_factory)
 
     db = _StubDb()
-    judge_service.judge_submission(7, db)
+    judge.judge_submission(7, db)
 
     assert calls["args"] == (7, "print(1)", 1, "python", db)
     assert repo_factory.last.updates == [(7, "Accepted", 100.0, "Test Case 1: Passed", [])]
@@ -69,10 +69,10 @@ def test_judge_submission_dispatches_acm_and_updates_result(monkeypatch):
 
 def test_judge_submission_unsupported_type_marks_system_error(monkeypatch):
     repo_factory = make_repo_factory("text")
-    monkeypatch.setattr(judge_service, "SubmissionRepository", repo_factory)
+    monkeypatch.setattr(judge, "SubmissionRepository", repo_factory)
 
     db = _StubDb()
-    judge_service.judge_submission(7, db)
+    judge.judge_submission(7, db)
 
     assert repo_factory.last.updates == [(7, "System Error", 0, "Unsupported problem type", [])]
 
@@ -82,11 +82,11 @@ def test_judge_submission_marks_system_error_on_exception(monkeypatch):
         raise RuntimeError("sandbox exploded")
 
     repo_factory = make_repo_factory("acm")
-    monkeypatch.setattr(judge_service, "run_acm_judge", boom)
-    monkeypatch.setattr(judge_service, "SubmissionRepository", repo_factory)
+    monkeypatch.setattr(judge, "run_acm_judge", boom)
+    monkeypatch.setattr(judge, "SubmissionRepository", repo_factory)
 
     db = _StubDb()
-    judge_service.judge_submission(7, db)
+    judge.judge_submission(7, db)
 
     assert repo_factory.last.updates == [
         (7, "System Error", 0, "Judge Error: sandbox exploded", [])
@@ -110,10 +110,10 @@ def test_judge_submission_missing_submission_skips(monkeypatch):
         ):
             raise AssertionError("不应更新不存在的提交")
 
-    monkeypatch.setattr(judge_service, "SubmissionRepository", _EmptyRepo)
+    monkeypatch.setattr(judge, "SubmissionRepository", _EmptyRepo)
 
     db = _StubDb()
-    judge_service.judge_submission(7, db)
+    judge.judge_submission(7, db)
 
     assert db.committed == 0
 
@@ -286,13 +286,13 @@ def test_sandbox_runner_context_manager_stops(monkeypatch):
 
 
 def test_no_import_cycle_between_judge_modules():
-    """judge_service 与模式模块可以以任意顺序导入。"""
+    """judge 与模式模块可以以任意顺序导入。"""
     import importlib
 
-    for module_name in ("app.services.acm", "app.services.judge_service"):
+    for module_name in ("app.services.acm", "app.services.judge"):
         importlib.import_module(module_name)
-    import app.services.judge_service  # noqa: F401
+    import app.services.judge  # noqa: F401
     import app.services.acm  # noqa: F401
     import app.services.oop  # noqa: F401
     import app.services.kaggle  # noqa: F401
-    import app.services.test_gen_service  # noqa: F401
+    import app.services.test_gen  # noqa: F401

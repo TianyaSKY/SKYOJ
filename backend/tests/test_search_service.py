@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from app.services.search_facade_service import SearchFacadeService
+from app.services.search import SearchFacadeService
 
 
 class FakeSearchRepository:

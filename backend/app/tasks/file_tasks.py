@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.clients.dataset_storage_client import DatasetStorageClient
 from app.messaging.celery_app import celery_app
 from app.messaging.task_names import FINALIZE_DATASET_TASK
-from app.repositories.async_job_repository import AsyncJobRepository
+from app.persistence.jobs import AsyncJobRepository
 from app.persistence.dataset import DatasetRepository
-from app.services.async_job_service import AsyncJobService
+from app.services.async_job import AsyncJobService
 from app.services.dataset import DatasetService
 from app.tasks.base import run_job
 

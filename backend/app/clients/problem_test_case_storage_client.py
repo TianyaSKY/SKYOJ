@@ -1,5 +1,13 @@
 """题目测试用例文件存储客户端。"""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.problem import TestCaseItem, TestCaseSummary
+
+
 import io
 import re
 import shutil
@@ -8,8 +16,7 @@ import uuid
 import zipfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from app.domain.errors import InvalidStateError, ResourceNotFoundError
-from app.domain.problem import TestCaseItem, TestCaseSummary
+from app.core.errors import InvalidStateError, ResourceNotFoundError
 
 
 
@@ -100,6 +107,7 @@ class ProblemTestCaseStorageClient:
 
     def summarize(self, problem_id: int) -> TestCaseSummary:
         """读取题目测试点的配对状态和文件明细。"""
+        from app.services.problem import TestCaseItem, TestCaseSummary
 
         folder = self._folder(problem_id)
         if not folder.is_dir():
@@ -179,6 +187,7 @@ class ProblemTestCaseStorageClient:
 
     @staticmethod
     def _empty_summary() -> TestCaseSummary:
+        from app.services.problem import TestCaseSummary
         return TestCaseSummary(
             status="empty",
             total_count=0,

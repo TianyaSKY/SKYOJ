@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.config import require_env, require_secret_key
+from app.core.config import require_env, require_secret_key
 
 
 def test_missing_required_environment_variable_is_rejected(monkeypatch):

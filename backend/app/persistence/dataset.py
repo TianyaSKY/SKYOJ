@@ -1,14 +1,17 @@
 """数据集数据库模型、仓储与业务结果映射。"""
 
-from datetime import datetime
-from typing import Optional
+from __future__ import annotations
 
+from app.persistence.database import Base
+from app.persistence.unit_of_work import UnitOfWork
+from datetime import datetime
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Session, relationship
+from typing import Optional, TYPE_CHECKING
 
-from app.database import Base
-from app.services.dataset import DatasetDetail, DatasetListItem, DatasetRecord
-from app.unit_of_work import UnitOfWork
+
+if TYPE_CHECKING:
+    from app.services.dataset import DatasetDetail, DatasetListItem, DatasetRecord
 
 
 class Dataset(Base):
@@ -116,6 +119,8 @@ class DatasetRepository:
 
 def from_dataset_orm(dataset) -> DatasetListItem:
     """数据集 ORM → 列表项。"""
+
+    from app.services.dataset import DatasetListItem
     return DatasetListItem(
         id=dataset.id,
         name=dataset.name,
@@ -130,6 +135,8 @@ def from_dataset_orm(dataset) -> DatasetListItem:
 
 def from_dataset_detail_orm(dataset) -> DatasetDetail:
     """数据集 ORM → 详情。"""
+
+    from app.services.dataset import DatasetDetail
     return DatasetDetail(
         id=dataset.id,
         name=dataset.name,
@@ -145,6 +152,8 @@ def from_dataset_detail_orm(dataset) -> DatasetDetail:
 
 def _to_dataset_record(dataset: Dataset) -> DatasetRecord:
     """ORM → 不依赖 Session 的数据集快照。"""
+
+    from app.services.dataset import DatasetRecord
     detail = from_dataset_detail_orm(dataset)
     return DatasetRecord(
         id=detail.id,

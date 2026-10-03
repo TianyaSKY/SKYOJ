@@ -5,10 +5,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from app.domain.errors import PermissionDeniedError, ResourceNotFoundError
-from app.domain.exam import EnterExamParams
-from app.services.exam_service import ExamService
-from app.utils.time import utcnow
+from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.services.exam import EnterExamParams
+from app.services.exam import ExamService
+from app.core.time import utcnow
 
 
 class FakeExamRepository:

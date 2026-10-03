@@ -8,7 +8,7 @@ from app.api.schemas.plagiarism import (
     PlagiarismReportResponse,
     PlagiarismScanResponse,
 )
-from app.services.plagiarism_service import PlagiarismService
+from app.services.plagiarism import PlagiarismService
 from app.utils.auth_tools import AuthContext, get_current_auth
 
 router = APIRouter()

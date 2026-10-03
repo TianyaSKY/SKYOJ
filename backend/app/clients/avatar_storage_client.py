@@ -3,8 +3,8 @@
 import os
 import uuid
 
-from app.config import BACKEND_ROOT
-from app.domain.errors import ResourceNotFoundError
+from app.core.config import BACKEND_ROOT
+from app.core.errors import ResourceNotFoundError
 from app.utils.files import secure_filename
 
 
