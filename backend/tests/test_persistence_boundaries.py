@@ -145,7 +145,7 @@ def test_like_and_counter_roll_back_together(
     assert db_session.get(ProblemSolution, created.id).vote_count == 0
 
 
-def test_tag_approval_persists_and_problem_filter_uses_injected_repository(
+def test_tag_approval_persists_and_problem_query_filters_approved_tags(
     db_session, teacher_user, sample_problem
 ):
     repo = ProblemCommunityRepository(db_session)
@@ -159,7 +159,7 @@ def test_tag_approval_persists_and_problem_filter_uses_injected_repository(
     from app.services.problem import ProblemService
 
     problem_service = ProblemService(
-        ProblemRepository(db_session), MagicMock(), repo, uow=UnitOfWork(db_session)
+        ProblemRepository(db_session), MagicMock(), uow=UnitOfWork(db_session)
     )
     assert [
         item.id for item in problem_service.list_problems("teacher", tag_id=tag.id)

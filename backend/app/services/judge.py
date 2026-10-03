@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import time as time_module
 from dataclasses import dataclass
 from typing import Optional
 
+from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
 from app.judging.acm import run_acm_judge
 from app.judging.kaggle import run_kaggle_judge
 from app.judging.oop import run_oop_judge
@@ -219,28 +219,26 @@ def _enqueue_plagiarism_scan(db, problem_id: int, submission_id: int) -> None:
         logger.warning("查重任务投递失败 problem_id={} error={}", problem_id, exc)
 
 
-def save_non_acm_script(problem_id, code, problem_type, language):
-    """封装非 ACM 类型的脚本保存逻辑"""
-    problem_dir = os.path.join("uploads/problems", str(problem_id))
-    os.makedirs(problem_dir, exist_ok=True)
-
-    lang_map = {
-        "python": "main.py",
-        "c": "main.c",
-        "cpp": "main.cpp",
-        "java": "Main.java",
-    }
-
-    filename = lang_map.get((language or "python").lower(), "main.py")
-    file_path = os.path.join(problem_dir, filename)
+def save_non_acm_script(
+    problem_id: int,
+    code: str,
+    problem_type: str,
+    language: str | None,
+    *,
+    storage: ProblemTestCaseStorageClient | None = None,
+) -> tuple[bool, str]:
+    """编排非 ACM 判题脚本保存，文件操作由存储客户端负责。"""
     try:
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(code)
+        filename = (storage or ProblemTestCaseStorageClient()).save_script(
+            problem_id,
+            code,
+            language,
+        )
         return True, f"Script saved as {filename} for {problem_type} problem."
-    except Exception as exc:
+    except OSError:
         logger.exception(
             "保存非 ACM 测试脚本失败 problem_id={} problem_type={}",
             problem_id,
             problem_type,
         )
-        return False, str(exc)
+        return False, "测试脚本保存失败"

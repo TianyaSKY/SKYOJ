@@ -9,8 +9,7 @@ from typing import Optional
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
 from app.clients.redis_client import redis_client
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
-from app.persistence.community import ProblemCommunityRepository
-from app.persistence.problem import ProblemRecord, ProblemRepository
+from app.persistence.problem import ProblemQuery, ProblemRecord, ProblemRepository
 from app.persistence.unit_of_work import UnitOfWork
 
 
@@ -123,13 +122,11 @@ class ProblemService:
         self,
         problem_repository: ProblemRepository,
         test_case_storage: ProblemTestCaseStorageClient | None = None,
-        community_repository: ProblemCommunityRepository | None = None,
         *,
         uow: UnitOfWork,
     ) -> None:
         self._uow = uow
         self._problem_repository = problem_repository
-        self._community_repository = community_repository
         self._test_case_storage = test_case_storage or ProblemTestCaseStorageClient()
 
     def create_problem(
@@ -164,54 +161,26 @@ class ProblemService:
         教师可见全部题目；其他角色仅可见已上传测试用例的题目。
         支持按 tag_id 过滤（仅返回关联该标签且 approved=True 的题目）。
         """
-        allowed_ids: set[int] | None = None
-        if tag_id is not None:
-            if self._community_repository is None:
-                raise RuntimeError("题目标签仓储未注入")
-            ids = self._community_repository.list_problem_ids_by_tag(tag_id)
-            if not ids:
-                if page is not None and page_size is not None:
-                    return PaginatedProblems(
-                        total=0, page=page, page_size=page_size, problems=[]
-                    )
-                return []
-            allowed_ids = set(ids)
-
-        if requester_role == "teacher":
-            problems, total = self._problem_repository.list_all(
-                page=page, page_size=page_size
-            )
-            items = [
-                self._with_test_case_status(to_problem_result(problem))
-                for problem in problems
-            ]
-            if allowed_ids is not None:
-                items = [p for p in items if p.id in allowed_ids]
-                total = len(items)
-            if page is None or page_size is None:
-                return items
-            return PaginatedProblems(
-                total=total or 0, page=page, page_size=page_size, problems=items
-            )
-
-        problems, _ = self._problem_repository.list_all()
-        visible = [
-            problem
-            for problem in problems
-            if self._test_case_storage.has_test_cases(problem.id)
-        ]
-        if allowed_ids is not None:
-            visible = [p for p in visible if p.id in allowed_ids]
-        if page is None or page_size is None:
-            return [to_problem_result(problem) for problem in visible]
-
-        start = (page - 1) * page_size
-        paged = visible[start : start + page_size]
-        return PaginatedProblems(
-            total=len(visible),
+        filters = ProblemQuery(
+            tag_id=tag_id,
+            visible_ids=(
+                None
+                if requester_role == "teacher"
+                else self._test_case_storage.list_problem_ids_with_test_cases()
+            ),
+        )
+        problems, total = self._problem_repository.list_all(
             page=page,
             page_size=page_size,
-            problems=[to_problem_result(problem) for problem in paged],
+            filters=filters,
+        )
+        items = [to_problem_result(problem) for problem in problems]
+        if requester_role == "teacher":
+            items = [self._with_test_case_status(item) for item in items]
+        if page is None or page_size is None:
+            return items
+        return PaginatedProblems(
+            total=total or 0, page=page, page_size=page_size, problems=items
         )
 
     def get_problem(self, problem_id: int) -> ProblemDetail:
@@ -254,9 +223,11 @@ class ProblemService:
         """删除题目记录。"""
         self._require_teacher(requester_role)
         problem = self._require_problem(problem_id)
-        self._test_case_storage.delete_problem_directory(problem_id)
-        self._problem_repository.delete(problem)
-        self._uow.commit()
+        with (
+            self._test_case_storage.stage_deletion(problem_id),
+            self._uow.transaction(),
+        ):
+            self._problem_repository.delete(problem)
         invalidate_detail_cache(problem_id)
 
     def upload_test_cases(

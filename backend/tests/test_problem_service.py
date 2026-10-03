@@ -44,8 +44,10 @@ class FakeProblemRepository:
     def get_by_id(self, problem_id: int):
         return next((item for item in self.items if item.id == problem_id), None)
 
-    def list_all(self, page=None, page_size=None):
+    def list_all(self, page=None, page_size=None, *, filters=None):
         items = list(reversed(self.items))
+        if filters and filters.visible_ids is not None:
+            items = [item for item in items if item.id in filters.visible_ids]
         if page is None or page_size is None:
             return items, None
         start = (page - 1) * page_size
@@ -60,6 +62,9 @@ class FakeProblemRepository:
 
 class FakeTestCaseStorage:
     """内存假测试用例存储：仅 1、3 号题目已有测试用例。"""
+
+    def list_problem_ids_with_test_cases(self):
+        return frozenset({1, 3})
 
     def has_test_cases(self, problem_id: int) -> bool:
         return problem_id in {1, 3}

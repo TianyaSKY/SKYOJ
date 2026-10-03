@@ -157,7 +157,7 @@ docker build -t skyoj-generator ./docker/generator
 
 ### 第四步：启动服务
 
-使用 Docker Compose 拉起全栈服务：
+新数据库可直接使用 Docker Compose 拉起全栈服务；已有数据库先按 [数据库接入与迁移](docs/operations.md#21-数据库迁移与字典种子) 备份并登记版本：
 
 ```bash
 # 后台启动所有服务
@@ -204,6 +204,8 @@ cd backend
 export DATABASE_URL=mysql+pymysql://skyoj:replace_with_strong_app_password@127.0.0.1:3306/oj_db \
 SECRET_KEY=hajimiyounanbeiluduoxixigahaayoudingdongji \
 CELERY_BROKER_URL=amqp://guest:guest@127.0.0.1:5672//
+# 新库先迁移；已有库接入步骤见 docs/operations.md 的 2.1 节
+uv run alembic upgrade head
 # 等待 API 初始化完成后再启动 Worker
 uv run python run.py
 ```
@@ -238,7 +240,7 @@ cd frontend
 npm run dev
 ```
 
-API 启动时创建缺失的表并初始化系统默认数据；Docker Compose 的 Worker 等待 API 就绪。已有表的字段变更需手动执行 SQL。初始化方式、事务约定及验证范围见 [架构与数据库初始化](docs/architecture.md)。
+Docker Compose 先运行一次性 `migrate` 服务，再启动 API 和 Worker；API 只检查迁移版本并初始化系统默认数据。已有未版本化数据库先备份、校验结构并登记初始版本，步骤见 [数据库接入与迁移](docs/operations.md#21-数据库迁移与字典种子)。分层和事务约定见 [架构说明](docs/architecture.md)。
 
 ### 运行测试
 

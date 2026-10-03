@@ -93,13 +93,39 @@ docker compose restart backend      # 仅重启后端
 
 ## 2. 数据初始化与账号
 
-### 2.1 数据库自动建表 + 字典种子
+### 2.1 数据库迁移与字典种子
 
-`init_db()` 在 backend 容器启动时自动执行：
+先备份数据库及 `backend/uploads`。新库执行 `alembic upgrade head`；已有未版本化数据库只在结构校验通过后登记初始版本，不能直接 stamp 未校验的库。
 
-- `Base.metadata.create_all()` — 创建缺失的 ORM 表，保留已有表和数据。
-- 若 `sys_dict` 表为空，按 `app/core/defaults.py` 中默认值写入。
-- 失败重试 5 次，每次间隔 3s（应对 mysql 慢启动）。
+本地命令在仓库根目录执行，使用已配置的 `DATABASE_URL`、`SECRET_KEY`：
+
+```bash
+uv sync --frozen
+# 仅已有未版本化数据库接入时运行；空库跳过这一步
+uv run python backend/scripts/baseline_database.py
+uv run alembic -c backend/alembic.ini upgrade head
+uv run alembic -c backend/alembic.ini current
+```
+
+接入脚本检查表、列、类型、可空性、索引、外键及唯一约束是否与初始模型一致；有差异时退出并保留原结构，不写入版本。先审查差异、备份和修复 SQL，再重试。该脚本仅用于初始版本 `0001`；已有其他版本或未来版本需使用对应已审核的接入流程。
+
+Docker Compose 新库自动先运行 `migrate` 服务，迁移成功才启动 API；已有库首次接入：
+
+```bash
+docker compose up -d mysql
+docker compose build migrate
+docker compose run --rm migrate python scripts/baseline_database.py
+docker compose run --rm migrate
+docker compose up -d --build
+```
+
+未来发布也先备份、执行一次性迁移、确认退出成功，再更新应用与 Worker。`init_db()` 只检查连接与迁移版本，若 `sys_dict` 为空则写入默认配置；连接异常最多重试 5 次，版本不匹配直接拒绝启动。新增结构变更用 `alembic revision --autogenerate -m "说明"` 生成候选脚本，审核 upgrade/downgrade 和数据回填，再提交。初始版本禁止自动降级，避免删除接管的历史数据；恢复应使用已验证的备份。操作依据见 [Alembic 官方教程](https://alembic.sqlalchemy.org/en/latest/tutorial.html)。
+
+### 文件删除补偿与暂存清理
+
+删除题目或数据集会先把目录/文件改名到同一父目录的 `.trash/<uuid>-<原名称>`。数据库删除失败时自动恢复；数据库提交后清理失败时，日志保留暂存位置，后续可清理。
+
+如进程在删除中被强制终止，先暂停相关写入/Worker，备份并检查 `.trash` 与数据库：题目以原目录名对应题目 ID，数据集以原文件名对照 `file_path`/`temp_path`。记录仍存在且原路径缺失时恢复暂存文件；记录已删除时清理。恢复目标已存在时先核对文件，不覆盖。不要按时间自动清空 `.trash`，它可能是尚未恢复的数据。
 
 ### 2.2 第一个教师账号
 

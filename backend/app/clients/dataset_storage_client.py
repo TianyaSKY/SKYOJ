@@ -3,11 +3,13 @@
 import hashlib
 import os
 import uuid
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import BinaryIO
 
 from loguru import logger
 
+from app.clients.file_deletion import stage_file_deletion
 from app.core.config import UPLOAD_FOLDER
 from app.core.errors import InvalidStateError
 from app.core.files import secure_filename
@@ -21,6 +23,15 @@ class DatasetStorageClient:
 
     def __init__(self, upload_folder: str | None = None) -> None:
         self._upload_folder = upload_folder or UPLOAD_FOLDER
+
+    def stage_deletion(
+        self, file_path: str, temp_path: str | None = None
+    ) -> AbstractContextManager[None]:
+        """一起暂存最终文件与尚未完成写入的上传文件。"""
+        paths = [Path(file_path)]
+        if temp_path:
+            paths.append(Path(temp_path))
+        return stage_file_deletion(paths)
 
     def save(self, file_path: str, content: bytes, dataset_id: int) -> None:
         """将上传内容写入目标路径。"""

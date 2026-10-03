@@ -71,6 +71,14 @@ class Problem(Base):
         return f"<Problem {self.title}>"
 
 
+@dataclass(frozen=True)
+class ProblemQuery:
+    """题目查询条件，过滤在计数和分页之前执行。"""
+
+    tag_id: int | None = None
+    visible_ids: frozenset[int] | None = None
+
+
 class ProblemRepository:
     """problems 表读写（草稿应用场景）。"""
 
@@ -108,10 +116,29 @@ class ProblemRepository:
         return _to_problem_record(problem)
 
     def list_all(
-        self, page: int | None = None, page_size: int | None = None
+        self,
+        page: int | None = None,
+        page_size: int | None = None,
+        *,
+        filters: ProblemQuery | None = None,
     ) -> tuple[list[ProblemRecord], int | None]:
         """按创建顺序倒序查询题目，必要时在数据库侧分页。"""
         query = self._db.query(Problem).order_by(Problem.id.desc())
+        if filters is not None:
+            if filters.tag_id is not None:
+                from app.persistence.community import ProblemTagMap
+
+                query = query.filter(
+                    self._db.query(ProblemTagMap.id)
+                    .filter(
+                        ProblemTagMap.problem_id == Problem.id,
+                        ProblemTagMap.tag_id == filters.tag_id,
+                        ProblemTagMap.approved.is_(True),
+                    )
+                    .exists()
+                )
+            if filters.visible_ids is not None:
+                query = query.filter(Problem.id.in_(filters.visible_ids))
         if page is None or page_size is None:
             return ([_to_problem_record(row) for row in (query.all())], None)
 

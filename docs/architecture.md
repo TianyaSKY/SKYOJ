@@ -64,11 +64,13 @@ Worker 捕获执行异常后先回滚失败事务，再写入任务失败状态�
 
 `main.py` 仅装配应用与生命周期，路由、异常响应、指标分别位于 `api/router.py`、`api/errors.py`、`middleware/metrics.py`；数据库初始化位于 `persistence/bootstrap.py`。鉴权入口在 `api/auth_context.py`，JWT 编解码在 `core/auth_tokens.py`。题目与考试缓存键留在所属 Service，共享 `clients/redis_client.py` 的 JSON/发布操作；旧 `utils/` 已删除。
 
-配置 `DATABASE_URL`、`SECRET_KEY` 后启动 API。启动流程检查连接，通过 SQLAlchemy `Base.metadata.create_all()` 创建缺失的表，然后初始化系统默认数据；初始化失败将拒绝启动。
+配置 `DATABASE_URL`、`SECRET_KEY` 后，在仓库根目录执行 `uv run alembic -c backend/alembic.ini upgrade head`。冻结初始结构位于 `backend/migrations/versions/0001_initial_schema.py`，不导入运行时 ORM 生成 DDL。API 启动只检查连接、数据库 revision 是否等于代码 head，以及初始化系统默认数据；未迁移或版本不匹配时拒绝启动。
 
-Docker Compose 的 Worker 和恢复进程等待 API 健康检查通过后启动。本地启动时先等待 API 初始化完成，再启动 Worker。
+Docker Compose 的一次性 `migrate` 服务等待 MySQL 就绪，成功后 API 才启动；Worker 和恢复进程继续等待 API 健康检查。本地部署也先迁移，再启动 API 与 Worker。已有未版本化数据库不能直接执行初始建表迁移，需备份后用 `backend/scripts/baseline_database.py` 比较完整结构，校验通过才 stamp 初始版本。差异会拒绝登记，修复 SQL 需人工审核。未来结构变更提交新的 revision 并审核 SQL，不能修改初始版本或仅依赖 `create_all()`。
 
-建表操作可重复执行，保留已有表和数据，不自动新增、删除或修改已有表的字段、索引及约束。已有数据库的结构变更需要备份后手动执行 SQL；项目不再维护数据库版本及迁移脚本。
+题目标签使用仓储内的关联 EXISTS 过滤，已审批条件与可见 ID 在 count/offset/limit 之前生效。学生列表由存储客户端扫描非空题目目录取得 ID，再在数据库分页；不加载所有题目记录，但目录扫描成本仍随上传题目数量增长。教师只读取当前页的测试点详情。
+
+非 ACM 脚本写入由 `ProblemTestCaseStorageClient.save_script()` 负责。题目与数据集删除先把现有文件同盘改名到父目录 `.trash/<uuid>-<原名称>`，随后在 UoW 中删除记录并提交；数据库失败恢复文件，成功后最终清理。清理失败保留暂存文件并记录位置，不能把已提交的删除恢复或报告为失败。该补偿覆盖进程内异常，不构成数据库与文件系统的分布式事务；进程被强制终止时需按运维步骤检查暂存文件。
 
 ## 验证与持续检查
 

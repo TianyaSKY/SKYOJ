@@ -55,8 +55,7 @@ def test_service_lists_and_deletes_snapshots(db_session, teacher_user):
     assert service.list_datasets(page=2, page_size=1).datasets == []
     assert repository.get_by_id(record.id).temp_path == "tmp/data.pending"
     service.delete_dataset("teacher", record.id)
-    storage.delete.assert_called_once_with(record.file_path, record.id)
-    storage.remove_staged.assert_called_once_with(record.temp_path)
+    storage.stage_deletion.assert_called_once_with(record.file_path, record.temp_path)
     assert repository.get_by_id(record.id) is None
 
 

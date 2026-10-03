@@ -6,10 +6,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from alembic import command
+from alembic.config import Config
 from app.core.defaults import sys_dict_kv
 from app.core.passwords import hash_password
 from app.persistence import Exam, ExamProblem, Problem, Submission, SysDict, User
-from app.persistence.database import Base, SessionLocal, engine
+from app.persistence.database import SessionLocal, engine
 from loguru import logger
 from sqlalchemy import select
 
@@ -20,7 +22,9 @@ def seed() -> None:
         or Path(engine.url.database or "").name != "skyoj-e2e.sqlite"
     ):
         raise RuntimeError("E2E 初始化只允许写入专用 skyoj-e2e.sqlite 数据库")
-    Base.metadata.create_all(bind=engine)
+    command.upgrade(
+        Config(str(Path(__file__).resolve().parents[1] / "alembic.ini")), "head"
+    )
     with SessionLocal.begin() as db:
         if db.scalar(select(User.id).limit(1)) is not None:
             raise RuntimeError("E2E 数据库已有用户，请使用新的临时数据库")

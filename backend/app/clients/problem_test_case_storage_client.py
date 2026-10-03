@@ -8,10 +8,12 @@ import shutil
 import stat
 import uuid
 import zipfile
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Optional
 
+from app.clients.file_deletion import stage_file_deletion
 from app.core.errors import InvalidStateError, ResourceNotFoundError
 
 
@@ -53,6 +55,37 @@ class ProblemTestCaseStorageClient:
 
     def __init__(self, base_dir: str = "uploads/problems") -> None:
         self._base_dir = Path(base_dir)
+
+    def stage_deletion(self, problem_id: int) -> AbstractContextManager[None]:
+        """暂存题目文件，数据库事务失败时恢复。"""
+        return stage_file_deletion([self._folder(problem_id)])
+
+    def save_script(self, problem_id: int, code: str, language: str | None) -> str:
+        """保存非 ACM 判题脚本，返回约定的脚本文件名。"""
+        folder = self._folder(problem_id)
+        folder.mkdir(parents=True, exist_ok=True)
+        filename = {
+            "python": "main.py",
+            "c": "main.c",
+            "cpp": "main.cpp",
+            "java": "Main.java",
+        }.get((language or "python").lower(), "main.py")
+        (folder / filename).write_text(code, encoding="utf-8")
+        return filename
+
+    def list_problem_ids_with_test_cases(self) -> frozenset[int]:
+        """扫描存储目录取得可见 ID，避免先加载全部数据库记录。"""
+        if not self._base_dir.is_dir():
+            return frozenset()
+        return frozenset(
+            int(folder.name)
+            for folder in self._base_dir.iterdir()
+            if folder.name.isascii()
+            and folder.name.isdecimal()
+            and folder.is_dir()
+            and not folder.is_symlink()
+            and any(folder.iterdir())
+        )
 
     def save_zip(self, problem_id: int, filename: str, content: bytes) -> list[str]:
         """安全保存并解压测试用例 ZIP，返回解压后的文件列表。"""

@@ -58,7 +58,6 @@ def get_problem_service(db: Session = Depends(get_db)) -> ProblemService:
     return ProblemService(
         problem_repository=ProblemRepository(db),
         test_case_storage=ProblemTestCaseStorageClient(),
-        community_repository=ProblemCommunityRepository(db),
         uow=uow,
     )
 

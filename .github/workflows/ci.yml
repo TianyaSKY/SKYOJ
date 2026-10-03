@@ -35,6 +35,14 @@ jobs:
       - name: Compile backend sources
         run: uv run python -m compileall -q backend/app backend/tests
 
+      - name: Validate migration on isolated database
+        env:
+          DATABASE_URL: sqlite:////tmp/skyoj-migrations.sqlite
+          SECRET_KEY: ci-migration-secret-key
+        run: |
+          uv run alembic -c backend/alembic.ini upgrade head
+          uv run alembic -c backend/alembic.ini check
+
       - name: Run backend tests
         env:
           DATABASE_URL: sqlite://

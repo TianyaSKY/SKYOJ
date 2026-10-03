@@ -1,12 +1,11 @@
-"""启动建表可重复执行、保留已有数据，建表失败时拒绝启动。"""
+"""应用启动只检查迁移版本并初始化种子，不执行业务表 DDL。"""
 
 import pytest
 from app.persistence import bootstrap
-from app.persistence.database import Base
 from app.persistence.system import SysDict
-from sqlalchemy import create_engine, event, inspect, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.orm import sessionmaker
+from test_migrations import upgrade
 
 
 @pytest.fixture
@@ -19,9 +18,15 @@ def startup_engine(monkeypatch):
     engine.dispose()
 
 
-def test_startup_creates_tables_and_preserves_existing_data(startup_engine):
+def test_startup_seeds_without_ddl_and_preserves_existing_data(startup_engine):
+    with startup_engine.begin() as connection:
+        upgrade(connection)
+
+    @event.listens_for(startup_engine, "before_cursor_execute")
+    def reject_ddl(conn, cursor, statement, parameters, context, executemany):
+        assert not statement.lstrip().upper().startswith(("CREATE ", "ALTER ", "DROP "))
+
     bootstrap.init_db()
-    assert set(inspect(startup_engine).get_table_names()) == set(Base.metadata.tables)
     sessions = sessionmaker(bind=startup_engine)
     with sessions.begin() as db:
         assert db.scalar(select(SysDict.id).limit(1)) is not None
@@ -34,11 +39,14 @@ def test_startup_creates_tables_and_preserves_existing_data(startup_engine):
         )
 
 
-def test_startup_rejects_failed_table_creation(startup_engine):
-    @event.listens_for(startup_engine, "before_cursor_execute")
-    def reject_ddl(conn, cursor, statement, parameters, context, executemany):
-        if statement.lstrip().upper().startswith("CREATE TABLE"):
-            raise SQLAlchemyError("DDL rejected")
+def test_startup_rejects_unmigrated_database(startup_engine):
+    with pytest.raises(RuntimeError, match="数据库迁移未完成"):
+        bootstrap.init_db()
 
-    with pytest.raises(RuntimeError, match="数据库初始化失败"):
+
+def test_startup_rejects_wrong_revision(startup_engine):
+    with startup_engine.begin() as connection:
+        upgrade(connection)
+        connection.execute(text("UPDATE alembic_version SET version_num = 'unknown'"))
+    with pytest.raises(RuntimeError, match="数据库迁移未完成"):
         bootstrap.init_db()

@@ -178,13 +178,11 @@ class DatasetService:
         """删除数据集文件和记录。"""
         self._require_teacher(requester_role)
         dataset = self._require_dataset(dataset_id)
-        self._storage_client.delete(dataset.file_path, dataset.id)
-        if getattr(dataset, "temp_path", None):
-            remove_staged = getattr(self._storage_client, "remove_staged", None)
-            if callable(remove_staged):
-                remove_staged(dataset.temp_path)
-        self._dataset_repository.delete(dataset)
-        self._uow.commit()
+        with (
+            self._storage_client.stage_deletion(dataset.file_path, dataset.temp_path),
+            self._uow.transaction(),
+        ):
+            self._dataset_repository.delete(dataset)
 
     def dataset_file_exists(self, dataset_id: int) -> DatasetDetail:
         """确认数据集及其文件均存在。"""
