@@ -48,6 +48,8 @@
                       :icon="Delete"
                       size="small"
                       type="danger"
+                      :loading="deleting.has(scope.row.id)"
+                      :disabled="deleting.has(scope.row.id)"
                   >
                     删除
                   </el-button>
@@ -60,8 +62,9 @@
 
       <div class="pagination-container">
         <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
+            :current-page="currentPage"
+            :page-size="pageSize"
+            :disabled="loading"
             :page-sizes="[10, 20, 50]"
             :total="total"
             layout="total, sizes, prev, pager, next, jumper"
@@ -122,12 +125,15 @@ const datasets = ref([])
 const loading = ref(false)
 const total = ref(0)
 const currentPage = ref(1)
+const deleting = ref(new Set())
 const pageSize = ref(20)
 const uploadDialogVisible = ref(false)
 const uploading = ref(false)
 const uploadRef = ref(null)
 let uploadVersion = 0
 let listVersion = 0
+let requestedPage = 1
+let requestedPageSize = 20
 let disposed = false
 let refreshTimer = null
 const isCurrentUpload = version => !disposed && version === uploadVersion && uploadDialogVisible.value
@@ -142,40 +148,40 @@ const uploadForm = ref({
 
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
-const fetchDatasets = async () => {
+const fetchDatasets = async (page = requestedPage, size = requestedPageSize) => {
+  if (disposed) return
+  requestedPage = page
+  requestedPageSize = size
   const version = ++listVersion
   const isCurrent = () => !disposed && version === listVersion
   loading.value = true
   try {
     const res = await getDatasetList({
-      page: currentPage.value,
-      page_size: pageSize.value
+      page,
+      page_size: size
     })
     if (!isCurrent()) return
-    if (res.datasets) {
-      datasets.value = res.datasets
-      total.value = res.total
-    } else {
-      datasets.value = res.data || res
-      total.value = datasets.value.length
-    }
+    const items = res.datasets || res.data || res
+    const count = res.datasets ? res.total : items.length
+    const lastPage = Math.max(1, Math.ceil(count / size))
+    if (page > lastPage) return await fetchDatasets(lastPage, size)
+    datasets.value = items
+    total.value = count
+    currentPage.value = page
+    pageSize.value = size
   } catch (error) {
-    if (isCurrent()) ElMessage.error('获取数据集列表失败')
+    if (isCurrent()) {
+      requestedPage = currentPage.value
+      requestedPageSize = pageSize.value
+      ElMessage.error('获取数据集列表失败')
+    }
   } finally {
     if (isCurrent()) loading.value = false
   }
 }
 
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  currentPage.value = 1
-  fetchDatasets()
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  fetchDatasets()
-}
+const handleSizeChange = val => fetchDatasets(1, val)
+const handleCurrentChange = val => fetchDatasets(val, pageSize.value)
 
 const handleDownload = async (row) => {
   try {
@@ -194,12 +200,17 @@ const handleDownload = async (row) => {
 }
 
 const handleDelete = async (row) => {
+  if (disposed || deleting.value.has(row.id)) return
+  deleting.value.add(row.id)
   try {
     await deleteDataset(row.id)
+    if (disposed) return
     ElMessage.success('删除成功')
-    fetchDatasets()
+    await fetchDatasets()
   } catch (error) {
-    ElMessage.error('删除失败')
+    if (!disposed) ElMessage.error('删除失败')
+  } finally {
+    deleting.value.delete(row.id)
   }
 }
 

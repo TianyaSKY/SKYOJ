@@ -4,7 +4,7 @@ vi.mock('@/stores/user', () => ({ useUserStore: () => ({ user: { role: 'teacher'
 vi.mock('@/api/dataset', () => ({ getDatasetList: vi.fn(), uploadDataset: vi.fn(), deleteDataset: vi.fn(), downloadDataset: vi.fn() }))
 vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 import DatasetListView from '../DatasetListView.vue'
-import { getDatasetList, uploadDataset } from '@/api/dataset'
+import { getDatasetList, uploadDataset, deleteDataset } from '@/api/dataset'
 import { ElMessage } from 'element-plus'
 let wrapper
 function deferred() {
@@ -95,4 +95,62 @@ it.each([true, false])('卸载后旧上传完成或刷新计时器不再查询�
   if (!resolveFirst) { upload.resolve({}); await first }
   await vi.advanceTimersByTimeAsync(2000)
   expect(getDatasetList).toHaveBeenCalledOnce()
+})
+
+it('翻页失败保留原页码和内容，允许重试', async () => {
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 1 }], total: 21 })
+  mountPage(); await flushPromises()
+  getDatasetList.mockRejectedValueOnce(new Error('page failed'))
+  await wrapper.vm.handleCurrentChange(2)
+  expect(wrapper.vm.currentPage).toBe(1)
+  expect(wrapper.vm.datasets).toEqual([{ id: 1 }])
+  expect(wrapper.vm.loading).toBe(false)
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 21 }], total: 21 })
+  await wrapper.vm.handleCurrentChange(2)
+  expect(wrapper.vm.currentPage).toBe(2)
+  expect(wrapper.vm.datasets).toEqual([{ id: 21 }])
+})
+it('调整每页数量失败时保留此前分页参数', async () => {
+  mountPage(); await flushPromises()
+  getDatasetList.mockRejectedValueOnce(new Error('size failed'))
+  await wrapper.vm.handleSizeChange(50)
+  expect(wrapper.vm.pageSize).toBe(20)
+  expect(wrapper.vm.currentPage).toBe(1)
+  await wrapper.vm.fetchDatasets()
+  expect(getDatasetList).toHaveBeenLastCalledWith({ page: 1, page_size: 20 })
+})
+it('删除末页最后一条记录后自动回退到有效页', async () => {
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 1 }], total: 21 })
+  mountPage(); await flushPromises()
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 21 }], total: 21 })
+  await wrapper.vm.handleCurrentChange(2)
+  deleteDataset.mockResolvedValue({})
+  getDatasetList.mockResolvedValueOnce({ datasets: [], total: 20 })
+    .mockResolvedValueOnce({ datasets: [{ id: 1 }], total: 20 })
+  await wrapper.vm.handleDelete({ id: 21 })
+  expect(wrapper.vm.currentPage).toBe(1)
+  expect(wrapper.vm.datasets).toEqual([{ id: 1 }])
+  expect(getDatasetList).toHaveBeenLastCalledWith({ page: 1, page_size: 20 })
+})
+it('重复删除只发送一次，卸载后的删除响应不刷新页面或显示提示', async () => {
+  const deletion = deferred()
+  deleteDataset.mockReturnValue(deletion.promise)
+  mountPage(); await flushPromises()
+  const first = wrapper.vm.handleDelete({ id: 1 })
+  await wrapper.vm.handleDelete({ id: 1 })
+  expect(deleteDataset).toHaveBeenCalledOnce()
+  wrapper.unmount(); wrapper = undefined
+  deletion.resolve({}); await first
+  expect(getDatasetList).toHaveBeenCalledOnce()
+  expect(ElMessage.success).not.toHaveBeenCalled()
+})
+it('旧翻页响应不能覆盖后来成功的页码和内容', async () => {
+  mountPage(); await flushPromises()
+  const old = deferred()
+  getDatasetList.mockReturnValueOnce(old.promise).mockResolvedValueOnce({ datasets: [{ id: 41 }], total: 41 })
+  const first = wrapper.vm.handleCurrentChange(2)
+  await wrapper.vm.handleCurrentChange(3)
+  old.resolve({ datasets: [{ id: 21 }], total: 41 }); await first
+  expect(wrapper.vm.currentPage).toBe(3)
+  expect(wrapper.vm.datasets).toEqual([{ id: 41 }])
 })
