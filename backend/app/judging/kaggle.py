@@ -5,12 +5,15 @@ from app.judging.sandbox import SandboxRunner, time_limit_seconds
 from app.persistence.problem import ProblemRepository
 
 
-def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
+def run_kaggle_judge(
+    submission_id, user_csv_content, problem_id, db=None, *, source_path: str | None = None
+):
     """
     Kaggle 模式判题逻辑
     约定:
     - 教师提供: main.py (评分脚本) 和 truth.csv (标准答案)
     - 学生提供: CSV 内容
+    - 附件由业务层通过 source_path 显式指定，不根据 CSV 文本猜测本地路径
     - 评分脚本需读取 truth.csv 和 submission.csv，并将最终分数打印到标准输出的最后一行
     """
     if db is None:
@@ -33,9 +36,9 @@ def run_kaggle_judge(submission_id, user_csv_content, problem_id, db=None):
             )
 
             # 1. 上传学生提交的 CSV
-            if os.path.isfile(str(user_csv_content)):
+            if source_path is not None:
                 runner.put_file_from_path(
-                    os.path.abspath(user_csv_content), "submission.csv"
+                    os.path.abspath(source_path), "submission.csv"
                 )
             else:
                 runner.put_file("submission.csv", user_csv_content)

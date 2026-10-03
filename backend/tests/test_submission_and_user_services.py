@@ -27,7 +27,7 @@ class FakeSubmissionRepository:
             return SimpleNamespace(exam_id=exam_id, problem_id=problem_id)
         return None
 
-    def create(self, user_id, problem_id, exam_id, language, code):
+    def create(self, user_id, problem_id, exam_id, language, code, *, code_path=""):
         item = SimpleNamespace(
             id=len(self.created) + 1,
             user_id=user_id,
@@ -35,6 +35,7 @@ class FakeSubmissionRepository:
             exam_id=exam_id,
             language=language,
             code_content=code,
+            code_path=code_path,
             status="Pending",
             score=0.0,
             output_log=None,

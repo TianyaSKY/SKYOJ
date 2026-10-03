@@ -120,6 +120,7 @@ class Submission(Base):
     )
     exam_id = Column(Integer, ForeignKey("exams.id"), nullable=True)
 
+    # 新记录：空串表示内联文本，非空表示存储客户端生成的附件路径；NULL 为旧记录。
     code_path = Column(String(500))
     code_content = Column(Text)
     language = Column(String(50))
@@ -292,6 +293,8 @@ class SubmissionRepository:
         exam_id: int | None,
         language: str,
         code: str,
+        *,
+        code_path: str = "",
     ) -> SubmissionRecord:
         """创建提交记录。"""
         submission = Submission(
@@ -300,6 +303,7 @@ class SubmissionRepository:
             exam_id=exam_id,
             language=language,
             code_content=code,
+            code_path=code_path,
             status="Pending",
         )
         self._db.add(submission)

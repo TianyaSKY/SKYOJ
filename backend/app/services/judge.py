@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
+from app.clients.submission_storage_client import legacy_submission_path
 from app.judging.acm import run_acm_judge
 from app.judging.kaggle import run_kaggle_judge
 from app.judging.oop import run_oop_judge
@@ -116,8 +117,17 @@ def judge_submission(submission_id: int, db) -> None:
                 submission_id, user_code, problem_id, language, db=db
             )
         elif problem_type == "kaggle":
+            source_path = submission.code_path
+            if source_path is None:
+                source_path = legacy_submission_path(
+                    user_code, submission.user_id, problem_id
+                )
             status, score, log = run_kaggle_judge(
-                submission_id, user_code, problem_id, db=db
+                submission_id,
+                user_code,
+                problem_id,
+                db=db,
+                source_path=source_path or None,
             )
         else:
             status, score, log = "System Error", 0, "Unsupported problem type"

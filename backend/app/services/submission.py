@@ -192,7 +192,12 @@ class SubmissionService:
             )
         try:
             submission = self._submission_repository.create(
-                params.user_id, params.problem_id, exam_id, params.language, code
+                params.user_id,
+                params.problem_id,
+                exam_id,
+                params.language,
+                code,
+                code_path=code if params.is_file_upload else "",
             )
             self._job_service.enqueue_judge_submission(submission.id)
         except Exception:

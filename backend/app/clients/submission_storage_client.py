@@ -3,10 +3,28 @@
 import os
 import shutil
 import tempfile
+from pathlib import Path
 
 from loguru import logger
 
 from app.core.files import secure_filename
+
+
+def legacy_submission_path(content: str, user_id: int, problem_id: int) -> str | None:
+    """旧记录未标记附件，只兼容当前用户及题目在提交目录内的历史路径。"""
+    root = Path("uploads/submissions")
+    candidate = Path(content)
+    try:
+        relative = candidate.relative_to(root)
+        prefix = f"{user_id}_{problem_id}_"
+        if len(relative.parts) not in (1, 2) or not relative.parts[0].startswith(prefix):
+            return None
+        resolved = candidate.resolve().relative_to(root.resolve())
+        if len(resolved.parts) not in (1, 2) or not resolved.parts[0].startswith(prefix):
+            return None
+    except (ValueError, OSError):
+        return None
+    return str(candidate)
 
 
 class SubmissionStorageClient:
