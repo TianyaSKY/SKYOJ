@@ -3,10 +3,56 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from app.judging import acm
 from app.judging import sandbox as sandbox_runner
 from app.persistence.unit_of_work import UnitOfWork
 from app.services import judge
+
+
+@pytest.mark.parametrize('language', ['c', 'cpp', 'java'])
+def test_acm_compile_failure_preserves_status_and_diagnostics(monkeypatch, tmp_path, language):
+    """真实测试点执行的编译失败不能被汇总成答案错误。"""
+    runners = []
+
+    class CompileFailRunner:
+        def __init__(self):
+            self.commands = []
+            self.stopped = False
+            runners.append(self)
+
+        def launch(self, **kwargs):
+            pass
+
+        def put_file(self, *args):
+            pass
+
+        def exec_run(self, command):
+            self.commands.append(command)
+            return 1, 'compiler: syntax error on line 1'
+
+        def stop(self):
+            self.stopped = True
+
+    monkeypatch.setattr(acm, 'SandboxRunner', CompileFailRunner)
+    monkeypatch.setattr(acm, 'ProblemRepository', lambda db: SimpleNamespace(
+        get_by_id=lambda pid: SimpleNamespace(memory_limit=128, time_limit=1000),
+    ))
+    monkeypatch.chdir(tmp_path)
+    folder = tmp_path / 'uploads' / 'problems' / '1'
+    folder.mkdir(parents=True)
+    for name in ['1', '2']:
+        (folder / f'{name}.in').write_text('1')
+        (folder / f'{name}.out').write_text('1')
+    status, score, log, cases = acm.run_acm_judge(1, 'invalid code', 1, language, db=object())
+    assert status == 'Compile Error'
+    assert score == 0
+    assert 'compiler: syntax error on line 1' in log
+    assert 'Wrong Answer' not in log
+    assert [case['status'] for case in cases] == ['compile_error', 'compile_error']
+    assert all(case['error_output'] == 'compiler: syntax error on line 1' for case in cases)
+    assert all(runner.stopped and len(runner.commands) == 1 for runner in runners)
 
 
 class _StubSubmission:

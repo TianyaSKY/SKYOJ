@@ -32,7 +32,7 @@
             <el-option label="Time Limit Exceeded" value="Time Limit Exceeded" />
             <el-option label="Memory Limit Exceeded" value="Memory Limit Exceeded" />
             <el-option label="Runtime Error" value="Runtime Error" />
-            <el-option label="Compilation Error" value="Compilation Error" />
+            <el-option label="Compile Error" value="Compile Error" />
             <el-option label="Pending" value="Pending" />
             <el-option label="Judging" value="Judging" />
           </el-select>
@@ -142,13 +142,15 @@ const loadSavedFilter = () => {
 }
 const savedFilter = loadSavedFilter()
 const savedField = (key) => typeof savedFilter[key] === 'string' ? savedFilter[key] : ''
+// 兼容旧版管理页面保存的错误状态名称。
+const savedStatus = savedField('status') === 'Compilation Error' ? 'Compile Error' : savedField('status')
 
 const filterForm = reactive({
   problem_id: savedField('problem_id'),
   user_id: savedField('user_id'),
   username: savedField('username'),
   exam_id: savedField('exam_id'),
-  status: savedField('status')
+  status: savedStatus
 })
 
 const pagination = reactive({
@@ -231,7 +233,7 @@ const getStatusType = (status) => {
     'Wrong Answer': 'danger',
     'Pending': 'info',
     'Judging': 'warning',
-    'Compilation Error': 'info',
+    'Compile Error': 'info',
     'Runtime Error': 'danger',
     'Time Limit Exceeded': 'warning',
     'Memory Limit Exceeded': 'warning'

@@ -18,14 +18,17 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.restoreAllMocks() })
 
-function mountPage() {
+function mountPage(renderFilter = false) {
   wrapper = shallowMount(SubmissionAdminView, {
     global: {
       directives: { loading: () => {} },
-      stubs: Object.fromEntries([
+      stubs: { ...Object.fromEntries([
         'el-button', 'el-page-header', 'el-input', 'el-form-item', 'el-option', 'el-select',
         'el-form', 'el-card', 'el-table-column', 'el-link', 'el-tag', 'el-table', 'el-pagination',
       ].map(name => [name, true])),
+        ...(renderFilter ? Object.fromEntries(['el-card', 'el-form', 'el-form-item', 'el-select']
+          .map(name => [name, { template: '<div><slot /></div>' }])) : {}),
+      },
     },
   })
   return wrapper
@@ -38,6 +41,23 @@ function deferred() {
 }
 
 describe('提交管理的筛选恢复与请求顺序', () => {
+  it('编译失败筛选使用判题后端的 Compile Error 状态', async () => {
+    mountPage(true)
+    const option = wrapper.find('el-option-stub[value="Compile Error"]')
+    expect(option.exists()).toBe(true)
+    wrapper.vm.filterForm.status = option.attributes('value')
+    wrapper.vm.handleFilter()
+    await flushPromises()
+    expect(getSubmissions).toHaveBeenLastCalledWith({ status: 'Compile Error', page: 1, per_page: 20 })
+  })
+
+  it('恢复旧版编译失败缓存时转换为后端状态', async () => {
+    localStorage.setItem('skyoj_submission_filter', JSON.stringify({ status: 'Compilation Error' }))
+    mountPage()
+    await flushPromises()
+    expect(getSubmissions).toHaveBeenCalledWith({ status: 'Compile Error', page: 1, per_page: 20 })
+    expect(wrapper.vm.filterForm.status).toBe('Compile Error')
+  })
   it.each(['{broken', 'null', '[]', '"text"', '42'])('损坏的筛选缓存 %s 不阻止页面加载', async (cached) => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     localStorage.setItem('skyoj_submission_filter', cached)

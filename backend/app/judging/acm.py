@@ -441,6 +441,7 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
         return "Runtime Error", 0, str(exc), []
 
     passed_count = 0
+    has_compile_error = False
     has_tle = False
     has_re = False
     logs = []
@@ -450,6 +451,19 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             passed_count += 1
             logs.append(f"Test Case {case_name}: Passed")
             case_results.append({"case_name": case_name, "status": "passed"})
+        elif result_type == "compile_error":
+            has_compile_error = True
+            logs.append(
+                f"Test Case {case_name}: Compile Error"
+                + (f"\n{detail}" if detail else "")
+            )
+            case_results.append(
+                {
+                    "case_name": case_name,
+                    "status": "compile_error",
+                    "error_output": str(detail) if detail else None,
+                }
+            )
         elif result_type == "tle":
             has_tle = True
             logs.append(f"Test Case {case_name}: Time Limit Exceeded")
@@ -472,7 +486,10 @@ def run_acm_judge(submission_id, user_code, problem_id, language="python", db=No
             case_results.append({"case_name": case_name, "status": "wrong_answer"})
 
     final_score = (passed_count / total_cases) * 100
-    if has_tle:
+    if has_compile_error:
+        final_status = "Compile Error"
+        final_score = 0
+    elif has_tle:
         final_status = "Time Limit Exceeded"
     elif has_re:
         final_status = "Runtime Error"
