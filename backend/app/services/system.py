@@ -7,7 +7,7 @@ from app.core.errors import PermissionDeniedError, ResourceNotFoundError
 from app.core.json import JsonObjectResult, JsonValue
 from app.core.time import utcnow
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,7 @@ class SystemStatistics:
     total_problems: int
     total_users: int
     exams_in_period: int
+
 
 @dataclass(frozen=True)
 class SysConfigItem:

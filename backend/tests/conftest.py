@@ -38,7 +38,11 @@ def db_session(engine):
 
     connection = engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection, expire_on_commit=False)
+    # SQLite 的 BEGIN 默认延迟到写入；显式开启外层事务，保证保存点释放不泄漏数据。
+    connection.exec_driver_sql("BEGIN")
+    session = Session(
+        bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+    )
     yield session
     session.close()
     transaction.rollback()

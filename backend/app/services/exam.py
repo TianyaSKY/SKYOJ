@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import hashlib
 from app.core.config import SECRET_KEY
-from app.core.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.core.errors import (
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
 from app.core.time import utcnow
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from loguru import logger
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from app.services.problem import ProblemRecord
 
 
 @dataclass(frozen=True)
@@ -220,7 +228,10 @@ class RankResult:
     def from_dict(cls, data: dict) -> "RankResult":
         return cls(
             exam_title=data["exam_title"],
-            problems=[RankProblemInfo(p["problem_id"], p.get("display_id")) for p in data.get("problems", [])],
+            problems=[
+                RankProblemInfo(p["problem_id"], p.get("display_id"))
+                for p in data.get("problems", [])
+            ],
             rank=[
                 RankEntry(
                     user_id=e["user_id"],
@@ -251,7 +262,35 @@ class ExamScoreRow:
     total_score: float
 
 
-from app.persistence.exam import ExamRepository, from_exam_detail_orm, from_exam_orm
+@dataclass
+class ExamRecord:
+    """Exam 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    title: str
+    description: str | None
+    start_time: datetime
+    end_time: datetime
+    contest_type: str
+    freeze_minutes: int | None
+    password: str | None
+    is_visible: bool | None
+    created_by: int | None
+
+
+@dataclass
+class ExamProblemRecord:
+    """ExamProblem 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    exam_id: int
+    problem_id: int
+    display_id: str | None
+    score: int | None
+    problem: ProblemRecord | None
+
+
+from app.persistence.exam import ExamRepository, to_exam_detail, to_exam_list_item
 
 
 class ExamService:
@@ -275,7 +314,7 @@ class ExamService:
             created_by=params.created_by,
         )
         self._repository.unit_of_work.commit()
-        return from_exam_detail_orm(exam, [])
+        return to_exam_detail(exam, [])
 
     def list_exams(self, requester_role: str) -> list[ExamListItem]:
         exams = self._repository.list_visible_for(requester_role)
@@ -283,7 +322,7 @@ class ExamService:
         problem_counts = self._repository.count_problems_batch(exam_ids)
         submission_counts = self._repository.count_submissions_batch(exam_ids)
         return [
-            from_exam_orm(
+            to_exam_list_item(
                 exam,
                 problem_count=problem_counts.get(exam.id, 0),
                 submission_count=submission_counts.get(exam.id, 0),
@@ -297,8 +336,8 @@ class ExamService:
         exam = self._require_exam(exam_id)
         self._assert_exam_discoverable(requester_role, exam, session_exam_id)
         if self._should_hide_problems(requester_role, exam, session_exam_id):
-            return from_exam_detail_orm(exam, [])
-        return from_exam_detail_orm(exam, self._repository.list_problems(exam_id))
+            return to_exam_detail(exam, [])
+        return to_exam_detail(exam, self._repository.list_problems(exam_id))
 
     def enter_exam(
         self,
@@ -373,7 +412,7 @@ class ExamService:
             exam.password = self._hash_password(params.password)
         self._repository.update(exam)
         self._repository.unit_of_work.commit()
-        return from_exam_detail_orm(exam, self._repository.list_problems(exam_id))
+        return to_exam_detail(exam, self._repository.list_problems(exam_id))
 
     def delete_exam(self, requester_role: str, exam_id: int) -> None:
         self._require_teacher(requester_role)
@@ -561,7 +600,7 @@ class ExamService:
             rows.append(ExamScoreRow(user.id, user.username, scores, sum(scores)))
         return detail, rows
 
-    def _require_exam(self, exam_id: int):
+    def _require_exam(self, exam_id: int) -> ExamRecord:
         exam = self._repository.get_by_id(exam_id)
         if exam is None:
             raise ResourceNotFoundError("考试不存在")

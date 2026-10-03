@@ -67,8 +67,30 @@ _STATUS_MAP = {
 }
 
 
+@dataclass
+class DebugRunRecord:
+    """DebugRun 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    problem_id: int
+    exam_id: int | None
+    language: str
+    code_content: str
+    status: str
+    case_name: str | None
+    input: str | None
+    expected_output: str | None
+    actual_output: str | None
+    error_output: str | None
+    time_used_ms: int | None
+    memory_used_kb: int | None
+    created_at: datetime
+    finished_at: datetime | None
+
+
 from app.clients.submission_storage_client import SubmissionStorageClient
-from app.persistence.submission import DebugRunRepository, from_debug_run_orm
+from app.persistence.submission import DebugRunRepository, to_debug_run_detail
 from app.services.acm import SingleCaseResult
 from app.services.async_job import AsyncJobService
 
@@ -143,7 +165,7 @@ class DebugService:
             raise ResourceNotFoundError("调试记录不存在")
         if requester_role == "student" and row.user_id != requester_id:
             raise PermissionDeniedError("无权查看该调试记录")
-        return from_debug_run_orm(row)
+        return to_debug_run_detail(row)
 
     def run_debug(self, debug_run_id: int) -> None:
         """Celery worker 调用：在 Judge 容器中执行单个测试点并写回结果。

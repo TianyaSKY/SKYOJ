@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import acm, judge, sandbox_runner
+from app.persistence.unit_of_work import UnitOfWork
 
 
 class _StubSubmission:
@@ -33,6 +34,7 @@ def make_repo_factory(problem_type):
 
         def __init__(self, db):
             self.db = db
+            self.unit_of_work = UnitOfWork(db)
             self.submission = _StubSubmission(problem_type)
             self.updates = []
             type(self).last = self
@@ -100,6 +102,7 @@ def test_judge_submission_missing_submission_skips(monkeypatch):
 
         def __init__(self, db):
             self.db = db
+            self.unit_of_work = UnitOfWork(db)
             type(self).last = self
 
         def get_by_id(self, submission_id):

@@ -1,6 +1,13 @@
 """持久化入口：注册全部 ORM 表与关系。"""
 
-from app.persistence.community import ProblemSolution, ProblemSolutionComment, ProblemSolutionFavorite, ProblemSolutionLike, ProblemTag, ProblemTagMap
+from app.persistence.community import (
+    ProblemSolution,
+    ProblemSolutionComment,
+    ProblemSolutionFavorite,
+    ProblemSolutionLike,
+    ProblemTag,
+    ProblemTagMap,
+)
 from app.persistence.dataset import Dataset
 from app.persistence.exam import Exam, ExamProblem
 from app.persistence.jobs import AiDraft, AsyncJob
@@ -22,6 +29,7 @@ __all__ = [
     "Problem",
     "ProblemSolution",
     "ProblemSolutionComment",
+    "ProblemSolutionFavorite",
     "ProblemSolutionLike",
     "ProblemTag",
     "ProblemTagMap",

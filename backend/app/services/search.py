@@ -6,7 +6,7 @@ from loguru import logger
 
 
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
-from app.persistence.problem import from_problem_orm
+from app.persistence.problem import to_problem_result
 from app.persistence.user import SearchRepository
 from app.services.problem import ProblemDetail
 
@@ -40,4 +40,4 @@ class SearchFacadeService:
                 for problem in problems
                 if self._test_case_storage.has_test_cases(problem.id)
             ]
-        return [from_problem_orm(problem, with_content=True) for problem in problems]
+        return [to_problem_result(problem, with_content=True) for problem in problems]

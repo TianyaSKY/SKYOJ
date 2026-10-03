@@ -50,10 +50,10 @@ class DatasetRepository:
         """倒序查询数据集，必要时在数据库侧分页。"""
         query = self._db.query(Dataset).order_by(Dataset.id.desc())
         if page is None or page_size is None:
-            return [from_dataset_orm(dataset) for dataset in query.all()], None
+            return [to_dataset_list_item(dataset) for dataset in query.all()], None
         total = query.count()
         datasets = query.offset((page - 1) * page_size).limit(page_size).all()
-        return [from_dataset_orm(dataset) for dataset in datasets], total
+        return [to_dataset_list_item(dataset) for dataset in datasets], total
 
     def create(
         self,
@@ -105,7 +105,9 @@ class DatasetRepository:
         self._db.refresh(dataset)
         return _to_dataset_record(dataset)
 
-    def mark_failed(self, dataset_id: int, error_message: str) -> Optional[DatasetRecord]:
+    def mark_failed(
+        self, dataset_id: int, error_message: str
+    ) -> Optional[DatasetRecord]:
         """文件处理失败后记录错误。"""
         dataset = self._db.get(Dataset, dataset_id)
         if dataset is None:
@@ -117,10 +119,11 @@ class DatasetRepository:
         return _to_dataset_record(dataset)
 
 
-def from_dataset_orm(dataset) -> DatasetListItem:
+def to_dataset_list_item(dataset) -> DatasetListItem:
     """数据集 ORM → 列表项。"""
 
     from app.services.dataset import DatasetListItem
+
     return DatasetListItem(
         id=dataset.id,
         name=dataset.name,
@@ -133,10 +136,11 @@ def from_dataset_orm(dataset) -> DatasetListItem:
     )
 
 
-def from_dataset_detail_orm(dataset) -> DatasetDetail:
+def to_dataset_detail(dataset) -> DatasetDetail:
     """数据集 ORM → 详情。"""
 
     from app.services.dataset import DatasetDetail
+
     return DatasetDetail(
         id=dataset.id,
         name=dataset.name,
@@ -154,7 +158,8 @@ def _to_dataset_record(dataset: Dataset) -> DatasetRecord:
     """ORM → 不依赖 Session 的数据集快照。"""
 
     from app.services.dataset import DatasetRecord
-    detail = from_dataset_detail_orm(dataset)
+
+    detail = to_dataset_detail(dataset)
     return DatasetRecord(
         id=detail.id,
         name=detail.name,

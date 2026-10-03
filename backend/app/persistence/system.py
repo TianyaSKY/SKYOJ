@@ -12,10 +12,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.services.system import SystemStatistics
-    from app.persistence.exam import Exam
-    from app.persistence.problem import Problem
-    from app.persistence.submission import Submission
-    from app.persistence.user import User
 
 
 class SysDict(Base):
@@ -84,6 +80,7 @@ class SystemRepository:
         from app.persistence.problem import Problem
         from app.persistence.submission import Submission
         from app.persistence.user import User
+
         return SystemStatistics(
             today_submissions=self._db.query(Submission)
             .filter(Submission.created_at >= today_start)

@@ -7,6 +7,7 @@ import time as time_module
 from dataclasses import dataclass
 from loguru import logger
 from typing import Optional
+from app.persistence.jobs import AsyncJobRepository
 from app.persistence.submission import SubmissionRepository
 from app.services.acm import run_acm_judge
 from app.services.kaggle import run_kaggle_judge
@@ -145,14 +146,16 @@ def judge_submission(submission_id: int, db) -> None:
         output_log=final_log,
         case_results=case_results,
     )
-    db.commit()
+    repository.unit_of_work.commit()
 
     # === 错题本更新 ===
     if submission is not None:
         try:
             from app.services.wrong_book import WrongBookService
 
-            wb = WrongBookService(db)
+            from app.persistence.user import WrongBookRepository
+
+            wb = WrongBookService(WrongBookRepository(db))
             wb.on_judge_complete(
                 user_id=submission.user_id,
                 problem_id=problem_id,
@@ -203,7 +206,7 @@ def _enqueue_plagiarism_scan(db, problem_id: int) -> None:
         from app.messaging.task_names import SCAN_PLAGIARISM_TASK
         from app.services.async_job import AsyncJobService
 
-        job_service = AsyncJobService.from_session(db)
+        job_service = AsyncJobService(AsyncJobRepository(db))
         job_service.enqueue(
             CreateAsyncJobParams(
                 task_name=SCAN_PLAGIARISM_TASK,

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.core.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.core.errors import (
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
 from dataclasses import dataclass
 from datetime import datetime
 from loguru import logger
@@ -85,6 +89,7 @@ class PaginatedDatasets:
     page_size: int
     datasets: list[DatasetListItem]
 
+
 @dataclass(frozen=True)
 class DatasetRecord(DatasetDetail):
     """数据集持久化快照，包含文件任务所需状态。"""
@@ -114,9 +119,7 @@ class DatasetService:
         self, page: int | None = None, page_size: int | None = None
     ) -> list[DatasetListItem] | PaginatedDatasets:
         """查询数据集列表。"""
-        items, total = self._dataset_repository.list_all(
-            page=page, page_size=page_size
-        )
+        items, total = self._dataset_repository.list_all(page=page, page_size=page_size)
         if page is None or page_size is None:
             return items
         return PaginatedDatasets(

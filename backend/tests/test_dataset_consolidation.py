@@ -62,6 +62,7 @@ def test_dataset_api_keeps_list_and_download_contracts(client, teacher_token, db
     repository = DatasetRepository(db_session)
     record = create_dataset(repository, teacher_user.id)
     repository.mark_ready(record.id, file_size="2 KB", file_hash="abc")
+    repository.unit_of_work.commit()
     service = DatasetService(repository, MagicMock(), MagicMock())
     from app.main import app
 

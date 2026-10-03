@@ -1,5 +1,7 @@
 """异步任务状态、租约与直接投递回归测试。"""
 
+from app.persistence.jobs import AsyncJobRepository
+
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -52,7 +54,7 @@ def make_params(**overrides):
 def test_enqueue_publishes_once_and_dedupe_skips_resend(monkeypatch):
     engine, db = make_session()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         sent = capture_send_task(monkeypatch)
 
         first = service.enqueue(make_params())
@@ -73,7 +75,7 @@ def test_enqueue_publishes_once_and_dedupe_skips_resend(monkeypatch):
 def test_enqueue_publish_failure_deletes_job_and_raises(monkeypatch):
     engine, db = make_session()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
 
         def boom(*args, **kwargs):
             raise ConnectionError("broker unreachable")
@@ -95,7 +97,7 @@ def test_enqueue_publish_failure_deletes_job_and_raises(monkeypatch):
 def test_fail_job_with_retry_republishes(monkeypatch):
     engine, db = make_session()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         job = service.enqueue(
             make_params(payload={"submission_id": 9}, dedupe_key=None)
         )
@@ -118,7 +120,7 @@ def test_fail_job_with_retry_republishes(monkeypatch):
 def test_fail_job_without_retry_does_not_republish(monkeypatch):
     engine, db = make_session()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         job = service.enqueue(
             make_params(payload={"submission_id": 10}, dedupe_key=None, max_attempts=1)
         )
@@ -137,13 +139,13 @@ def test_fail_job_without_retry_does_not_republish(monkeypatch):
 def test_job_lease_expiry_recovery_republishes(monkeypatch):
     engine, db = make_session()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         job = service.enqueue(
             make_params(payload={"submission_id": 11}, dedupe_key=None)
         )
         assert service.start_job(job.id, lease_seconds=60).attempts == 1
 
-        model = service._repository.get_by_id(job.id)
+        model = db.get(AsyncJob, job.id)
         model.lease_until = (
             datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=1)
         )
@@ -166,12 +168,12 @@ def test_recovery_republishes_stuck_pending_jobs(monkeypatch):
     """消息丢失/提前到达被拒后，pending 且已到 available_at 的任务应被重新投递。"""
     engine, db = make_session()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         job = service.enqueue(
             make_params(payload={"submission_id": 12}, dedupe_key=None)
         )
         # 模拟消息丢失：任务仍 pending 且早已可领取，但从未被消费
-        model = service._repository.get_by_id(job.id)
+        model = db.get(AsyncJob, job.id)
         model.available_at = (
             datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=60)
         )

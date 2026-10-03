@@ -1,5 +1,7 @@
 """验证跨仓储的原子提交、回滚与发布前的持久化。"""
 
+from app.persistence.jobs import AsyncJobRepository
+
 import json
 from datetime import datetime
 from unittest.mock import MagicMock
@@ -56,7 +58,7 @@ def test_enqueue_is_committed_before_publish(tmp_path, monkeypatch):
     engine = create_engine(f"sqlite:///{tmp_path / 'queue.db'}")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         published = []
 
         def publish(job):
@@ -84,7 +86,7 @@ def test_worker_can_record_failure_after_database_flush_error(monkeypatch):
     sessions = sessionmaker(bind=engine)
     monkeypatch.setattr(base, "SessionLocal", sessions)
     with sessions() as seed:
-        service = AsyncJobService.from_session(seed)
+        service = AsyncJobService(AsyncJobRepository(seed))
         job = service.enqueue(
             CreateAsyncJobParams(
                 task_name="test", queue="judge", payload={}, dedupe_key="duplicate"

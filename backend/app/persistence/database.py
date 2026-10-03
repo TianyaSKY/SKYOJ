@@ -1,4 +1,3 @@
-
 from app.core.config import DATABASE_URL
 from collections.abc import Generator
 from sqlalchemy import create_engine
@@ -22,5 +21,8 @@ def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

@@ -10,6 +10,10 @@ from typing import Optional, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from app.services.problem import ProblemRecord
+
+
+if TYPE_CHECKING:
     from app.services.problem import ProblemDetail, ProblemListItem
 
 
@@ -63,9 +67,9 @@ class ProblemRepository:
         self._db = db
         self.unit_of_work = UnitOfWork(db)
 
-    def get_by_id(self, problem_id: int) -> Optional[Problem]:
+    def get_by_id(self, problem_id: int) -> Optional[ProblemRecord]:
         """按主键查询题目。"""
-        return self._db.get(Problem, problem_id)
+        return _to_problem_record(self._db.get(Problem, problem_id))
 
     def create(
         self,
@@ -77,7 +81,7 @@ class ProblemRepository:
         time_limit: int,
         memory_limit: int,
         template_code: str = "",
-    ) -> Problem:
+    ) -> ProblemRecord:
         """创建正式题目。"""
         problem = Problem(
             title=title,
@@ -91,43 +95,49 @@ class ProblemRepository:
         self._db.add(problem)
         self._db.flush()
         self._db.refresh(problem)
-        return problem
+        return _to_problem_record(problem)
 
     def list_all(
         self, page: int | None = None, page_size: int | None = None
-    ) -> tuple[list[Problem], int | None]:
+    ) -> tuple[list[ProblemRecord], int | None]:
         """按创建顺序倒序查询题目，必要时在数据库侧分页。"""
         query = self._db.query(Problem).order_by(Problem.id.desc())
         if page is None or page_size is None:
-            return query.all(), None
+            return ([_to_problem_record(row) for row in (query.all())], None)
 
         total = query.count()
         problems = query.offset((page - 1) * page_size).limit(page_size).all()
-        return problems, total
+        return ([_to_problem_record(row) for row in (problems)], total)
 
-    def update(self, problem: Problem) -> Problem:
+    def update(self, problem: ProblemRecord) -> ProblemRecord:
         """持久化题目更新。"""
+        row = self._db.get(Problem, problem.id)
+        row.title = problem.title
+        row.content = problem.content
+        row.type = problem.type
+        row.language = problem.language
+        row.time_limit = problem.time_limit
+        row.memory_limit = problem.memory_limit
+        row.template_code = problem.template_code
+        row.test_case_path = problem.test_case_path
+        problem = row
         self._db.flush()
         self._db.refresh(problem)
-        return problem
+        return _to_problem_record(problem)
 
-    def delete(self, problem: Problem) -> None:
+    def delete(self, problem: ProblemRecord) -> None:
         """删除指定题目。"""
-        self._db.delete(problem)
+        self._db.delete(self._db.get(Problem, problem.id))
         self._db.flush()
 
-    def list_problem_ids_by_tag(self, tag_id: int) -> list[int]:
-        from app.persistence.community import (
-            ProblemCommunityRepository,
-        )
 
-        return ProblemCommunityRepository(self._db).list_problem_ids_by_tag(tag_id)
-
-
-def from_problem_orm(problem, *, with_content: bool = False) -> ProblemListItem | ProblemDetail:
+def to_problem_result(
+    problem, *, with_content: bool = False
+) -> ProblemListItem | ProblemDetail:
     """题目 ORM → 列表项或详情。"""
 
     from app.services.problem import ProblemDetail, ProblemListItem
+
     if with_content:
         return ProblemDetail(
             id=problem.id,
@@ -148,4 +158,24 @@ def from_problem_orm(problem, *, with_content: bool = False) -> ProblemListItem 
         language=problem.language,
         time_limit=problem.time_limit,
         memory_limit=problem.memory_limit,
+    )
+
+
+def _to_problem_record(row: Problem | None) -> ProblemRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.problem import ProblemRecord
+
+    if row is None or isinstance(row, ProblemRecord):
+        return row
+    return ProblemRecord(
+        id=row.id,
+        title=row.title,
+        content=row.content,
+        type=row.type,
+        language=row.language,
+        time_limit=row.time_limit,
+        memory_limit=row.memory_limit,
+        test_case_path=row.test_case_path,
+        template_code=row.template_code,
+        created_at=row.created_at,
     )

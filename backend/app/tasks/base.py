@@ -29,7 +29,7 @@ def run_job(
     """
     db = SessionLocal()
     try:
-        service = AsyncJobService.from_session(db)
+        service = AsyncJobService(AsyncJobRepository(db))
         if (
             service.start_job(job_id, lease_seconds=service.lease_seconds(task_name))
             is None

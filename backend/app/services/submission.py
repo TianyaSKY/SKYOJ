@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
-from app.core.errors import InvalidStateError, PermissionDeniedError, ResourceNotFoundError
+from app.core.errors import (
+    InvalidStateError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
+from app.core.json import JsonValue
 from app.core.time import utcnow
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from app.services.user import UserRecord
+    from app.services.problem import ProblemRecord
 
 
 @dataclass(frozen=True)
@@ -111,6 +121,7 @@ class CaseResult:
     actual_output: Optional[str] = None
     error_output: Optional[str] = None
 
+
 @dataclass(frozen=True)
 class ProblemSubmissionCounts:
     problem_id: int
@@ -152,8 +163,32 @@ class PlatformAnalytics:
     daily_submissions: list[DailySubmissionCount]
 
 
+@dataclass
+class SubmissionRecord:
+    """Submission 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    problem_id: int
+    exam_id: int | None
+    code_path: str | None
+    code_content: str | None
+    language: str | None
+    status: str | None
+    score: float | None
+    output_log: str | None
+    case_results: list[dict[str, JsonValue]] | None
+    created_at: datetime | None
+    user: UserRecord | None
+    problem: ProblemRecord | None
+
+
 from app.clients.submission_storage_client import SubmissionStorageClient
-from app.persistence.submission import SubmissionRepository, from_submission_detail_orm, from_submission_orm
+from app.persistence.submission import (
+    SubmissionRepository,
+    to_submission_detail,
+    to_submission_list_item,
+)
 from app.services.async_job import AsyncJobService
 
 
@@ -236,7 +271,7 @@ class SubmissionService:
             total=total,
             pages=pages,
             current_page=params.page,
-            submissions=[from_submission_orm(item) for item in submissions],
+            submissions=[to_submission_list_item(item) for item in submissions],
         )
 
     def get_submission(
@@ -248,7 +283,7 @@ class SubmissionService:
             raise ResourceNotFoundError("提交记录不存在")
         if requester_role == "student" and submission.user_id != requester_id:
             raise PermissionDeniedError("无权查看该提交记录")
-        return from_submission_detail_orm(submission)
+        return to_submission_detail(submission)
 
     def get_platform_analytics(self, requester_role: str) -> PlatformAnalytics:
         """聚合平台统计，仅教师可以访问。"""

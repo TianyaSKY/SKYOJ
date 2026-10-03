@@ -48,8 +48,23 @@ class UploadAvatarParams:
     content: bytes
 
 
+@dataclass
+class UserRecord:
+    """User 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    username: str
+    password_hash: str
+    role: str | None
+    avatar: str | None
+
+
 from app.clients.avatar_storage_client import AvatarStorageClient
-from app.persistence.user import UserRepository, from_user_orm, from_user_submission_orm
+from app.persistence.user import (
+    UserRepository,
+    to_user_profile,
+    to_user_submission_item,
+)
 
 
 class UserService:
@@ -66,11 +81,11 @@ class UserService:
     def list_users(self, requester_role: str) -> list[UserProfile]:
         """供教师查询所有用户。"""
         self._require_teacher(requester_role)
-        return [from_user_orm(user) for user in self._user_repository.list_all()]
+        return [to_user_profile(user) for user in self._user_repository.list_all()]
 
     def get_profile(self, user_id: int) -> UserProfile:
         """查询用户公开资料。"""
-        return from_user_orm(self._require_user(user_id))
+        return to_user_profile(self._require_user(user_id))
 
     def upload_avatar(self, params: UploadAvatarParams) -> UserProfile:
         """保存头像并更新用户资料。"""
@@ -78,7 +93,7 @@ class UserService:
             raise ValueError("未选择头像文件")
         user = self._require_user(params.user_id)
         avatar = self._avatar_storage_client.save(params.filename, params.content)
-        updated = from_user_orm(self._user_repository.update_avatar(user, avatar))
+        updated = to_user_profile(self._user_repository.update_avatar(user, avatar))
         self._user_repository.unit_of_work.commit()
         return updated
 
@@ -94,11 +109,11 @@ class UserService:
             raise PermissionDeniedError("无权查看该用户的提交记录")
         self._require_user(user_id)
         return [
-            from_user_submission_orm(item)
+            to_user_submission_item(item)
             for item in self._user_repository.list_submissions(user_id)
         ]
 
-    def _require_user(self, user_id: int):
+    def _require_user(self, user_id: int) -> UserRecord:
         user = self._user_repository.get_by_id(user_id)
         if user is None:
             raise ResourceNotFoundError("用户不存在")

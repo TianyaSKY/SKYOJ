@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from app.core.errors import InvalidStateError, LlmConfigError, PermissionDeniedError, ResourceNotFoundError
+from app.core.errors import (
+    InvalidStateError,
+    LlmConfigError,
+    PermissionDeniedError,
+    ResourceNotFoundError,
+)
 from app.core.json import JsonObjectResult, JsonValue
 from dataclasses import dataclass
 from datetime import datetime
@@ -118,12 +123,35 @@ class ApplyProblemDraftResult:
     title: str
 
 
+@dataclass
+class AiDraftRecord:
+    """AiDraft 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    task_type: str
+    status: str
+    title: str
+    problem_id: int | None
+    request_payload: str | None
+    result_payload: str | None
+    error_message: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    consumed_at: datetime | None
+
+
 from app.clients.llm_client import LlmClient
 from app.messaging.task_names import GENERATE_PROBLEM_TASK, GENERATE_TEST_SCRIPT_TASK
-from app.persistence.jobs import AiDraftRepository, from_ai_draft_orm
+from app.persistence.jobs import AiDraftRepository, to_ai_draft_result
 from app.persistence.problem import ProblemRepository
 from app.services.async_job import AsyncJobService
-from app.services.llm_prompts import PROBLEM_GENERATION_OUTPUT_FORMAT, PROBLEM_GENERATION_SYSTEM_SETTING, TEST_SCRIPT_MODE_CONFIGS, TEST_SCRIPT_OUTPUT_FORMAT
+from app.services.llm_prompts import (
+    PROBLEM_GENERATION_OUTPUT_FORMAT,
+    PROBLEM_GENERATION_SYSTEM_SETTING,
+    TEST_SCRIPT_MODE_CONFIGS,
+    TEST_SCRIPT_OUTPUT_FORMAT,
+)
 
 
 class AiDraftService:
@@ -406,7 +434,7 @@ class AiDraftService:
             task_type=task_type,
             limit=limit,
         )
-        return [from_ai_draft_orm(d) for d in drafts]
+        return [to_ai_draft_result(d) for d in drafts]
 
     def get_draft(
         self, user_id: int, draft_id: int, *, requester_role: str
@@ -414,7 +442,7 @@ class AiDraftService:
         """获取草稿详情。"""
         self._require_teacher(requester_role)
         draft = self._require_owned_draft(user_id, draft_id)
-        return from_ai_draft_orm(draft, detail=True)
+        return to_ai_draft_result(draft, detail=True)
 
     def delete_draft(self, user_id: int, draft_id: int, *, requester_role: str) -> None:
         """删除草稿。"""
@@ -500,7 +528,7 @@ class AiDraftService:
             title=problem.title,
         )
 
-    def _require_owned_draft(self, user_id: int, draft_id: int):
+    def _require_owned_draft(self, user_id: int, draft_id: int) -> AiDraftRecord:
         draft = self._drafts.get_by_id(draft_id)
         if draft is None:
             raise ResourceNotFoundError(f"草稿不存在: {draft_id}")

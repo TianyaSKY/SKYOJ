@@ -1,5 +1,7 @@
 """FastAPI 依赖注入。"""
 
+from app.persistence.jobs import AsyncJobRepository
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,8 @@ from app.persistence.submission import DebugRunRepository
 from app.persistence.exam import ExamRepository
 from app.persistence.submission import PlagiarismRepository
 from app.persistence.problem import ProblemRepository
+from app.persistence.community import ProblemCommunityRepository
+from app.persistence.user import WrongBookRepository
 from app.persistence.user import SearchRepository
 from app.persistence.submission import SubmissionRepository
 from app.persistence.system import SystemRepository
@@ -42,7 +46,7 @@ def get_ai_draft_service(db: Session = Depends(get_db)) -> AiDraftService:
     return AiDraftService(
         draft_repository=AiDraftRepository(db),
         problem_repository=ProblemRepository(db),
-        job_service=AsyncJobService.from_session(db),
+        job_service=AsyncJobService(AsyncJobRepository(db)),
         llm_client=LlmClient(),
     )
 
@@ -52,6 +56,7 @@ def get_problem_service(db: Session = Depends(get_db)) -> ProblemService:
     return ProblemService(
         problem_repository=ProblemRepository(db),
         test_case_storage=ProblemTestCaseStorageClient(),
+        community_repository=ProblemCommunityRepository(db),
     )
 
 
@@ -81,7 +86,7 @@ def get_dataset_service(db: Session = Depends(get_db)) -> DatasetService:
     return DatasetService(
         dataset_repository=DatasetRepository(db),
         storage_client=storage_client,
-        job_service=AsyncJobService.from_session(db),
+        job_service=AsyncJobService(AsyncJobRepository(db)),
     )
 
 
@@ -89,14 +94,14 @@ def get_submission_service(db: Session = Depends(get_db)) -> SubmissionService:
     """构造提交领域服务。"""
     return SubmissionService(
         SubmissionRepository(db),
-        AsyncJobService.from_session(db),
+        AsyncJobService(AsyncJobRepository(db)),
         SubmissionStorageClient(),
     )
 
 
 def get_debug_service(db: Session = Depends(get_db)) -> DebugService:
     """构造调试运行领域服务。"""
-    return DebugService(DebugRunRepository(db), AsyncJobService.from_session(db))
+    return DebugService(DebugRunRepository(db), AsyncJobService(AsyncJobRepository(db)))
 
 
 def get_system_service(db: Session = Depends(get_db)) -> SystemService:
@@ -117,20 +122,20 @@ def get_plagiarism_service(db: Session = Depends(get_db)) -> PlagiarismService:
         plagiarism_repo=PlagiarismRepository(db),
         submission_repo=SubmissionRepository(db),
         jplag_client=JPlagClient(),
-        job_service=AsyncJobService.from_session(db),
+        job_service=AsyncJobService(AsyncJobRepository(db)),
     )
 
 
 def get_solution_service(db: Session = Depends(get_db)) -> SolutionService:
     """构造题解业务服务。"""
-    return SolutionService(db)
+    return SolutionService(ProblemCommunityRepository(db))
 
 
 def get_tag_service(db: Session = Depends(get_db)) -> TagService:
     """构造题目标签业务服务。"""
-    return TagService(db)
+    return TagService(ProblemCommunityRepository(db))
 
 
 def get_wrong_book_service(db: Session = Depends(get_db)) -> WrongBookService:
     """构造错题本服务。"""
-    return WrongBookService(db)
+    return WrongBookService(WrongBookRepository(db))

@@ -5,14 +5,30 @@ from __future__ import annotations
 from app.persistence.database import Base
 from app.persistence.unit_of_work import UnitOfWork
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, String, UniqueConstraint, and_, func, or_
-from sqlalchemy.orm import Session, relationship
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+    or_,
+)
+from sqlalchemy.orm import Session, relationship, selectinload
 from typing import Optional, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from app.persistence.submission import Submission
-    from app.persistence.problem import Problem
+    from app.services.user import UserRecord
+    from app.services.submission import SubmissionRecord
+    from app.services.wrong_book import WrongBookRecord
+
+
+if TYPE_CHECKING:
     from app.services.user import UserProfile, UserSubmissionItem
 
 
@@ -48,7 +64,8 @@ class WrongBook(Base):
     __tablename__ = "wrong_books"
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "problem_id",
+            "user_id",
+            "problem_id",
             name="uq_wrong_books_user_problem",
         ),
         Index("ix_wrong_books_user", "user_id"),
@@ -65,9 +82,7 @@ class WrongBook(Base):
     first_wrong_at = Column(DateTime, nullable=False)
     latest_wrong_at = Column(DateTime, nullable=False)
     # 提交 id（方便定位到具体哪次提交出错的代码）。
-    submission_id = Column(
-        Integer, ForeignKey("submissions.id"), nullable=True
-    )
+    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=True)
     # 是否已 AC：是则从错题本移除（学生已掌握）
     accepted = Column(Boolean, default=False, nullable=False)
     # 是否已复习
@@ -106,48 +121,61 @@ class UserRepository:
         self._db = db
         self.unit_of_work = UnitOfWork(db)
 
-    def get_by_username(self, username: str) -> Optional[User]:
+    def get_by_username(self, username: str) -> Optional[UserRecord]:
         """按用户名查询用户。"""
-        return self._db.query(User).filter_by(username=username).first()
+        return _to_user_record(
+            self._db.query(User).filter_by(username=username).first()
+        )
 
-    def create(self, username: str, password_hash: str, role: str) -> User:
+    def create(self, username: str, password_hash: str, role: str) -> UserRecord:
         """创建并持久化用户。"""
         user = User(username=username, password_hash=password_hash, role=role)
         self._db.add(user)
         self._db.flush()
         self._db.refresh(user)
-        return user
+        return _to_user_record(user)
 
-    def get_by_id(self, user_id: int) -> Optional[User]:
+    def get_by_id(self, user_id: int) -> Optional[UserRecord]:
         """按 ID 查询用户。"""
-        return self._db.get(User, user_id)
+        return _to_user_record(self._db.get(User, user_id))
 
-    def list_all(self) -> list[User]:
+    def list_all(self) -> list[UserRecord]:
         """查询全部用户。"""
-        return self._db.query(User).all()
+        return [_to_user_record(row) for row in (self._db.query(User).all())]
 
-    def update_avatar(self, user: User, avatar: str) -> User:
+    def update_avatar(self, user: UserRecord, avatar: str) -> UserRecord:
         """更新用户头像路径。"""
+        user = self._db.get(User, user.id)
         user.avatar = avatar
         self._db.flush()
         self._db.refresh(user)
-        return user
+        return _to_user_record(user)
 
-    def list_submissions(self, user_id: int) -> list[Submission]:
+    def list_submissions(self, user_id: int) -> list[SubmissionRecord]:
         """按创建时间倒序查询用户的提交记录。"""
+        from app.persistence.submission import _to_submission_record
 
         from app.persistence.submission import Submission
-        return (
-            self._db.query(Submission)
-            .filter_by(user_id=user_id)
-            .order_by(Submission.created_at.desc())
-            .all()
-        )
+
+        return [
+            _to_submission_record(row)
+            for row in (
+                self._db.query(Submission)
+                .filter_by(user_id=user_id)
+                .order_by(Submission.created_at.desc())
+                .all()
+            )
+        ]
 
 
 class WrongBookRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
+
+    def get_by_id(self, entry_id: int) -> WrongBookRecord | None:
+        """查询用于访问控制的错题本快照。"""
+        return _to_wrong_book_record(self._db.get(WrongBook, entry_id))
 
     def upsert(
         self,
@@ -156,7 +184,7 @@ class WrongBookRepository:
         problem_id: int,
         submission_id: int,
         now: datetime,
-    ) -> WrongBook:
+    ) -> WrongBookRecord:
         """写入或更新错题本：WA/TLE/RE 时调用；Accepted 时改为 accepted=True。"""
         existing = (
             self._db.query(WrongBook)
@@ -174,7 +202,7 @@ class WrongBookRepository:
             existing.latest_wrong_at = now
             existing.submission_id = submission_id
             self._db.flush()
-            return existing
+            return _to_wrong_book_record(existing)
         entry = WrongBook(
             user_id=user_id,
             problem_id=problem_id,
@@ -186,7 +214,7 @@ class WrongBookRepository:
         )
         self._db.add(entry)
         self._db.flush()
-        return entry
+        return _to_wrong_book_record(entry)
 
     def mark_accepted(self, user_id: int, problem_id: int) -> None:
         """学生 ac 后从错题本移除（标记 accepted=True）。"""
@@ -202,12 +230,12 @@ class WrongBookRepository:
             row.accepted = True
             self._db.flush()
 
-    def toggle_reviewed(self, entry_id: int) -> WrongBook:
+    def toggle_reviewed(self, entry_id: int) -> WrongBookRecord:
         row = self._db.get(WrongBook, entry_id)
         if row is not None:
             row.reviewed = not row.reviewed
             self._db.flush()
-        return row
+        return _to_wrong_book_record(row)
 
     def list_for_user(
         self,
@@ -216,9 +244,10 @@ class WrongBookRepository:
         unresolved_only: bool = False,
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[list[WrongBook], int]:
+    ) -> tuple[list[WrongBookRecord], int]:
         query = (
             self._db.query(WrongBook)
+            .options(selectinload(WrongBook.problem))
             .filter(WrongBook.user_id == user_id)
             .order_by(WrongBook.latest_wrong_at.desc())
         )
@@ -227,14 +256,13 @@ class WrongBookRepository:
                 or_(WrongBook.accepted == False, WrongBook.accepted.is_(None))  # noqa: E712
             )
         total = query.count()
-        rows = (
-            query.offset((page - 1) * page_size).limit(page_size).all()
-        )
-        return rows, total
+        rows = query.offset((page - 1) * page_size).limit(page_size).all()
+        return ([_to_wrong_book_record(row) for row in (rows)], total)
 
     def get_stats(self, user_id: int) -> tuple[int, int, int, int]:
         rows = (
             self._db.query(WrongBook)
+            .options(selectinload(WrongBook.problem))
             .filter(WrongBook.user_id == user_id)
             .all()
         )
@@ -254,27 +282,34 @@ class SearchRepository:
 
     def search_problems(self, query: str, top_k: int):
 
+        from app.persistence.problem import _to_problem_record
         from app.persistence.problem import Problem
-        return (
-            self._db.query(Problem)
-            .filter(
-                or_(
-                    Problem.title.like(f"%{query}%"), Problem.content.like(f"%{query}%")
+
+        return [
+            _to_problem_record(row)
+            for row in (
+                self._db.query(Problem)
+                .filter(
+                    or_(
+                        Problem.title.like(f"%{query}%"),
+                        Problem.content.like(f"%{query}%"),
+                    )
                 )
+                .limit(top_k)
+                .all()
             )
-            .limit(top_k)
-            .all()
-        )
+        ]
 
     def add_history(self, user_id: int, query: str) -> None:
         self._db.add(SearchHistory(user_id=user_id, query=query))
         self._db.flush()
 
 
-def from_user_orm(user) -> UserProfile:
+def to_user_profile(user) -> UserProfile:
     """用户 ORM → 公开资料。"""
 
     from app.services.user import UserProfile
+
     return UserProfile(
         id=user.id,
         username=user.username,
@@ -283,10 +318,11 @@ def from_user_orm(user) -> UserProfile:
     )
 
 
-def from_user_submission_orm(submission) -> UserSubmissionItem:
+def to_user_submission_item(submission) -> UserSubmissionItem:
     """提交 ORM → 用户提交项（problem_title 取 submission.problem.title，调用方须预取）。"""
 
     from app.services.user import UserSubmissionItem
+
     return UserSubmissionItem(
         id=submission.id,
         problem_id=submission.problem_id,
@@ -296,4 +332,41 @@ def from_user_submission_orm(submission) -> UserSubmissionItem:
         language=submission.language,
         created_at=submission.created_at,
         exam_id=submission.exam_id,
+    )
+
+
+def _to_user_record(row: User | None) -> UserRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.user import UserRecord
+
+    if row is None or isinstance(row, UserRecord):
+        return row
+    return UserRecord(
+        id=row.id,
+        username=row.username,
+        password_hash=row.password_hash,
+        role=row.role,
+        avatar=row.avatar,
+    )
+
+
+def _to_wrong_book_record(row: WrongBook | None) -> WrongBookRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.wrong_book import WrongBookRecord
+    from app.persistence.problem import _to_problem_record
+
+    if row is None or isinstance(row, WrongBookRecord):
+        return row
+    return WrongBookRecord(
+        id=row.id,
+        user_id=row.user_id,
+        problem_id=row.problem_id,
+        first_wrong_at=row.first_wrong_at,
+        latest_wrong_at=row.latest_wrong_at,
+        submission_id=row.submission_id,
+        accepted=row.accepted,
+        reviewed=row.reviewed,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        problem=_to_problem_record(row.problem),
     )

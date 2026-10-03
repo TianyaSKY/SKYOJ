@@ -101,9 +101,9 @@ def seeded():
 def test_list_latest_submissions_returns_latest_per_pair(seeded):
     latest = seeded["repository"].list_latest_submissions(seeded["exam"].id)
 
-    assert latest[(seeded["alice"].id, seeded["p1"].id)] is seeded["ac1"]
-    assert latest[(seeded["alice"].id, seeded["p2"].id)] is seeded["ac2"]
-    assert latest[(seeded["bob"].id, seeded["p1"].id)] is seeded["wa_bob"]
+    assert latest[(seeded["alice"].id, seeded["p1"].id)].id == seeded["ac1"].id
+    assert latest[(seeded["alice"].id, seeded["p2"].id)].id == seeded["ac2"].id
+    assert latest[(seeded["bob"].id, seeded["p1"].id)].id == seeded["wa_bob"].id
     assert len(latest) == 3
 
 
@@ -114,7 +114,9 @@ def test_list_latest_submissions_respects_filters(seeded):
         problem_ids=[seeded["p1"].id],
     )
 
-    assert latest == {(seeded["bob"].id, seeded["p1"].id): seeded["wa_bob"]}
+    assert {key: row.id for key, row in latest.items()} == {
+        (seeded["bob"].id, seeded["p1"].id): seeded["wa_bob"].id
+    }
 
 
 def test_get_status_takes_latest_submission(seeded):

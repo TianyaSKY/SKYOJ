@@ -5,8 +5,11 @@ from __future__ import annotations
 from app.core.errors import ResourceNotFoundError
 from dataclasses import dataclass
 from datetime import datetime
-from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from app.services.problem import ProblemRecord
 
 
 @dataclass(frozen=True)
@@ -42,16 +45,37 @@ class ToggleReviewedResult:
 
 
 # 视为"错题"的状态列表。
-_WRONG_STATUSES = {"Wrong Answer", "Time Limit Exceeded", "Runtime Error", "System Error"}
+_WRONG_STATUSES = {
+    "Wrong Answer",
+    "Time Limit Exceeded",
+    "Runtime Error",
+    "System Error",
+}
+
+
+@dataclass
+class WrongBookRecord:
+    """WrongBook 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    user_id: int
+    problem_id: int
+    first_wrong_at: datetime
+    latest_wrong_at: datetime
+    submission_id: int | None
+    accepted: bool
+    reviewed: bool
+    created_at: datetime
+    updated_at: datetime
+    problem: ProblemRecord | None
 
 
 from app.persistence.user import WrongBookRepository
 
 
 class WrongBookService:
-    def __init__(self, db: Session) -> None:
-        self._db = db
-        self._repo = WrongBookRepository(db)
+    def __init__(self, repository: WrongBookRepository) -> None:
+        self._repo = repository
 
     # === 判题结果监听 ===
 
@@ -63,18 +87,17 @@ class WrongBookService:
         status: str,
     ) -> None:
         """由 judge_service 在判题完成后调用，写入/更新错题本。"""
-        now = datetime.utcnow()
-        if status == "Accepted":
-            self._repo.mark_accepted(user_id, problem_id)
-            self._db.commit()
-        elif status in _WRONG_STATUSES:
-            self._repo.upsert(
-                user_id=user_id,
-                problem_id=problem_id,
-                submission_id=submission_id,
-                now=now,
-            )
-            self._db.commit()
+        with self._repo.unit_of_work.transaction():
+            now = datetime.utcnow()
+            if status == "Accepted":
+                self._repo.mark_accepted(user_id, problem_id)
+            elif status in _WRONG_STATUSES:
+                self._repo.upsert(
+                    user_id=user_id,
+                    problem_id=problem_id,
+                    submission_id=submission_id,
+                    now=now,
+                )
         # Pending / Compile Error 不操作。
 
     # === 查询 ===
@@ -113,12 +136,13 @@ class WrongBookService:
 
     def toggle_reviewed(self, entry_id: int, requester_id: int) -> ToggleReviewedResult:
         """切换复习标记。"""
-        row = self._repo.toggle_reviewed(entry_id)
-        if row is None:
-            raise ResourceNotFoundError("错题记录不存在")
-        if row.user_id != requester_id:
-            from app.core.errors import PermissionDeniedError
+        with self._repo.unit_of_work.transaction():
+            row = self._repo.get_by_id(entry_id)
+            if row is None:
+                raise ResourceNotFoundError("错题记录不存在")
+            if row.user_id != requester_id:
+                from app.core.errors import PermissionDeniedError
 
-            raise PermissionDeniedError("无权修改此记录")
-        self._db.commit()
-        return ToggleReviewedResult(id=row.id, reviewed=row.reviewed)
+                raise PermissionDeniedError("无权修改此记录")
+            row = self._repo.toggle_reviewed(entry_id)
+            return ToggleReviewedResult(id=row.id, reviewed=row.reviewed)

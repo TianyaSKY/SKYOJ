@@ -42,6 +42,7 @@ class UploadTestCasesParams:
     filename: str
     content: bytes
 
+
 @dataclass(frozen=True)
 class TestCaseItem:
     """单个测试点的输入输出文件状态。"""
@@ -66,6 +67,7 @@ class TestCaseSummary:
     total_size: int
     ignored_files: list[str]
     cases: list[TestCaseItem]
+
 
 @dataclass(frozen=True)
 class ProblemListItem:
@@ -108,9 +110,30 @@ class PaginatedProblems:
     problems: list[ProblemListItem]
 
 
+@dataclass
+class ProblemRecord:
+    """Problem 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    title: str
+    content: str
+    type: str
+    language: str
+    time_limit: int | None
+    memory_limit: int | None
+    test_case_path: str | None
+    template_code: str | None
+    created_at: datetime | None
+
+
 from app.clients.problem_test_case_storage_client import ProblemTestCaseStorageClient
-from app.persistence.problem import ProblemRepository, from_problem_orm
-from app.utils.problem_cache import get_detail_cache, invalidate_detail_cache, set_detail_cache
+from app.persistence.community import ProblemCommunityRepository
+from app.persistence.problem import ProblemRepository, to_problem_result
+from app.utils.problem_cache import (
+    get_detail_cache,
+    invalidate_detail_cache,
+    set_detail_cache,
+)
 
 
 class ProblemService:
@@ -120,8 +143,10 @@ class ProblemService:
         self,
         problem_repository: ProblemRepository,
         test_case_storage: ProblemTestCaseStorageClient | None = None,
+        community_repository: ProblemCommunityRepository | None = None,
     ) -> None:
         self._problem_repository = problem_repository
+        self._community_repository = community_repository
         self._test_case_storage = test_case_storage or ProblemTestCaseStorageClient()
 
     def create_problem(
@@ -139,7 +164,7 @@ class ProblemService:
             template_code=params.template_code,
         )
         self._problem_repository.unit_of_work.commit()
-        detail = from_problem_orm(problem, with_content=True)
+        detail = to_problem_result(problem, with_content=True)
         # 新建题目的详情立即可缓存（首次读取必然命中）。
         set_detail_cache(detail.id, self._detail_to_dict(detail))
         return detail
@@ -158,7 +183,9 @@ class ProblemService:
         """
         allowed_ids: set[int] | None = None
         if tag_id is not None:
-            ids = self._problem_repository.list_problem_ids_by_tag(tag_id)
+            if self._community_repository is None:
+                raise RuntimeError("题目标签仓储未注入")
+            ids = self._community_repository.list_problem_ids_by_tag(tag_id)
             if not ids:
                 if page is not None and page_size is not None:
                     return PaginatedProblems(
@@ -172,7 +199,7 @@ class ProblemService:
                 page=page, page_size=page_size
             )
             items = [
-                self._with_test_case_status(from_problem_orm(problem))
+                self._with_test_case_status(to_problem_result(problem))
                 for problem in problems
             ]
             if allowed_ids is not None:
@@ -193,7 +220,7 @@ class ProblemService:
         if allowed_ids is not None:
             visible = [p for p in visible if p.id in allowed_ids]
         if page is None or page_size is None:
-            return [from_problem_orm(problem) for problem in visible]
+            return [to_problem_result(problem) for problem in visible]
 
         start = (page - 1) * page_size
         paged = visible[start : start + page_size]
@@ -201,7 +228,7 @@ class ProblemService:
             total=len(visible),
             page=page,
             page_size=page_size,
-            problems=[from_problem_orm(problem) for problem in paged],
+            problems=[to_problem_result(problem) for problem in paged],
         )
 
     def get_problem(self, problem_id: int) -> ProblemDetail:
@@ -211,7 +238,7 @@ class ProblemService:
             return self._detail_from_dict(cached)
         problem = self._require_problem(problem_id)
         self._problem_repository.unit_of_work.commit()
-        detail = from_problem_orm(problem, with_content=True)
+        detail = to_problem_result(problem, with_content=True)
         set_detail_cache(detail.id, self._detail_to_dict(detail))
         return detail
 
@@ -233,7 +260,7 @@ class ProblemService:
             if value is not None:
                 setattr(problem, attribute, value)
 
-        updated = from_problem_orm(
+        updated = to_problem_result(
             self._problem_repository.update(problem), with_content=True
         )
         self._problem_repository.unit_of_work.commit()
@@ -289,7 +316,7 @@ class ProblemService:
             test_case_valid_count=summary.valid_count,
         )
 
-    def _require_problem(self, problem_id: int):
+    def _require_problem(self, problem_id: int) -> ProblemRecord:
         problem = self._problem_repository.get_by_id(problem_id)
         if problem is None:
             raise ResourceNotFoundError("题目不存在")

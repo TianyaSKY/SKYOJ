@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 from app.core.errors import PermissionDeniedError, ResourceNotFoundError
+from app.core.json import JsonValue
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from loguru import logger
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from app.services.submission import SubmissionRecord
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,24 @@ class PaginatedPlagiarismReports:
     page: int
     page_size: int
     reports: list[PlagiarismReportItem]
+
+
+@dataclass
+class PlagiarismReportRecord:
+    """PlagiarismReport 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    problem_id: int
+    submission_a_id: int
+    submission_b_id: int
+    similarity_score: float | None
+    matched_blocks: list[dict[str, JsonValue]] | None
+    status: str | None
+    jplag_result_id: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    submission_a: SubmissionRecord | None
+    submission_b: SubmissionRecord | None
 
 
 from app.clients.jplag_client import JPlagAPIError, JPlagClient

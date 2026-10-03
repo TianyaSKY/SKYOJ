@@ -43,7 +43,7 @@ def _build_service(db: Session) -> AiDraftService:
     return AiDraftService(
         draft_repository=AiDraftRepository(db),
         problem_repository=ProblemRepository(db),
-        job_service=AsyncJobService.from_session(db),
+        job_service=AsyncJobService(AsyncJobRepository(db)),
         llm_client=LlmClient(),
     )
 

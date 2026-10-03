@@ -3,15 +3,43 @@
 from __future__ import annotations
 
 from app.persistence.database import Base
-from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, select
+from app.persistence.unit_of_work import UnitOfWork
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Session, relationship, selectinload
 from typing import Optional, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from app.persistence.problem import Problem
-    from app.services.community import CommentDetail, SolutionDetail, SolutionListItem, TagDetail
+    from app.services.problem import ProblemRecord
+    from app.services.community import (
+        ProblemSolutionRecord,
+        ProblemSolutionCommentRecord,
+        ProblemSolutionLikeRecord,
+        ProblemSolutionFavoriteRecord,
+        ProblemTagRecord,
+        ProblemTagMapRecord,
+    )
+
+
+if TYPE_CHECKING:
+    from app.services.community import (
+        CommentDetail,
+        SolutionDetail,
+        SolutionListItem,
+        TagDetail,
+    )
 
 
 class ProblemTag(Base):
@@ -187,16 +215,16 @@ class ProblemSolutionFavorite(Base):
     solution = relationship("ProblemSolution", back_populates="favorites")
 
     def __repr__(self) -> str:
-        return f"<ProblemSolutionFavorite solution={self.solution_id} user={self.user_id}>"
+        return (
+            f"<ProblemSolutionFavorite solution={self.solution_id} user={self.user_id}>"
+        )
 
 
 class ProblemSolutionComment(Base):
     """题解评论。扁平（不支持嵌套），按时间正序。"""
 
     __tablename__ = "problem_solution_comments"
-    __table_args__ = (
-        Index("ix_problem_solution_comments_solution", "solution_id"),
-    )
+    __table_args__ = (Index("ix_problem_solution_comments_solution", "solution_id"),)
 
     id = Column(Integer, primary_key=True)
     solution_id = Column(
@@ -218,6 +246,32 @@ class ProblemSolutionComment(Base):
 class ProblemCommunityRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
+        self.unit_of_work = UnitOfWork(db)
+
+    def save_solution(self, record: ProblemSolutionRecord) -> ProblemSolutionRecord:
+        """将业务修改写回题解行，事务由服务控制。"""
+        row = self._db.get(ProblemSolution, record.id)
+        for attribute in (
+            "title",
+            "content",
+            "language",
+            "is_official",
+            "status",
+            "vote_count",
+            "favorite_count",
+            "comment_count",
+            "view_count",
+        ):
+            setattr(row, attribute, getattr(record, attribute))
+        self._db.flush()
+        self._db.refresh(row)
+        return _to_problem_solution_record(row)
+
+    def save_tag_map(self, record: ProblemTagMapRecord) -> None:
+        """更新标签审批状态。"""
+        row = self._db.get(ProblemTagMap, record.id)
+        row.approved = record.approved
+        self._db.flush()
 
     # -- 题解 --
 
@@ -229,7 +283,7 @@ class ProblemCommunityRepository:
         title: str,
         content: str,
         language: Optional[str],
-    ) -> ProblemSolution:
+    ) -> ProblemSolutionRecord:
         solution = ProblemSolution(
             problem_id=problem_id,
             author_id=author_id,
@@ -240,12 +294,16 @@ class ProblemCommunityRepository:
         )
         self._db.add(solution)
         self._db.flush()
-        return solution
+        return _to_problem_solution_record(solution)
 
-    def get_solution_by_id(self, solution_id: int) -> Optional[ProblemSolution]:
-        return (
+    def get_solution_by_id(self, solution_id: int) -> Optional[ProblemSolutionRecord]:
+        return _to_problem_solution_record(
             self._db.query(ProblemSolution)
-            .options(selectinload(ProblemSolution.author))
+            .options(
+                selectinload(ProblemSolution.author),
+                selectinload(ProblemSolution.likes),
+                selectinload(ProblemSolution.favorites),
+            )
             .filter(ProblemSolution.id == solution_id)
             .first()
         )
@@ -257,9 +315,11 @@ class ProblemCommunityRepository:
         only_published: bool = True,
         page: int = 1,
         page_size: int = 20,
-    ) -> tuple[list[ProblemSolution], int]:
+    ) -> tuple[list[ProblemSolutionRecord], int]:
         query = self._db.query(ProblemSolution).options(
-            selectinload(ProblemSolution.author)
+            selectinload(ProblemSolution.author),
+            selectinload(ProblemSolution.likes),
+            selectinload(ProblemSolution.favorites),
         )
         query = query.filter(ProblemSolution.problem_id == problem_id)
         if only_published:
@@ -275,12 +335,14 @@ class ProblemCommunityRepository:
             .limit(page_size)
             .all()
         )
-        return rows, total
+        return ([_to_problem_solution_record(row) for row in (rows)], total)
 
     # -- 点赞 --
 
-    def get_like(self, solution_id: int, user_id: int) -> Optional[ProblemSolutionLike]:
-        return (
+    def get_like(
+        self, solution_id: int, user_id: int
+    ) -> Optional[ProblemSolutionLikeRecord]:
+        return _to_problem_solution_like_record(
             self._db.query(ProblemSolutionLike)
             .filter(
                 ProblemSolutionLike.solution_id == solution_id,
@@ -289,14 +351,14 @@ class ProblemCommunityRepository:
             .first()
         )
 
-    def add_like(self, solution_id: int, user_id: int) -> ProblemSolutionLike:
+    def add_like(self, solution_id: int, user_id: int) -> ProblemSolutionLikeRecord:
         like = ProblemSolutionLike(solution_id=solution_id, user_id=user_id)
         self._db.add(like)
         self._db.flush()
-        return like
+        return _to_problem_solution_like_record(like)
 
-    def remove_like(self, like: ProblemSolutionLike) -> None:
-        self._db.delete(like)
+    def remove_like(self, like: ProblemSolutionLikeRecord) -> None:
+        self._db.delete(self._db.get(ProblemSolutionLike, like.id))
         self._db.flush()
 
     def list_likers(self, solution_id: int) -> list[int]:
@@ -309,8 +371,10 @@ class ProblemCommunityRepository:
 
     # -- 收藏 --
 
-    def get_favorite(self, solution_id: int, user_id: int) -> Optional[ProblemSolutionFavorite]:
-        return (
+    def get_favorite(
+        self, solution_id: int, user_id: int
+    ) -> Optional[ProblemSolutionFavoriteRecord]:
+        return _to_problem_solution_favorite_record(
             self._db.query(ProblemSolutionFavorite)
             .filter(
                 ProblemSolutionFavorite.solution_id == solution_id,
@@ -319,14 +383,16 @@ class ProblemCommunityRepository:
             .first()
         )
 
-    def add_favorite(self, solution_id: int, user_id: int) -> ProblemSolutionFavorite:
+    def add_favorite(
+        self, solution_id: int, user_id: int
+    ) -> ProblemSolutionFavoriteRecord:
         fav = ProblemSolutionFavorite(solution_id=solution_id, user_id=user_id)
         self._db.add(fav)
         self._db.flush()
-        return fav
+        return _to_problem_solution_favorite_record(fav)
 
-    def remove_favorite(self, fav: ProblemSolutionFavorite) -> None:
-        self._db.delete(fav)
+    def remove_favorite(self, fav: ProblemSolutionFavoriteRecord) -> None:
+        self._db.delete(self._db.get(ProblemSolutionFavorite, fav.id))
         self._db.flush()
 
     def list_favorites_for_user(self, user_id: int) -> list[ProblemSolutionFavorite]:
@@ -340,23 +406,29 @@ class ProblemCommunityRepository:
 
     def create_comment(
         self, *, solution_id: int, user_id: int, content: str
-    ) -> ProblemSolutionComment:
+    ) -> ProblemSolutionCommentRecord:
         comment = ProblemSolutionComment(
             solution_id=solution_id, user_id=user_id, content=content
         )
         self._db.add(comment)
         self._db.flush()
-        return comment
+        return _to_problem_solution_comment_record(comment)
 
-    def get_comment_by_id(self, comment_id: int) -> Optional[ProblemSolutionComment]:
-        return self._db.get(ProblemSolutionComment, comment_id)
+    def get_comment_by_id(
+        self, comment_id: int
+    ) -> Optional[ProblemSolutionCommentRecord]:
+        return _to_problem_solution_comment_record(
+            self._db.get(ProblemSolutionComment, comment_id)
+        )
 
     def list_comments(
         self, solution_id: int, page: int = 1, page_size: int = 50
-    ) -> tuple[list[ProblemSolutionComment], int]:
-        query = self._db.query(ProblemSolutionComment).options(
-            selectinload(ProblemSolutionComment.user)
-        ).filter(ProblemSolutionComment.solution_id == solution_id)
+    ) -> tuple[list[ProblemSolutionCommentRecord], int]:
+        query = (
+            self._db.query(ProblemSolutionComment)
+            .options(selectinload(ProblemSolutionComment.user))
+            .filter(ProblemSolutionComment.solution_id == solution_id)
+        )
         total = query.count()
         rows = (
             query.order_by(ProblemSolutionComment.created_at.asc())
@@ -364,26 +436,31 @@ class ProblemCommunityRepository:
             .limit(page_size)
             .all()
         )
-        return rows, total
+        return ([_to_problem_solution_comment_record(row) for row in (rows)], total)
 
-    def delete_comment(self, comment: ProblemSolutionComment) -> None:
-        self._db.delete(comment)
+    def delete_comment(self, comment: ProblemSolutionCommentRecord) -> None:
+        self._db.delete(self._db.get(ProblemSolutionComment, comment.id))
         self._db.flush()
 
     # -- 标签 --
 
-    def get_tag_by_id(self, tag_id: int) -> Optional[ProblemTag]:
-        return self._db.get(ProblemTag, tag_id)
+    def get_tag_by_id(self, tag_id: int) -> Optional[ProblemTagRecord]:
+        return _to_problem_tag_record(self._db.get(ProblemTag, tag_id))
 
-    def get_tag_by_slug(self, slug: str) -> Optional[ProblemTag]:
-        return self._db.query(ProblemTag).filter(ProblemTag.slug == slug).first()
-
-    def list_tags(self) -> list[ProblemTag]:
-        return (
-            self._db.query(ProblemTag)
-            .order_by(ProblemTag.category, ProblemTag.name)
-            .all()
+    def get_tag_by_slug(self, slug: str) -> Optional[ProblemTagRecord]:
+        return _to_problem_tag_record(
+            self._db.query(ProblemTag).filter(ProblemTag.slug == slug).first()
         )
+
+    def list_tags(self) -> list[ProblemTagRecord]:
+        return [
+            _to_problem_tag_record(row)
+            for row in (
+                self._db.query(ProblemTag)
+                .order_by(ProblemTag.category, ProblemTag.name)
+                .all()
+            )
+        ]
 
     def create_tag(
         self,
@@ -392,42 +469,45 @@ class ProblemCommunityRepository:
         name: str,
         category: Optional[str],
         description: Optional[str],
-    ) -> ProblemTag:
+    ) -> ProblemTagRecord:
         tag = ProblemTag(
             slug=slug, name=name, category=category, description=description
         )
         self._db.add(tag)
         self._db.flush()
-        return tag
+        return _to_problem_tag_record(tag)
 
-    def get_problem_exists(self, problem_id: int) -> Optional[Problem]:
+    def get_problem_exists(self, problem_id: int) -> Optional[ProblemRecord]:
 
+        from app.persistence.problem import _to_problem_record
         from app.persistence.problem import Problem
-        return self._db.get(Problem, problem_id)
 
-    def get_tag_map(self, problem_id: int, tag_id: int) -> Optional[ProblemTagMap]:
-        return (
+        return _to_problem_record(self._db.get(Problem, problem_id))
+
+    def get_tag_map(
+        self, problem_id: int, tag_id: int
+    ) -> Optional[ProblemTagMapRecord]:
+        return _to_problem_tag_map_record(
             self._db.query(ProblemTagMap)
             .filter(
-                ProblemTagMap.problem_id == problem_id,
-                ProblemTagMap.tag_id == tag_id,
+                ProblemTagMap.problem_id == problem_id, ProblemTagMap.tag_id == tag_id
             )
             .first()
         )
 
     def create_tag_map(
         self, *, problem_id: int, tag_id: int, approved: bool
-    ) -> ProblemTagMap:
+    ) -> ProblemTagMapRecord:
         link = ProblemTagMap(problem_id=problem_id, tag_id=tag_id, approved=approved)
         self._db.add(link)
         self._db.flush()
-        return link
+        return _to_problem_tag_map_record(link)
 
-    def delete_tag_map(self, link: ProblemTagMap) -> None:
-        self._db.delete(link)
+    def delete_tag_map(self, link: ProblemTagMapRecord) -> None:
+        self._db.delete(self._db.get(ProblemTagMap, link.id))
         self._db.flush()
 
-    def list_tags_for_problem(self, problem_id: int) -> list[ProblemTag]:
+    def list_tags_for_problem(self, problem_id: int) -> list[ProblemTagRecord]:
         rows = (
             self._db.query(ProblemTag)
             .join(ProblemTagMap, ProblemTagMap.tag_id == ProblemTag.id)
@@ -435,7 +515,7 @@ class ProblemCommunityRepository:
             .order_by(ProblemTag.name)
             .all()
         )
-        return rows
+        return [_to_problem_tag_record(row) for row in (rows)]
 
     def list_problem_ids_by_tag(self, tag_id: int) -> list[int]:
         rows = (
@@ -449,10 +529,11 @@ class ProblemCommunityRepository:
         return [r[0] for r in rows]
 
 
-def from_solution_orm(solution, *, viewer_id: int | None = None) -> SolutionDetail:
+def to_solution_detail(solution, *, viewer_id: int | None = None) -> SolutionDetail:
     """题解 ORM → 详情；liked_by_me / favorited_by_me 视调用方预取的 viewer_id 是否点赞/收藏决定。"""
 
     from app.services.community import SolutionDetail
+
     liked_by_me = False
     favorited_by_me = False
     if viewer_id is not None and solution.likes is not None:
@@ -480,10 +561,11 @@ def from_solution_orm(solution, *, viewer_id: int | None = None) -> SolutionDeta
     )
 
 
-def from_solution_list_orm(solution) -> SolutionListItem:
+def to_solution_list_item(solution) -> SolutionListItem:
     """题解 ORM → 列表项（不含正文）。"""
 
     from app.services.community import SolutionListItem
+
     return SolutionListItem(
         id=solution.id,
         problem_id=solution.problem_id,
@@ -498,9 +580,10 @@ def from_solution_list_orm(solution) -> SolutionListItem:
     )
 
 
-def from_comment_orm(comment) -> CommentDetail:
+def to_comment_detail(comment) -> CommentDetail:
 
     from app.services.community import CommentDetail
+
     return CommentDetail(
         id=comment.id,
         solution_id=comment.solution_id,
@@ -511,13 +594,128 @@ def from_comment_orm(comment) -> CommentDetail:
     )
 
 
-def from_tag_orm(tag) -> TagDetail:
+def to_tag_detail(tag) -> TagDetail:
 
     from app.services.community import TagDetail
+
     return TagDetail(
         id=tag.id,
         slug=tag.slug,
         name=tag.name,
         category=tag.category,
         description=tag.description,
+    )
+
+
+def _to_problem_solution_record(
+    row: ProblemSolution | None,
+) -> ProblemSolutionRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.community import ProblemSolutionRecord
+    from app.persistence.user import _to_user_record
+
+    if row is None or isinstance(row, ProblemSolutionRecord):
+        return row
+    return ProblemSolutionRecord(
+        id=row.id,
+        problem_id=row.problem_id,
+        author_id=row.author_id,
+        title=row.title,
+        content=row.content,
+        language=row.language,
+        is_official=row.is_official,
+        status=row.status,
+        vote_count=row.vote_count,
+        comment_count=row.comment_count,
+        view_count=row.view_count,
+        favorite_count=row.favorite_count,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        author=_to_user_record(row.author),
+        likes=[_to_problem_solution_like_record(item) for item in row.likes],
+        favorites=[
+            _to_problem_solution_favorite_record(item) for item in row.favorites
+        ],
+    )
+
+
+def _to_problem_solution_comment_record(
+    row: ProblemSolutionComment | None,
+) -> ProblemSolutionCommentRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.community import ProblemSolutionCommentRecord
+    from app.persistence.user import _to_user_record
+
+    if row is None or isinstance(row, ProblemSolutionCommentRecord):
+        return row
+    return ProblemSolutionCommentRecord(
+        id=row.id,
+        solution_id=row.solution_id,
+        user_id=row.user_id,
+        content=row.content,
+        created_at=row.created_at,
+        user=_to_user_record(row.user),
+    )
+
+
+def _to_problem_solution_like_record(
+    row: ProblemSolutionLike | None,
+) -> ProblemSolutionLikeRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.community import ProblemSolutionLikeRecord
+
+    if row is None or isinstance(row, ProblemSolutionLikeRecord):
+        return row
+    return ProblemSolutionLikeRecord(
+        id=row.id,
+        solution_id=row.solution_id,
+        user_id=row.user_id,
+        created_at=row.created_at,
+    )
+
+
+def _to_problem_solution_favorite_record(
+    row: ProblemSolutionFavorite | None,
+) -> ProblemSolutionFavoriteRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.community import ProblemSolutionFavoriteRecord
+
+    if row is None or isinstance(row, ProblemSolutionFavoriteRecord):
+        return row
+    return ProblemSolutionFavoriteRecord(
+        id=row.id,
+        solution_id=row.solution_id,
+        user_id=row.user_id,
+        created_at=row.created_at,
+    )
+
+
+def _to_problem_tag_record(row: ProblemTag | None) -> ProblemTagRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.community import ProblemTagRecord
+
+    if row is None or isinstance(row, ProblemTagRecord):
+        return row
+    return ProblemTagRecord(
+        id=row.id,
+        slug=row.slug,
+        name=row.name,
+        category=row.category,
+        description=row.description,
+        created_at=row.created_at,
+    )
+
+
+def _to_problem_tag_map_record(row: ProblemTagMap | None) -> ProblemTagMapRecord | None:
+    """在数据库边界复制字段和必要关系。"""
+    from app.services.community import ProblemTagMapRecord
+
+    if row is None or isinstance(row, ProblemTagMapRecord):
+        return row
+    return ProblemTagMapRecord(
+        id=row.id,
+        problem_id=row.problem_id,
+        tag_id=row.tag_id,
+        approved=row.approved,
+        created_at=row.created_at,
     )

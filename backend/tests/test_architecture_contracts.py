@@ -12,7 +12,8 @@ def test_repositories_do_not_commit_or_rollback():
         forbidden = [
             node.lineno
             for repository in tree.body
-            if isinstance(repository, ast.ClassDef) and repository.name.endswith("Repository")
+            if isinstance(repository, ast.ClassDef)
+            and repository.name.endswith("Repository")
             for node in ast.walk(repository)
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -31,12 +32,19 @@ def test_reviewed_services_do_not_reach_into_database():
         "problem",
         "debug",
         "dataset",
+        "community",
+        "wrong_book",
+        "user",
+        "auth",
+        "exam",
+        "search",
+        "async_job",
     ):
         tree = ast.parse((APP / "services" / f"{name}.py").read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
                 assert not (node.module or "").startswith(
-                    ("app.persistence.database", "app.models")
+                    ("app.persistence.database", "sqlalchemy.orm")
                 ), name
             if isinstance(node, ast.Attribute):
                 assert node.attr not in {"_db", "query"}, name
@@ -67,13 +75,7 @@ def test_service_public_dict_results_are_limited_to_json_boundary():
 
 def test_http_routes_declare_response_contracts():
     for path in (APP / "api").glob("*.py"):
-        tree = ast.parse(path.read_text())
-        for node in (
-            method
-            for service in tree.body
-            if isinstance(service, ast.ClassDef) and service.name.endswith("Service")
-            for method in service.body
-        ):
+        for node in ast.walk(ast.parse(path.read_text())):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             for decorator in node.decorator_list:
@@ -89,3 +91,49 @@ def test_http_routes_declare_response_contracts():
                         path.name,
                         node.name,
                     )
+
+
+def test_removed_packages_and_compatibility_layers_stay_removed():
+    for name in (
+        "domain",
+        "models",
+        "repositories",
+        "mappers.py",
+        "database.py",
+        "config.py",
+    ):
+        assert not (APP / name).exists(), name
+    assert not list((APP / "services").glob("*_service.py"))
+    for path in APP.rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.ImportFrom):
+                assert not (node.module or "").startswith(
+                    ("app.domain", "app.models", "app.repositories", "app.mappers")
+                ), path
+
+
+def test_persistence_registry_has_all_expected_tables():
+    from app.persistence.database import Base
+
+    assert set(Base.metadata.tables) == {
+        "users",
+        "problems",
+        "submissions",
+        "exams",
+        "exam_problems",
+        "datasets",
+        "ai_drafts",
+        "async_jobs",
+        "debug_runs",
+        "plagiarism_reports",
+        "audit_logs",
+        "sys_dict",
+        "search_history",
+        "wrong_books",
+        "problem_tags",
+        "problem_tag_maps",
+        "problem_solutions",
+        "problem_solution_likes",
+        "problem_solution_favorites",
+        "problem_solution_comments",
+    }

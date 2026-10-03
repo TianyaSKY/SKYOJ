@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 from typing import Optional
 
 
@@ -57,9 +56,37 @@ class AsyncJobResult:
     updated_at: Optional[datetime]
 
 
+@dataclass
+class AsyncJobRecord:
+    """AsyncJob 的数据库快照；不携带 ORM 或 Session。"""
+
+    id: int
+    task_name: str
+    queue: str
+    payload: str
+    status: str
+    dedupe_key: str | None
+    attempts: int
+    max_attempts: int
+    lease_until: datetime | None
+    available_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    last_error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 from app.messaging.queues import AI_QUEUE, FILE_QUEUE, JUDGE_QUEUE
-from app.messaging.task_names import DEBUG_SUBMISSION_TASK, EXECUTE_TEST_DATA_TASK, FINALIZE_DATASET_TASK, GENERATE_PROBLEM_TASK, GENERATE_TEST_SCRIPT_TASK, JUDGE_SUBMISSION_TASK
-from app.persistence.jobs import AsyncJobRepository, from_async_job_orm
+from app.messaging.task_names import (
+    DEBUG_SUBMISSION_TASK,
+    EXECUTE_TEST_DATA_TASK,
+    FINALIZE_DATASET_TASK,
+    GENERATE_PROBLEM_TASK,
+    GENERATE_TEST_SCRIPT_TASK,
+    JUDGE_SUBMISSION_TASK,
+)
+from app.persistence.jobs import AsyncJobRepository, to_async_job_result
 
 
 class AsyncJobService:
@@ -68,17 +95,12 @@ class AsyncJobService:
     def __init__(self, repository: AsyncJobRepository) -> None:
         self._repository = repository
 
-    @classmethod
-    def from_session(cls, db: Session) -> "AsyncJobService":
-        """从数据库会话构造服务。"""
-        return cls(AsyncJobRepository(db))
-
     def enqueue(self, params: CreateAsyncJobParams) -> AsyncJobResult:
         """创建任务并直接投递给 RabbitMQ；重复幂等键直接返回原任务。"""
         if params.dedupe_key:
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is not None:
-                return from_async_job_orm(existing)
+                return to_async_job_result(existing)
 
         available_at = params.available_at or utcnow()
         try:
@@ -98,7 +120,7 @@ class AsyncJobService:
             existing = self._repository.get_by_dedupe_key(params.dedupe_key)
             if existing is None:
                 raise
-            return from_async_job_orm(existing)
+            return to_async_job_result(existing)
         logger.info(
             "已创建异步任务 job_id={} task={} queue={}",
             job.id,
@@ -113,7 +135,7 @@ class AsyncJobService:
             self._repository.unit_of_work.commit()
             logger.exception("发布异步任务失败 job_id={} queue={}", job.id, job.queue)
             raise
-        return from_async_job_orm(job)
+        return to_async_job_result(job)
 
     def _publish(self, job, *, countdown: int | None = None) -> None:
         """向 Celery 投递任务消息；消息体只包含任务 ID。"""
@@ -201,13 +223,13 @@ class AsyncJobService:
             lease_until=now + timedelta(seconds=max(1, lease_seconds)),
         )
         self._repository.unit_of_work.commit()
-        return from_async_job_orm(job) if job is not None else None
+        return to_async_job_result(job) if job is not None else None
 
     def complete_job(self, job_id: int) -> AsyncJobResult | None:
         """标记任务成功。"""
         job = self._repository.mark_succeeded(job_id, now=utcnow())
         self._repository.unit_of_work.commit()
-        return from_async_job_orm(job) if job is not None else None
+        return to_async_job_result(job) if job is not None else None
 
     def fail_job(
         self,
@@ -249,7 +271,7 @@ class AsyncJobService:
                         job_id,
                         failed.queue,
                     )
-        return from_async_job_orm(failed) if failed is not None else None
+        return to_async_job_result(failed) if failed is not None else None
 
     def recover_expired_jobs(self, *, limit: int = 100) -> int:
         """恢复过期租约任务并重新投递。"""

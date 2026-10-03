@@ -29,7 +29,7 @@ def _handle_finalize_dataset(db: Session, payload: dict[str, Any]):
     service = DatasetService(
         dataset_repository=DatasetRepository(db),
         storage_client=DatasetStorageClient(),
-        job_service=AsyncJobService.from_session(db),
+        job_service=AsyncJobService(AsyncJobRepository(db)),
     )
     return service.finalize_dataset(int(payload["dataset_id"]))
 

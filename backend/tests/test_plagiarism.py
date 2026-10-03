@@ -96,7 +96,7 @@ class TestPlagiarismService:
         mock_job_service.enqueue.return_value = MagicMock(id=42)
 
         with patch(
-            "app.services.plagiarism.AsyncJobService.from_session",
+            "app.services.plagiarism.AsyncJobService",
             return_value=mock_job_service,
         ):
             service = PlagiarismService(
