@@ -129,3 +129,30 @@ it('旧 CSV 上传完成后不能为新题目启动结果订阅', async () => {
   expect(createSubmissionWS).not.toHaveBeenCalled()
   expect(wrapper.vm.submitting).toBe(false)
 })
+it('收到结果后的正常关闭和网络错误都不能隐藏成绩或详情入口', async () => {
+  mountPage(); await flushPromises()
+  wrapper.vm.startRealtimeWait(10)
+  const callbacks = createSubmissionWS.mock.calls[0][2]
+  callbacks.onMessage({ submission_id: 10, status: 'Accepted', score: 100 })
+  callbacks.onClose({ code: 1000 })
+  callbacks.onError(new Error('connection already closed'))
+  callbacks.onReconnect(1)
+  await nextTick()
+  expect(wrapper.vm.realtimeStatus).toBe('received')
+  expect(wrapper.find('.realtime-toast').text()).toContain('判题完成：Accepted')
+  expect(wrapper.find('.realtime-toast').text()).toContain('得分 100.0')
+  expect(wrapper.vm.realtimeResult.submission_id).toBe(10)
+})
+it('尚未收到结果时重连恢复等待提示，旧页重连不影响新页面', async () => {
+  mountPage(); await flushPromises()
+  wrapper.vm.startRealtimeWait(10)
+  const callbacks = createSubmissionWS.mock.calls[0][2]
+  callbacks.onClose({ code: 1006 })
+  expect(wrapper.vm.realtimeStatus).toBe('closed')
+  callbacks.onReconnect(1)
+  expect(wrapper.vm.realtimeStatus).toBe('pending')
+  state.route.params.id = '2'
+  await nextTick(); await flushPromises()
+  callbacks.onReconnect(2)
+  expect(wrapper.vm.realtimeStatus).toBe('idle')
+})

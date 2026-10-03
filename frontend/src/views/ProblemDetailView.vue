@@ -314,11 +314,16 @@ function startRealtimeWait(submissionId) {
     },
     onError: () => {
       if (!isCurrentPage(version)) return
-      realtimeStatus.value = 'closed'
+      if (!realtimeResult.value) realtimeStatus.value = 'closed'
     },
     onClose: () => {
       if (!isCurrentPage(version)) return
-      realtimeStatus.value = 'closed'
+      // 服务端发送结果后会正常关闭连接，不能因此隐藏已收到的成绩。
+      if (!realtimeResult.value) realtimeStatus.value = 'closed'
+    },
+    onReconnect: () => {
+      if (!isCurrentPage(version)) return
+      if (!realtimeResult.value) realtimeStatus.value = 'pending'
     },
   })
   activeWS.connect()
