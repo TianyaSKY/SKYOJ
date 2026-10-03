@@ -184,3 +184,59 @@ it('评论发送失败解除发送锁，允许使用保留的输入重试', asyn
   expect(wrapper.vm.currentSolution.comment_count).toBe(1)
   expect(wrapper.vm.newComment).toBe('')
 })
+
+it.each([
+  ['toggleLike', 'pendingLikes', { liked: true, vote_count: 1 }, 'liked_by_me'],
+  ['toggleFavorite', 'pendingFavorites', { favorited: true }, 'favorited_by_me'],
+])('%s 在同一题解请求完成前阻止重复切换，完成后允许再次操作', async (method, pending, response, field) => {
+  const post = deferred()
+  mountPage(); await flushPromises()
+  request.mockImplementation(config => config.method === 'post' ? post.promise : Promise.resolve({ items: [], total: 0 }))
+  const item = solution(1)
+  const first = wrapper.vm[method](item)
+  await wrapper.vm[method]({ ...item })
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(1)
+  expect(wrapper.vm[pending].has(1)).toBe(true)
+  post.resolve(response); await first
+  expect(item[field]).toBe(true)
+  expect(wrapper.vm[pending].has(1)).toBe(false)
+  await wrapper.vm[method](item)
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(2)
+})
+it.each(['toggleLike', 'toggleFavorite'])('%s 失败后允许重试', async method => {
+  mountPage(); await flushPromises()
+  request.mockRejectedValueOnce(new Error('failed')).mockResolvedValueOnce({ liked: true, favorited: true, vote_count: 1 })
+  const item = solution(1)
+  await wrapper.vm[method](item)
+  await wrapper.vm[method](item)
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(2)
+  expect(ElMessage.error).toHaveBeenCalledWith('failed')
+})
+it('不同题解和不同关系的请求互不阻塞', async () => {
+  const post = deferred()
+  mountPage(); await flushPromises()
+  request.mockReturnValue(post.promise)
+  const first = wrapper.vm.toggleLike(solution(1))
+  const second = wrapper.vm.toggleLike(solution(2))
+  const favorite = wrapper.vm.toggleFavorite(solution(1))
+  expect(request.mock.calls.filter(([config]) => config.method === 'post')).toHaveLength(3)
+  post.resolve({ liked: true, favorited: true, vote_count: 1 })
+  await Promise.all([first, second, favorite])
+})
+it.each([
+  ['toggleLike', 'pendingLikes'],
+  ['toggleFavorite', 'pendingFavorites'],
+])('%s 旧题目请求结束不能解除新题目的等待状态', async (method, pending) => {
+  const old = deferred(), current = deferred()
+  mountPage(); await flushPromises()
+  request.mockImplementation(config => config.method === 'post' ? old.promise : Promise.resolve({ items: [], total: 0 }))
+  const first = wrapper.vm[method](solution(1))
+  await wrapper.setProps({ problemId: 2 }); await flushPromises()
+  request.mockImplementation(config => config.method === 'post' ? current.promise : Promise.resolve({ items: [], total: 0 }))
+  const second = wrapper.vm[method](solution(1))
+  old.reject(new Error('old failed')); await first
+  expect(wrapper.vm[pending].has(1)).toBe(true)
+  expect(ElMessage.error).not.toHaveBeenCalled()
+  current.resolve({ liked: true, favorited: true, vote_count: 1 }); await second
+  expect(wrapper.vm[pending].has(1)).toBe(false)
+})

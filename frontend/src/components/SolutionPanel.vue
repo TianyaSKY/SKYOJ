@@ -27,6 +27,8 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
 const loading = ref(false)
 const solutions = ref([])
+const pendingLikes = ref(new Set())
+const pendingFavorites = ref(new Set())
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
@@ -84,6 +86,8 @@ watch(() => props.problemId, () => {
   commentsVersion += 1
   page.value = 1
   solutions.value = []
+  pendingLikes.value.clear()
+  pendingFavorites.value.clear()
   total.value = 0
   writeDialogVisible.value = false
   editing.value = null
@@ -161,7 +165,9 @@ async function submitSolution () {
 }
 
 async function toggleLike (item) {
+  if (pendingLikes.value.has(item.id)) return
   const scope = scopeVersion
+  pendingLikes.value.add(item.id)
   try {
     const resp = await request({
       url: `/problems/solutions/${item.id}/like`,
@@ -172,11 +178,15 @@ async function toggleLike (item) {
     item.liked_by_me = resp.liked
   } catch (e) {
     if (isCurrentScope(scope)) ElMessage.error(e.message || '点赞失败')
+  } finally {
+    if (isCurrentScope(scope)) pendingLikes.value.delete(item.id)
   }
 }
 
 async function toggleFavorite (item) {
+  if (pendingFavorites.value.has(item.id)) return
   const scope = scopeVersion
+  pendingFavorites.value.add(item.id)
   try {
     const resp = await request({
       url: `/problems/solutions/${item.id}/favorite`,
@@ -186,6 +196,8 @@ async function toggleFavorite (item) {
     item.favorited_by_me = resp.favorited
   } catch (e) {
     if (isCurrentScope(scope)) ElMessage.error(e.message || '收藏失败')
+  } finally {
+    if (isCurrentScope(scope)) pendingFavorites.value.delete(item.id)
   }
 }
 
@@ -321,11 +333,11 @@ async function deleteComment (commentId) {
         </div>
         <div class="solution-body markdown-body" v-html="renderMarkdown(item.content)" />
         <div class="solution-actions">
-          <el-button :type="item.liked_by_me ? 'primary' : 'default'" size="small" @click="toggleLike(item)">
+          <el-button :type="item.liked_by_me ? 'primary' : 'default'" size="small" :loading="pendingLikes.has(item.id)" :disabled="pendingLikes.has(item.id)" @click="toggleLike(item)">
             <el-icon><Star /></el-icon>
             <span style="margin-left: 4px">{{ item.vote_count }}</span>
           </el-button>
-          <el-button :type="item.favorited_by_me ? 'warning' : 'default'" size="small" @click="toggleFavorite(item)">
+          <el-button :type="item.favorited_by_me ? 'warning' : 'default'" size="small" :loading="pendingFavorites.has(item.id)" :disabled="pendingFavorites.has(item.id)" @click="toggleFavorite(item)">
             <el-icon><StarFilled /></el-icon>
           </el-button>
           <el-button size="small" @click="openComments(item)">
