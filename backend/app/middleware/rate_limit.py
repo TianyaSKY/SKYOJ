@@ -9,6 +9,7 @@ import time
 from typing import Optional
 
 import redis
+from loguru import logger
 
 _REDIS_URL = os.getenv("REDIS_URL") or ""
 _client: Optional[redis.Redis] = None
@@ -32,23 +33,22 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
 
     返回 True 表示允许（计数未超），False 表示拒绝。
     """
-    client = _get_client()
-    if client is None:
-        return True
-
-    now = int(time.time())
-    bucket = now // window_seconds
-    redis_key = f"skyoj:ratelimit:{key}:{bucket}"
-
     try:
+        client = _get_client()
+        if client is None:
+            return True
+
+        now = int(time.time())
+        bucket = now // window_seconds
+        redis_key = f"skyoj:ratelimit:{key}:{bucket}"
         pipe = client.pipeline()
         pipe.incr(redis_key)
         pipe.expire(redis_key, window_seconds + 5)
         count, _ = pipe.execute()
-    except Exception:
+        return int(count) <= limit
+    except Exception as exc:
+        logger.warning("限流检查失败，降级放行 key={} error={}", key, exc)
         return True
-
-    return int(count) <= limit
 
 
 def enforce(key: str, limit: int, window_seconds: int) -> None:
