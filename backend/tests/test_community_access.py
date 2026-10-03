@@ -102,3 +102,52 @@ def test_student_can_repeat_unapproved_tag_suggestion(db_session, sample_problem
     repeated = repository.get_tag_map(sample_problem.id, tag.id)
     assert repeated.id == original.id
     assert repeated.approved is False
+
+
+def test_solution_list_includes_body_and_viewer_interaction_state(
+    client, db_session, student_token, teacher_token, student_user, sample_problem
+):
+    repository = ProblemCommunityRepository(db_session)
+    service = SolutionService(repository, uow=UnitOfWork(db_session))
+    solution = service.create(
+        CreateSolutionParams(sample_problem.id, student_user.id, "完整题解", "## 解法\n正文")
+    )
+    service.toggle_like(solution.id, student_user.id)
+    service.toggle_favorite(solution.id, student_user.id)
+    path = f"/api/problems/{sample_problem.id}/solutions"
+
+    response = client.get(path, headers={"Authorization": f"Bearer {student_token}"})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["content"] == "## 解法\n正文"
+    assert item["liked_by_me"] is True
+    assert item["favorited_by_me"] is True
+
+    response = client.get(path, headers={"Authorization": f"Bearer {teacher_token}"})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["content"] == "## 解法\n正文"
+    assert item["liked_by_me"] is False
+    assert item["favorited_by_me"] is False
+    assert repository.get_solution_by_id(solution.id).view_count == 0
+
+
+def test_solution_list_excludes_hidden_body_and_interactions(
+    client, db_session, student_token, student_user, sample_problem
+):
+    service = SolutionService(
+        ProblemCommunityRepository(db_session), uow=UnitOfWork(db_session)
+    )
+    solution = service.create(
+        CreateSolutionParams(sample_problem.id, student_user.id, "隐藏题解", "隐藏正文")
+    )
+    service.hide(solution.id, student_user.id, "student")
+
+    response = client.get(
+        f"/api/problems/{sample_problem.id}/solutions",
+        headers={"Authorization": f"Bearer {student_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert response.json()["items"] == []

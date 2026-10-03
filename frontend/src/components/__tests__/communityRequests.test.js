@@ -141,4 +141,30 @@ describe('社区组件的 API 请求路径', () => {
     await flushPromises()
     expect(wrapper.vm.userInfo.id).toBe(2)
   })
+
+  it('列表返回正文和交互状态后，题解可展示并保留原文编辑', async () => {
+    const item = {
+      id: 7, author_id: 1, title: '完整题解', content: '## 解法\n原文',
+      liked_by_me: true, favorited_by_me: true, vote_count: 1, comment_count: 0,
+    }
+    request.defaults.adapter = config => Promise.resolve({
+      data: {items: [item], total: 1}, status: 200, statusText: 'OK', headers: {}, config,
+    })
+    wrapper = shallowMount(SolutionPanel, {
+      ...mountOptions,
+      global: {
+        stubs: {
+          ...mountOptions.global.stubs,
+          'el-card': {template: '<div><slot /></div>'},
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.solution-body').html()).toContain('<h2>解法</h2>')
+    expect(wrapper.vm.solutions[0].liked_by_me).toBe(true)
+    expect(wrapper.vm.solutions[0].favorited_by_me).toBe(true)
+    wrapper.vm.openWrite(wrapper.vm.solutions[0])
+    expect(wrapper.vm.form.content).toBe('## 解法\n原文')
+  })
 })

@@ -54,6 +54,9 @@ def list_solutions(
                 vote_count=i.vote_count,
                 comment_count=i.comment_count,
                 created_at=i.created_at,
+                content=i.content,
+                liked_by_me=i.liked_by_me,
+                favorited_by_me=i.favorited_by_me,
             )
             for i in items
         ],

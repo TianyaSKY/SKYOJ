@@ -32,6 +32,9 @@ class SolutionListItemResponse(BaseModel):
     vote_count: int
     comment_count: int
     created_at: Optional[datetime]
+    content: str
+    liked_by_me: bool
+    favorited_by_me: bool
 
 
 class SolutionDetailResponse(BaseModel):

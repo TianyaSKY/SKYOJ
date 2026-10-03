@@ -69,7 +69,7 @@ class SolutionDetail:
 
 @dataclass(frozen=True)
 class SolutionListItem:
-    """题解列表项（不含正文）。"""
+    """供题解面板直接展示、编辑的列表项。"""
 
     id: int
     problem_id: int
@@ -81,6 +81,9 @@ class SolutionListItem:
     vote_count: int
     comment_count: int
     created_at: Optional[datetime]
+    content: str
+    liked_by_me: bool
+    favorited_by_me: bool
 
 
 @dataclass(frozen=True)
@@ -236,7 +239,7 @@ class SolutionService:
         rows, total = self._repo.list_solutions(
             problem_id=problem_id, only_published=True, page=page, page_size=page_size
         )
-        return [to_solution_list_item(row) for row in rows], total
+        return [to_solution_list_item(row, viewer_id=viewer_id) for row in rows], total
 
     # -- 点赞 --
 
@@ -417,8 +420,10 @@ def to_solution_detail(
     )
 
 
-def to_solution_list_item(solution: ProblemSolutionRecord) -> SolutionListItem:
-    """题解 快照 → 列表项（不含正文）。"""
+def to_solution_list_item(
+    solution: ProblemSolutionRecord, *, viewer_id: int
+) -> SolutionListItem:
+    """题解快照转为列表项，复用已预取的点赞和收藏关系。"""
 
     return SolutionListItem(
         id=solution.id,
@@ -431,6 +436,9 @@ def to_solution_list_item(solution: ProblemSolutionRecord) -> SolutionListItem:
         vote_count=solution.vote_count or 0,
         comment_count=solution.comment_count or 0,
         created_at=solution.created_at,
+        content=solution.content,
+        liked_by_me=any(like.user_id == viewer_id for like in solution.likes or []),
+        favorited_by_me=any(fav.user_id == viewer_id for fav in solution.favorites or []),
     )
 
 
