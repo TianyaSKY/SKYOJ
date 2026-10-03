@@ -1,0 +1,112 @@
+// 使用真实 Axios 实例验证组件请求经过 baseURL 拼接后的地址。
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, shallowMount } from '@vue/test-utils'
+
+vi.mock('@/router', () => ({ default: {} }))
+vi.mock('element-plus', () => ({
+  ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  ElMessageBox: { confirm: vi.fn() },
+}))
+
+import request from '@/utils/request'
+import TagPanel from '../TagPanel.vue'
+import SolutionPanel from '../SolutionPanel.vue'
+import { ElMessageBox } from 'element-plus'
+
+const originalAdapter = request.defaults.adapter
+let urls
+let wrapper
+let calls
+const mountOptions = {
+  props: { problemId: 42 },
+  global: { stubs: Object.fromEntries([
+    'el-tag', 'el-icon', 'el-button', 'el-option', 'el-select', 'el-form-item',
+    'el-form', 'el-dialog', 'el-checkbox', 'el-card', 'el-empty', 'el-input',
+    'el-skeleton', 'el-pagination', 'Plus',
+  ].map(name => [name, true])) },
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  urls = []
+  calls = []
+  ElMessageBox.confirm.mockResolvedValue('confirm')
+  request.defaults.adapter = config => {
+    urls.push(request.getUri(config))
+    calls.push([config.method, request.getUri(config)])
+    return Promise.resolve({
+      data: config.url.includes('solutions') ? { items: [], total: 0 } : [],
+      status: 200, statusText: 'OK', headers: {}, config,
+    })
+  }
+})
+
+afterEach(() => {
+  wrapper?.unmount()
+  request.defaults.adapter = originalAdapter
+})
+
+describe('社区组件的 API 请求路径', () => {
+  it('标签面板只添加一次 API 前缀', async () => {
+    wrapper = shallowMount(TagPanel, mountOptions)
+    await flushPromises()
+    expect(urls).toEqual(['/api/tags/problems/42', '/api/tags'])
+  })
+
+  it('题解面板只添加一次 API 前缀且保留分页参数', async () => {
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    expect(urls).toEqual(['/api/problems/42/solutions?page=1&page_size=20'])
+  })
+
+  it('挂标签和移除标签也只添加一次 API 前缀', async () => {
+    wrapper = shallowMount(TagPanel, mountOptions)
+    await flushPromises()
+    wrapper.vm.selectedTagId = 7
+    await wrapper.vm.confirmAttach()
+    await wrapper.vm.detach({id: 7, name: '数组'})
+    await flushPromises()
+    expect(calls).toContainEqual(['post', '/api/tags/problems/42/attach'])
+    expect(calls).toContainEqual(['delete', '/api/tags/problems/42/7'])
+    expect(urls.every(url => !url.startsWith('/api/api/'))).toBe(true)
+  })
+
+  it('题解点赞、收藏和评论读取使用后端真实路径', async () => {
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    const item = {id: 7, comment_count: 0}
+    await wrapper.vm.toggleLike(item)
+    await wrapper.vm.toggleFavorite(item)
+    await wrapper.vm.openComments(item)
+    await flushPromises()
+    expect(calls).toContainEqual(['post', '/api/problems/solutions/7/like'])
+    expect(calls).toContainEqual(['post', '/api/problems/solutions/7/favorite'])
+    expect(calls).toContainEqual(['get', '/api/problems/solutions/7/comments?page=1&page_size=50'])
+    expect(urls.every(url => !url.startsWith('/api/api/'))).toBe(true)
+  })
+
+  it('题解发布、修改、隐藏和评论写入使用后端真实路径', async () => {
+    wrapper = shallowMount(SolutionPanel, mountOptions)
+    await flushPromises()
+    wrapper.vm.openWrite()
+    wrapper.vm.form.title = '题解'
+    wrapper.vm.form.content = '解法'
+    await wrapper.vm.submitSolution()
+    const item = {id: 7, title: '题解', content: '解法', comment_count: 1}
+    wrapper.vm.openWrite(item)
+    await wrapper.vm.submitSolution()
+    await wrapper.vm.hideSolution(item)
+    await wrapper.vm.openComments(item)
+    wrapper.vm.newComment = '评论'
+    await wrapper.vm.submitComment()
+    await wrapper.vm.deleteComment(8)
+    await flushPromises()
+
+    expect(calls).toContainEqual(['post', '/api/problems/42/solutions'])
+    expect(calls).toContainEqual(['put', '/api/problems/solutions/7'])
+    expect(calls).toContainEqual(['delete', '/api/problems/solutions/7'])
+    expect(calls).toContainEqual(['post', '/api/problems/solutions/7/comments'])
+    expect(calls).toContainEqual(['delete', '/api/problems/comments/8'])
+    expect(urls.every(url => !url.startsWith('/api/api/'))).toBe(true)
+  })
+})

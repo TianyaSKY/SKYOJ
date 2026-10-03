@@ -31,8 +31,8 @@ async function load () {
   loading.value = true
   try {
     const [a, b] = await Promise.all([
-      request({ url: `/api/tags/problems/${props.problemId}`, method: 'get' }),
-      request({ url: `/api/tags`, method: 'get' })
+      request({ url: `/tags/problems/${props.problemId}`, method: 'get' }),
+      request({ url: `/tags`, method: 'get' })
     ])
     attached.value = a || []
     all.value = b || []
@@ -59,7 +59,7 @@ async function confirmAttach () {
   }
   try {
     await request({
-      url: `/api/tags/problems/${props.problemId}/attach`,
+      url: `/tags/problems/${props.problemId}/attach`,
       method: 'post',
       data: { tag_id: selectedTagId.value, approved: approved.value }
     })
@@ -75,7 +75,7 @@ async function detach (tag) {
   try {
     await ElMessageBox.confirm(`从该题目移除标签「${tag.name}」？`, '确认移除', { type: 'warning' })
     await request({
-      url: `/api/tags/problems/${props.problemId}/${tag.id}`,
+      url: `/tags/problems/${props.problemId}/${tag.id}`,
       method: 'delete'
     })
     ElMessage.success('已移除')

@@ -248,7 +248,7 @@ const fetchProblems = async () => {
 
 const fetchTags = async () => {
   try {
-    const res = await request({ url: '/api/tags', method: 'get' })
+    const res = await request({ url: '/tags', method: 'get' })
     allTags.value = res || []
   } catch {
     // 标签加载失败不影响题目列表

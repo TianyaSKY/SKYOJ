@@ -245,8 +245,8 @@ const fetchWrongBook = async () => {
   wbLoading.value = true
   try {
     const [statsRes, listRes] = await Promise.all([
-      request({ url: '/api/wrong-book/stats', method: 'get' }),
-      request({ url: '/api/wrong-book/', method: 'get', params: { page: 1, page_size: 10 } }),
+      request({ url: '/wrong-book/stats', method: 'get' }),
+      request({ url: '/wrong-book/', method: 'get', params: { page: 1, page_size: 10 } }),
     ])
     wbStats.value = statsRes
     wbItems.value = listRes.items || []
@@ -260,7 +260,7 @@ const fetchWrongBook = async () => {
 const toggleReview = async (item) => {
   try {
     const res = await request({
-      url: `/api/wrong-book/${item.id}/toggle-review`,
+      url: `/wrong-book/${item.id}/toggle-review`,
       method: 'post',
     })
     item.reviewed = res.reviewed

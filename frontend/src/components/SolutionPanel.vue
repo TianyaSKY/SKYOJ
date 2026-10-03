@@ -48,7 +48,7 @@ async function load () {
   loading.value = true
   try {
     const resp = await request({
-      url: `/api/problems/${props.problemId}/solutions`,
+      url: `/problems/${props.problemId}/solutions`,
       method: 'get',
       params: { page: page.value, page_size: pageSize }
     })
@@ -85,14 +85,14 @@ async function submitSolution () {
   try {
     if (editing.value) {
       await request({
-        url: `/api/problems/solutions/${editing.value.id}`,
+        url: `/problems/solutions/${editing.value.id}`,
         method: 'put',
         data: form.value
       })
       ElMessage.success('题解已更新')
     } else {
       await request({
-        url: `/api/problems/${props.problemId}/solutions`,
+        url: `/problems/${props.problemId}/solutions`,
         method: 'post',
         data: form.value
       })
@@ -108,7 +108,7 @@ async function submitSolution () {
 async function toggleLike (item) {
   try {
     const resp = await request({
-      url: `/api/problems/solutions/${item.id}/like`,
+      url: `/problems/solutions/${item.id}/like`,
       method: 'post'
     })
     item.vote_count = resp.vote_count
@@ -121,7 +121,7 @@ async function toggleLike (item) {
 async function toggleFavorite (item) {
   try {
     const resp = await request({
-      url: `/api/problems/solutions/${item.id}/favorite`,
+      url: `/problems/solutions/${item.id}/favorite`,
       method: 'post'
     })
     item.favorited_by_me = resp.favorited
@@ -133,7 +133,7 @@ async function toggleFavorite (item) {
 async function hideSolution (item) {
   try {
     await ElMessageBox.confirm('确定要隐藏该题解吗？隐藏后仅你自己与教师可见。', '确认隐藏', { type: 'warning' })
-    await request({ url: `/api/problems/solutions/${item.id}`, method: 'delete' })
+    await request({ url: `/problems/solutions/${item.id}`, method: 'delete' })
     ElMessage.success('已隐藏')
     load()
   } catch (e) {
@@ -154,7 +154,7 @@ async function loadComments (pageNo = 1) {
   if (!currentSolution.value) return
   try {
     const resp = await request({
-      url: `/api/problems/solutions/${currentSolution.value.id}/comments`,
+      url: `/problems/solutions/${currentSolution.value.id}/comments`,
       method: 'get',
       params: { page: pageNo, page_size: 50 }
     })
@@ -170,7 +170,7 @@ async function submitComment () {
   if (!text) return
   try {
     await request({
-      url: `/api/problems/solutions/${currentSolution.value.id}/comments`,
+      url: `/problems/solutions/${currentSolution.value.id}/comments`,
       method: 'post',
       data: { content: text }
     })
@@ -185,7 +185,7 @@ async function submitComment () {
 async function deleteComment (commentId) {
   try {
     await ElMessageBox.confirm('删除这条评论？', '确认', { type: 'warning' })
-    await request({ url: `/api/problems/comments/${commentId}`, method: 'delete' })
+    await request({ url: `/problems/comments/${commentId}`, method: 'delete' })
     ElMessage.success('已删除')
     currentSolution.value.comment_count = Math.max(0, currentSolution.value.comment_count - 1)
     await loadComments()

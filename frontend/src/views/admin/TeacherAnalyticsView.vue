@@ -148,7 +148,7 @@ const shortDate = (s) => s ? s.slice(5) : ''
 const fetchAnalytics = async () => {
   loading.value = true
   try {
-    const res = await request({ url: '/api/admin/analytics', method: 'get' })
+    const res = await request({ url: '/admin/analytics', method: 'get' })
     analyticsData.value = res
   } catch {
     ElMessage.error('获取学情数据失败')
