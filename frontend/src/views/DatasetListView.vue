@@ -8,7 +8,7 @@
               v-if="isTeacher"
               :icon="Upload"
               type="primary"
-              @click="uploadDialogVisible = true"
+              @click="openUpload"
           >
             上传数据集
           </el-button>
@@ -72,7 +72,7 @@
     </el-card>
 
     <!-- Upload Dialog -->
-    <el-dialog v-model="uploadDialogVisible" title="上传数据集" width="500px" @close="resetUploadForm">
+    <el-dialog v-model="uploadDialogVisible" title="上传数据集" width="500px">
       <el-form :model="uploadForm" label-position="top">
         <el-form-item label="数据集名称">
           <el-input v-model="uploadForm.name" placeholder="请输入数据集名称"></el-input>
@@ -86,6 +86,7 @@
               :auto-upload="false"
               :limit="1"
               :on-change="handleFileChange"
+              :on-remove="handleFileRemove"
               action="#"
           >
             <el-button type="primary">选择文件</el-button>
@@ -100,7 +101,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="uploadDialogVisible = false">取消</el-button>
-          <el-button :loading="uploading" type="primary" @click="handleUpload">
+          <el-button :loading="uploading" :disabled="uploading" type="primary" @click="handleUpload">
             确认上传
           </el-button>
         </span>
@@ -110,7 +111,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {useUserStore} from '@/stores/user'
 import {deleteDataset, downloadDataset, getDatasetList, uploadDataset} from '@/api/dataset'
 import {ElMessage} from 'element-plus'
@@ -125,6 +126,11 @@ const pageSize = ref(20)
 const uploadDialogVisible = ref(false)
 const uploading = ref(false)
 const uploadRef = ref(null)
+let uploadVersion = 0
+let listVersion = 0
+let disposed = false
+let refreshTimer = null
+const isCurrentUpload = version => !disposed && version === uploadVersion && uploadDialogVisible.value
 
 const MAX_SIZE_MB = 500
 
@@ -137,12 +143,15 @@ const uploadForm = ref({
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 const fetchDatasets = async () => {
+  const version = ++listVersion
+  const isCurrent = () => !disposed && version === listVersion
   loading.value = true
   try {
     const res = await getDatasetList({
       page: currentPage.value,
       page_size: pageSize.value
     })
+    if (!isCurrent()) return
     if (res.datasets) {
       datasets.value = res.datasets
       total.value = res.total
@@ -151,9 +160,9 @@ const fetchDatasets = async () => {
       total.value = datasets.value.length
     }
   } catch (error) {
-    ElMessage.error('获取数据集列表失败')
+    if (isCurrent()) ElMessage.error('获取数据集列表失败')
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
 
@@ -205,12 +214,33 @@ const handleFileChange = (file) => {
   uploadForm.value.file = file.raw
 }
 
+const handleFileRemove = (file, files) => {
+  uploadForm.value.file = files[0]?.raw || null
+}
+
 const resetUploadForm = () => {
   uploadForm.value = {name: '', description: '', file: null}
   uploadRef.value?.clearFiles()
 }
 
+const openUpload = () => {
+  uploadVersion += 1
+  uploading.value = false
+  resetUploadForm()
+  uploadDialogVisible.value = true
+}
+
+watch(uploadDialogVisible, visible => {
+  if (!visible) {
+    uploadVersion += 1
+    uploading.value = false
+    resetUploadForm()
+  }
+}, { flush: 'sync' })
+
 const handleUpload = async () => {
+  if (!uploadDialogVisible.value || uploading.value) return
+  const version = uploadVersion
   if (!uploadForm.value.name || !uploadForm.value.file) {
     ElMessage.warning('请填写数据集名称并选择文件')
     return
@@ -224,18 +254,27 @@ const handleUpload = async () => {
     formData.append('file', uploadForm.value.file)
 
     await uploadDataset(formData)
-    ElMessage.success('上传已开始，请稍后刷新列表查看')
-    uploadDialogVisible.value = false
-    // 延迟刷新，给异步保存一点时间
-    setTimeout(() => {
+    if (disposed) return
+    // 上传已生效时刷新列表，不能关闭后来打开的上传窗口。
+    if (refreshTimer !== null) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null
       fetchDatasets()
     }, 1000)
+    if (!isCurrentUpload(version)) return
+    ElMessage.success('上传已开始，请稍后刷新列表查看')
+    uploadDialogVisible.value = false
   } catch (error) {
-    ElMessage.error('上传失败')
+    if (isCurrentUpload(version)) ElMessage.error('上传失败')
   } finally {
-    uploading.value = false
+    if (isCurrentUpload(version)) uploading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  disposed = true
+  if (refreshTimer !== null) clearTimeout(refreshTimer)
+})
 
 onMounted(() => {
   fetchDatasets()
