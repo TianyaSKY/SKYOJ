@@ -28,7 +28,9 @@ class RateLimitExceeded(Exception):
         super().__init__(f"Rate limit exceeded, retry after {retry_after}s")
 
 
-def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
+def check_rate_limit(
+    key: str, limit: int, window_seconds: int, *, now: int | None = None
+) -> bool:
     """检查 key 在当前窗口内是否超过限制。
 
     返回 True 表示允许（计数未超），False 表示拒绝。
@@ -38,7 +40,8 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
         if client is None:
             return True
 
-        now = int(time.time())
+        if now is None:
+            now = int(time.time())
         bucket = now // window_seconds
         redis_key = f"skyoj:ratelimit:{key}:{bucket}"
         pipe = client.pipeline()
@@ -53,9 +56,11 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
 
 def enforce(key: str, limit: int, window_seconds: int) -> None:
     """限流检查，超限时抛 RateLimitExceeded。"""
-    if not check_rate_limit(key, limit, window_seconds):
-        bucket = int(time.time()) // window_seconds
-        retry_after = (bucket + 1) * window_seconds - int(time.time())
+    now = int(time.time())
+    if not check_rate_limit(key, limit, window_seconds, now=now):
+        # Redis 返回时可能已跨窗；等待时间仍以实际计数的窗口为准。
+        window_end = (now // window_seconds + 1) * window_seconds
+        retry_after = max(1, window_end - int(time.time()))
         raise RateLimitExceeded(retry_after=retry_after)
 
 
