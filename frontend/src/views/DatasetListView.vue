@@ -4,6 +4,7 @@
       <template #header>
         <div class="card-header">
           <h2 class="header-title">公开数据集</h2>
+          <el-button :loading="loading" :disabled="loading" @click="fetchDatasets()">刷新</el-button>
           <el-button
               v-if="isTeacher"
               :icon="Upload"
@@ -20,6 +21,13 @@
         <el-table-column label="描述" min-width="300" prop="description"/>
         <el-table-column label="上传者" prop="uploader" width="120"/>
         <el-table-column label="大小" prop="file_size" width="100"/>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.status === 'failed' ? 'danger' : scope.row.status === 'pending' ? 'warning' : 'success'">
+              {{ datasetStatuses[scope.row.status || 'ready'] || scope.row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="上传日期" prop="created_at" width="180">
           <template #default="scope">
             {{ new Date(scope.row.created_at).toLocaleString() }}
@@ -32,6 +40,7 @@
                   :icon="Download"
                   size="small"
                   type="success"
+                  :disabled="!canDownload(scope.row)"
                   @click="handleDownload(scope.row)"
               >
                 下载
@@ -139,6 +148,17 @@ let refreshTimer = null
 const isCurrentUpload = version => !disposed && version === uploadVersion && uploadDialogVisible.value
 
 const MAX_SIZE_MB = 500
+const datasetStatuses = { pending: '处理中', ready: '可下载', failed: '处理失败' }
+const canDownload = row => !row.status || row.status === 'ready'
+
+const scheduleRefresh = delay => {
+  if (disposed) return
+  if (refreshTimer !== null) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    fetchDatasets()
+  }, delay)
+}
 
 const uploadForm = ref({
   name: '',
@@ -150,6 +170,10 @@ const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 const fetchDatasets = async (page = requestedPage, size = requestedPageSize) => {
   if (disposed) return
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
   requestedPage = page
   requestedPageSize = size
   const version = ++listVersion
@@ -169,6 +193,8 @@ const fetchDatasets = async (page = requestedPage, size = requestedPageSize) => 
     total.value = count
     currentPage.value = page
     pageSize.value = size
+    // 等本次查询结束再安排下一次查询，避免慢请求重叠。
+    if (items.some(item => item.status === 'pending')) scheduleRefresh(2000)
   } catch (error) {
     if (isCurrent()) {
       requestedPage = currentPage.value
@@ -184,6 +210,7 @@ const handleSizeChange = val => fetchDatasets(1, val)
 const handleCurrentChange = val => fetchDatasets(val, pageSize.value)
 
 const handleDownload = async (row) => {
+  if (disposed || !canDownload(row)) return
   try {
     const blob = await downloadDataset(row.id)
     const url = window.URL.createObjectURL(new Blob([blob]))
@@ -267,11 +294,7 @@ const handleUpload = async () => {
     await uploadDataset(formData)
     if (disposed) return
     // 上传已生效时刷新列表，不能关闭后来打开的上传窗口。
-    if (refreshTimer !== null) clearTimeout(refreshTimer)
-    refreshTimer = setTimeout(() => {
-      refreshTimer = null
-      fetchDatasets()
-    }, 1000)
+    scheduleRefresh(1000)
     if (!isCurrentUpload(version)) return
     ElMessage.success('上传已开始，请稍后刷新列表查看')
     uploadDialogVisible.value = false

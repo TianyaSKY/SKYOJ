@@ -4,7 +4,7 @@ vi.mock('@/stores/user', () => ({ useUserStore: () => ({ user: { role: 'teacher'
 vi.mock('@/api/dataset', () => ({ getDatasetList: vi.fn(), uploadDataset: vi.fn(), deleteDataset: vi.fn(), downloadDataset: vi.fn() }))
 vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 import DatasetListView from '../DatasetListView.vue'
-import { getDatasetList, uploadDataset, deleteDataset } from '@/api/dataset'
+import { getDatasetList, uploadDataset, deleteDataset, downloadDataset } from '@/api/dataset'
 import { ElMessage } from 'element-plus'
 let wrapper
 function deferred() {
@@ -153,4 +153,45 @@ it('旧翻页响应不能覆盖后来成功的页码和内容', async () => {
   old.resolve({ datasets: [{ id: 21 }], total: 41 }); await first
   expect(wrapper.vm.currentPage).toBe(3)
   expect(wrapper.vm.datasets).toEqual([{ id: 41 }])
+})
+
+it('待处理数据集继续刷新，进入 ready 或 failed 后停止查询', async () => {
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 1, status: 'pending' }], total: 1 })
+    .mockResolvedValueOnce({ datasets: [{ id: 1, status: 'pending' }], total: 1 })
+    .mockResolvedValueOnce({ datasets: [{ id: 1, status: 'ready' }, { id: 2, status: 'failed' }], total: 2 })
+  mountPage(); await flushPromises()
+  await vi.advanceTimersByTimeAsync(4000)
+  expect(getDatasetList).toHaveBeenCalledTimes(3)
+  expect(wrapper.vm.datasets[0].status).toBe('ready')
+  await vi.advanceTimersByTimeAsync(6000)
+  expect(getDatasetList).toHaveBeenCalledTimes(3)
+})
+it('待处理列表的慢查询不会重叠，卸载后不重新安排刷新', async () => {
+  const poll = deferred()
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 1, status: 'pending' }], total: 1 }).mockReturnValueOnce(poll.promise)
+  mountPage(); await flushPromises()
+  await vi.advanceTimersByTimeAsync(10000)
+  expect(getDatasetList).toHaveBeenCalledTimes(2)
+  wrapper.unmount(); wrapper = undefined
+  poll.resolve({ datasets: [{ id: 1, status: 'pending' }], total: 1 }); await flushPromises()
+  await vi.advanceTimersByTimeAsync(4000)
+  expect(getDatasetList).toHaveBeenCalledTimes(2)
+})
+it('轮询失败后停止自动请求，手动刷新可恢复查询', async () => {
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 1, status: 'pending' }], total: 1 }).mockRejectedValueOnce(new Error('offline'))
+  mountPage(); await flushPromises()
+  await vi.advanceTimersByTimeAsync(6000)
+  expect(getDatasetList).toHaveBeenCalledTimes(2)
+  expect(ElMessage.error).toHaveBeenCalledWith('获取数据集列表失败')
+  getDatasetList.mockResolvedValueOnce({ datasets: [{ id: 1, status: 'ready' }], total: 1 })
+  await wrapper.vm.fetchDatasets()
+  expect(wrapper.vm.datasets[0].status).toBe('ready')
+})
+it('未完成或失败的数据集不能发起下载，兼容旧接口没有状态的记录', async () => {
+  mountPage(); await flushPromises()
+  await wrapper.vm.handleDownload({ id: 1, status: 'pending' })
+  await wrapper.vm.handleDownload({ id: 2, status: 'failed' })
+  expect(downloadDataset).not.toHaveBeenCalled()
+  expect(wrapper.vm.canDownload({ status: 'ready' })).toBe(true)
+  expect(wrapper.vm.canDownload({})).toBe(true)
 })
