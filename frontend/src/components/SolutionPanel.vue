@@ -14,8 +14,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
-import request from '@/utils/request'
-import type { SolutionListItemResponse, SolutionListResponse, CommentResponse, CommentListResponse, ToggleLikeResponse, ToggleFavoriteResponse } from '@/types/community'
+import { getSolutions, createSolution, updateSolution, hideSolution as hideSolutionRequest, toggleSolutionLike, toggleSolutionFavorite, getComments, createComment, deleteComment as deleteCommentRequest } from '@/api/community'
+import type { SolutionListItemResponse, CommentResponse } from '@/types/community'
 import { errorMessage } from '@/utils/error'
 import { formatServerDateTime, formatServerDate } from '@/utils/date'
 import { useUserStore } from '@/stores/user'
@@ -76,11 +76,7 @@ async function load (pageNo = page.value): Promise<void> {
   const isCurrent = () => isCurrentScope(scope) && requestId === loadVersion
   loading.value = true
   try {
-    const resp = await request<SolutionListResponse>({
-      url: `/problems/${props.problemId}/solutions`,
-      method: 'get',
-      params: { page: pageNo, page_size: pageSize }
-    })
+    const resp = await getSolutions(props.problemId, { page: pageNo, page_size: pageSize })
     if (!isCurrent()) return
     const lastPage = Math.max(1, Math.ceil((resp.total || 0) / pageSize))
     if (pageNo > lastPage) return await load(lastPage)
@@ -171,11 +167,7 @@ async function submitSolution () {
   const problemId = props.problemId
   savingSolution.value = true
   try {
-    await request({
-      url: editingId ? `/problems/solutions/${editingId}` : `/problems/${problemId}/solutions`,
-      method: editingId ? 'put' : 'post',
-      data: parsed.data
-    })
+    await (editingId ? updateSolution(editingId, parsed.data) : createSolution(problemId, parsed.data))
     if (!isCurrentScope(scope)) return
     // 保存已生效时刷新当前题目列表，但不能干扰后来打开的编辑窗口。
     load()
@@ -204,10 +196,7 @@ async function toggleLike (item: SolutionListItemResponse) {
   const scope = scopeVersion
   pendingLikes.value.add(item.id)
   try {
-    const resp = await request<ToggleLikeResponse>({
-      url: `/problems/solutions/${item.id}/like`,
-      method: 'post'
-    })
+    const resp = await toggleSolutionLike(item.id)
     if (!isCurrentScope(scope)) return
     applyReactionResult(item, 'like', { vote_count: resp.vote_count, liked_by_me: resp.liked })
   } catch (e) {
@@ -222,10 +211,7 @@ async function toggleFavorite (item: SolutionListItemResponse) {
   const scope = scopeVersion
   pendingFavorites.value.add(item.id)
   try {
-    const resp = await request<ToggleFavoriteResponse>({
-      url: `/problems/solutions/${item.id}/favorite`,
-      method: 'post'
-    })
+    const resp = await toggleSolutionFavorite(item.id)
     if (!isCurrentScope(scope)) return
     applyReactionResult(item, 'favorite', { favorited_by_me: resp.favorited })
   } catch (e) {
@@ -240,7 +226,7 @@ async function hideSolution (item: SolutionListItemResponse) {
   try {
     await ElMessageBox.confirm('确定要隐藏该题解吗？隐藏后仅你自己与教师可见。', '确认隐藏', { type: 'warning' })
     if (!isCurrentScope(scope)) return
-    await request({ url: `/problems/solutions/${item.id}`, method: 'delete' })
+    await hideSolutionRequest(item.id)
     if (!isCurrentScope(scope)) return
     ElMessage.success('已隐藏')
     load()
@@ -272,11 +258,7 @@ async function loadComments (pageNo = commentsPage.value, latest = false): Promi
   const isCurrent = () => isCurrentComments(scope, version, item) && requestId === commentRequestVersion
   loadingComments.value = true
   try {
-    const resp = await request<CommentListResponse>({
-      url: `/problems/solutions/${item.id}/comments`,
-      method: 'get',
-      params: { page: pageNo, page_size: commentsPageSize }
-    })
+    const resp = await getComments(item.id, { page: pageNo, page_size: commentsPageSize })
     if (!isCurrent()) return
     const lastPage = Math.max(1, Math.ceil((resp.total || 0) / commentsPageSize))
     if (pageNo > lastPage || (latest && pageNo !== lastPage)) {
@@ -304,11 +286,7 @@ async function submitComment () {
   }
   submittingComment.value = true
   try {
-    await request({
-      url: `/problems/solutions/${item.id}/comments`,
-      method: 'post',
-      data: parsed.data
-    })
+    await createComment(item.id, parsed.data)
     if (!isCurrentScope(scope)) return
     item.comment_count += 1
     if (!isCurrentComments(scope, version, item)) return
@@ -330,7 +308,7 @@ async function deleteComment (commentId: number) {
   try {
     await ElMessageBox.confirm('删除这条评论？', '确认', { type: 'warning' })
     if (!isCurrentComments(scope, version, item)) return
-    await request({ url: `/problems/comments/${commentId}`, method: 'delete' })
+    await deleteCommentRequest(commentId)
     if (!isCurrentScope(scope)) return
     item.comment_count = Math.max(0, item.comment_count - 1)
     if (!isCurrentComments(scope, version, item)) return

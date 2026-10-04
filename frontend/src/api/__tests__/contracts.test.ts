@@ -13,6 +13,14 @@ import * as user from '../user'
 import * as sys from '../sys'
 import * as debug from '../debug'
 import * as llm from '../llm'
+import * as community from '../community'
+import * as tag from '../tag'
+import * as wrongBook from '../wrongBook'
+import * as analytics from '../analytics'
+import type { SolutionListResponse, CommentListResponse } from '@/types/community'
+import type { WrongBookStatsResponse } from '@/types/wrongBook'
+import type { PlatformAnalyticsResponse } from '@/types/analytics'
+import type { SolutionFormInput } from '@/schemas/community'
 
 const send = vi.mocked(request)
 beforeEach(() => vi.resetAllMocks())
@@ -26,7 +34,26 @@ interface ContractCase {
 const code = { problem_id: 1, code: 'print(3)', language: 'python', exam_id: 2 }
 const form = new FormData()
 form.append('file', new Blob(['data']), 'test.txt')
+const solutionForm: SolutionFormInput = { title: '题解', content: '    保留 Markdown 缩进', language: null }
 const cases: ContractCase[] = [
+  { name: '题解列表分页', invoke: () => community.getSolutions(42, {page: 2, page_size: 20}), config: {url: '/problems/42/solutions', method: 'get', params: {page: 2, page_size: 20}} },
+  { name: '发布题解保留正文与空语言', invoke: () => community.createSolution(42, solutionForm), config: {url: '/problems/42/solutions', method: 'post', data: solutionForm} },
+  { name: '修改题解', invoke: () => community.updateSolution(7, solutionForm), config: {url: '/problems/solutions/7', method: 'put', data: solutionForm} },
+  { name: '隐藏题解', invoke: () => community.hideSolution(7), config: {url: '/problems/solutions/7', method: 'delete'} },
+  { name: '题解点赞', invoke: () => community.toggleSolutionLike(7), config: {url: '/problems/solutions/7/like', method: 'post'} },
+  { name: '题解收藏', invoke: () => community.toggleSolutionFavorite(7), config: {url: '/problems/solutions/7/favorite', method: 'post'} },
+  { name: '评论列表分页', invoke: () => community.getComments(7, {page: 2, page_size: 50}), config: {url: '/problems/solutions/7/comments', method: 'get', params: {page: 2, page_size: 50}} },
+  { name: '发布评论', invoke: () => community.createComment(7, {content: '评论'}), config: {url: '/problems/solutions/7/comments', method: 'post', data: {content: '评论'}} },
+  { name: '删除评论', invoke: () => community.deleteComment(8), config: {url: '/problems/comments/8', method: 'delete'} },
+  { name: '全部标签', invoke: () => tag.getTags(), config: {url: '/tags', method: 'get'} },
+  { name: '题目标签', invoke: () => tag.getProblemTags(42), config: {url: '/tags/problems/42', method: 'get'} },
+  { name: '教师直接批准标签', invoke: () => tag.attachProblemTag(42, {tag_id: 7, approved: true}), config: {url: '/tags/problems/42/attach', method: 'post', data: {tag_id: 7, approved: true}} },
+  { name: '学生建议标签', invoke: () => tag.attachProblemTag(42, {tag_id: 7, approved: false}), config: {url: '/tags/problems/42/attach', method: 'post', data: {tag_id: 7, approved: false}} },
+  { name: '移除标签', invoke: () => tag.detachProblemTag(42, 7), config: {url: '/tags/problems/42/7', method: 'delete'} },
+  { name: '错题本统计', invoke: () => wrongBook.getWrongBookStats(), config: {url: '/wrong-book/stats', method: 'get'} },
+  { name: '错题本列表保留尾斜杠', invoke: () => wrongBook.getWrongBook({page: 2, page_size: 10}), config: {url: '/wrong-book/', method: 'get', params: {page: 2, page_size: 10}} },
+  { name: '错题复习切换不携带请求体', invoke: () => wrongBook.toggleWrongBookReview(9), config: {url: '/wrong-book/9/toggle-review', method: 'post'} },
+  { name: '平台分析统计', invoke: () => analytics.getPlatformAnalytics(), config: {url: '/admin/analytics', method: 'get'} },
   { name: '清空测例保留删除接口', invoke: () => problem.deleteAllTestCases(1), config: {url: '/problems/1/test_cases', method: 'delete'} },
   { name: '同步 AI 对话保留五分钟超时', invoke: () => llm.askLLM({system_setting: '分析代码', prompt: 'print(3)'}), config: {url: '/llm/ask', method: 'post', data: {system_setting: '分析代码', prompt: 'print(3)'}, timeout: 300000} },
   { name: '异步执行测例脚本保留请求体与两分钟超时', invoke: () => llm.executeAndSubmitTestData({problem_id: 1, code: 'print(3)'}), config: {url: '/llm/execute-test-generation', method: 'post', data: {problem_id: 1, code: 'print(3)'}, timeout: 120000} },
@@ -61,6 +88,24 @@ describe('领域 API 保持现有 HTTP 契约', () => {
     send.mockResolvedValueOnce(response)
     expect(await invoke()).toBe(response)
     expect(send).toHaveBeenCalledExactlyOnceWith(config)
+  })
+  it('无正文写操作保留空响应语义，失败不被包装或吞掉', async () => {
+    send.mockResolvedValueOnce(undefined)
+    expect(await tag.detachProblemTag(42, 7)).toBeUndefined()
+    const failure = { response: { status: 403, data: { error: '无权访问' } } }
+    send.mockRejectedValueOnce(failure)
+    await expect(community.createComment(7, {content: '评论'})).rejects.toBe(failure)
+    expect(send).toHaveBeenLastCalledWith({url: '/problems/solutions/7/comments', method: 'post', data: {content: '评论'}})
+  })
+  it('新领域 API 的输入输出具有明确类型', () => {
+    expectTypeOf(community.getSolutions).returns.toEqualTypeOf<Promise<SolutionListResponse>>()
+    expectTypeOf(community.getComments).returns.toEqualTypeOf<Promise<CommentListResponse>>()
+    expectTypeOf(community.createSolution).parameter(1).toEqualTypeOf<SolutionFormInput>()
+    expectTypeOf(tag.attachProblemTag).parameter(1).toEqualTypeOf<{tag_id: number; approved: boolean}>()
+    expectTypeOf(tag.detachProblemTag).returns.toEqualTypeOf<Promise<void>>()
+    expectTypeOf(wrongBook.getWrongBookStats).returns.toEqualTypeOf<Promise<WrongBookStatsResponse>>()
+    expectTypeOf(analytics.getPlatformAnalytics).returns.toEqualTypeOf<Promise<PlatformAnalyticsResponse>>()
+    expectTypeOf(sys).not.toHaveProperty('rebuildIndex')
   })
   it('下载结果保持 Blob，文件表单保持同一实例', async () => {
     const blob = new Blob(['case data'])

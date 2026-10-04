@@ -53,3 +53,5 @@ npm run test:e2e            # 使用 Playwright 配置连接或启动前后端
 CI 分别执行类型检查、覆盖率单测、构建和完整 E2E。覆盖率门槛来自迁移前实测：语句 74.04%、分支 59.11%、函数 43.58%、行 75.39%。真实后端 E2E 的隔离数据库准备方式见仓库 CI 工作流和 `backend/scripts/seed_e2e.py`。
 
 API 响应类型按后端协议放在 `src/types/`；关键输入和不可信 WebSocket、用户缓存、AI 响应在 `src/schemas/` 通过 Zod 校验。Axios 响应拦截器返回解包后的 `Promise<T>`，调用方直接读取业务响应。捕获异常保持 `unknown`，显示消息前校验字段。新增 Vue 组件使用 `<script setup lang="ts">`，避免通过 `any` 或关闭类型检查绕过边界。
+
+页面和组件统一通过 `src/api/` 调用后端。`utils/request.ts` 仅由领域 API、必要的认证 Store 和测试引用；架构单测检查生产代码的静态导入、再导出及动态导入，防止绕过 API 层。社区题解/评论、标签、错题本和统计接口也纳入集中 HTTP 契约测试。后端未实现的接口不保留占位 wrapper 或操作按钮。

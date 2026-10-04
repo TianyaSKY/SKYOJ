@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '@/utils/request'
+import { getPlatformAnalytics } from '@/api/analytics'
 import type { PlatformAnalyticsResponse } from '@/types/analytics'
 
 const loading = ref(false)
@@ -149,7 +149,7 @@ const shortDate = (s: string) => s ? s.slice(5) : ''
 const fetchAnalytics = async () => {
   loading.value = true
   try {
-    const res = await request<PlatformAnalyticsResponse>({ url: '/admin/analytics', method: 'get' })
+    const res = await getPlatformAnalytics()
     analyticsData.value = res
   } catch {
     ElMessage.error('获取学情数据失败')

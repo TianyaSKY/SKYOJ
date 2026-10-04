@@ -10,7 +10,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import request from '@/utils/request'
+import { getProblemTags, getTags, attachProblemTag, detachProblemTag } from '@/api/tag'
 import type { TagResponse } from '@/types/community'
 import { errorMessage } from '@/utils/error'
 import { useUserStore } from '@/stores/user'
@@ -43,8 +43,8 @@ async function load () {
   loading.value = true
   try {
     const [a, b] = await Promise.all([
-      request<TagResponse[]>({ url: `/tags/problems/${props.problemId}`, method: 'get' }),
-      request<TagResponse[]>({ url: `/tags`, method: 'get' })
+      getProblemTags(props.problemId),
+      getTags()
     ])
     if (!isCurrent()) return
     attached.value = a || []
@@ -91,11 +91,7 @@ async function confirmAttach () {
   }
   submittingAttach.value = true
   try {
-    await request({
-      url: `/tags/problems/${problemId}/attach`,
-      method: 'post',
-      data: { tag_id: selectedTagId.value, approved }
-    })
+    await attachProblemTag(problemId, { tag_id: selectedTagId.value, approved })
     if (!isCurrentScope(scope)) return
     // 已生效的操作刷新标签列表，但不影响后来打开的窗口。
     load()
@@ -115,10 +111,7 @@ async function detach (tag: TagResponse) {
   try {
     await ElMessageBox.confirm(`从该题目移除标签「${tag.name}」？`, '确认移除', { type: 'warning' })
     if (!isCurrentScope(scope)) return
-    await request({
-      url: `/tags/problems/${problemId}/${tag.id}`,
-      method: 'delete'
-    })
+    await detachProblemTag(problemId, tag.id)
     if (!isCurrentScope(scope)) return
     ElMessage.success('已移除')
     load()

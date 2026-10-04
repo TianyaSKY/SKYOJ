@@ -201,9 +201,9 @@ import {getUserProfile, getUserSubmissions, uploadAvatar} from '@/api/user'
 import {ElMessage} from 'element-plus'
 import {Calendar, List, Camera, Warning} from '@element-plus/icons-vue'
 import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
-import request from '@/utils/request'
+import { getWrongBookStats, getWrongBook, toggleWrongBookReview } from '@/api/wrongBook'
 import type { UserProfileResponse, UserSubmissionResponse } from '@/types/user'
-import type { WrongBookItemResponse, WrongBookListResponse, WrongBookStatsResponse, ToggleReviewResponse } from '@/types/wrongBook'
+import type { WrongBookItemResponse, WrongBookStatsResponse } from '@/types/wrongBook'
 import type { UploadRequestOptions } from 'element-plus'
 import { errorMessage } from '@/utils/error'
 import { parseRouteId } from '@/utils/route'
@@ -267,8 +267,8 @@ const fetchWrongBook = async (pageNo = wbPage.value): Promise<void> => {
   wbLoading.value = true
   try {
     const [statsRes, listRes] = await Promise.all([
-      request<WrongBookStatsResponse>({ url: '/wrong-book/stats', method: 'get' }),
-      request<WrongBookListResponse>({ url: '/wrong-book/', method: 'get', params: { page: pageNo, page_size: wbPageSize } }),
+      getWrongBookStats(),
+      getWrongBook({ page: pageNo, page_size: wbPageSize }),
     ])
     if (!isCurrent()) return
     const lastPage = Math.max(1, Math.ceil((listRes.total || 0) / wbPageSize))
@@ -289,10 +289,7 @@ const toggleReview = async (item: WrongBookItemResponse) => {
   const scope = wbScopeVersion
   pendingReviews.value.add(item.id)
   try {
-    const res = await request<ToggleReviewResponse>({
-      url: `/wrong-book/${item.id}/toggle-review`,
-      method: 'post',
-    })
+    const res = await toggleWrongBookReview(item.id)
     if (!isCurrentWrongBook(scope)) return
     item.reviewed = res.reviewed
     const current = wbItems.value.find(entry => entry.id === item.id)

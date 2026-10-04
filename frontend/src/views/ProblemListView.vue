@@ -138,7 +138,7 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
 import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
-import request from '@/utils/request'
+import { getTags } from '@/api/tag'
 import type { ProblemListResponse, SearchProblemResponse, ProblemQuery, SearchQuery } from '@/types/problem'
 import type { TagResponse } from '@/types/community'
 import type { TagProps } from 'element-plus'
@@ -268,7 +268,7 @@ const fetchProblems = async (page = currentPage.value, size = pageSize.value): P
 
 const fetchTags = async () => {
   try {
-    const res = await request<TagResponse[]>({ url: '/tags', method: 'get' })
+    const res = await getTags()
     if (!disposed) allTags.value = res || []
   } catch {
     // 标签加载失败不影响题目列表
