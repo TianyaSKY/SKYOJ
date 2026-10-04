@@ -67,3 +67,12 @@ it('编辑考试保留或清空选题，省略和 null 保持兼容，拒绝重�
   expect(updateExamSchema.parse({ problem_ids: null }).problem_ids).toBeNull()
   expect(updateExamSchema.safeParse({ problem_ids: [1, 1] }).success).toBe(false)
 })
+
+it('判题消息只接受有效的状态、分数和日志，兼容旧版可选字段', async () => {
+  const { submissionMessageSchema } = await import('../submission')
+  expect(submissionMessageSchema.parse({ status: 'Accepted', score: 100 })).toEqual({ status: 'Accepted', score: 100 })
+  expect(submissionMessageSchema.safeParse({ status: 'Accepted' }).success).toBe(true)
+  for (const value of ['not json', null, {}, { status: 'Accepted', score: '100' }, { status: 'Accepted', score: Infinity }]) {
+    expect(submissionMessageSchema.safeParse(value).success).toBe(false)
+  }
+})

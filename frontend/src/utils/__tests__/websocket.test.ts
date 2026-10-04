@@ -10,7 +10,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 // 1) 用 fake timers 控制 setTimeout；
 // 2) Mock global WebSocket 为构造器，捕获实例。
 class FakeWebSocket {
-  constructor (url) {
+  static lastInstance: FakeWebSocket | null = null
+  url: string
+  readyState = 0
+  onopen: (() => void) | null = null
+  onclose: ((event: { code: number; reason?: string }) => void) | null = null
+  onerror: ((event: unknown) => void) | null = null
+  onmessage: ((event: { data: string }) => void) | null = null
+  constructor (url: string) {
     this.url = url
     this.readyState = 0
     this.onopen = null
@@ -19,20 +26,25 @@ class FakeWebSocket {
     this.onmessage = null
     FakeWebSocket.lastInstance = this
   }
-  close (code, reason) {
+  close (code?: number, reason?: string) {
     this.readyState = 3
     if (this.onclose) this.onclose({ code: code ?? 1000, reason })
   }
-  triggerServerClose (code) {
+  triggerServerClose (code: number) {
     this.readyState = 3
     if (this.onclose) this.onclose({ code })
   }
 }
 FakeWebSocket.lastInstance = null
 
+function latest(): FakeWebSocket {
+  if (!FakeWebSocket.lastInstance) throw new Error('未创建测试 WebSocket')
+  return FakeWebSocket.lastInstance
+}
+
 beforeEach(() => {
   FakeWebSocket.lastInstance = null
-  global.WebSocket = FakeWebSocket
+  vi.stubGlobal('WebSocket', FakeWebSocket)
   global.window.location.protocol = 'http:'
   global.window.location.host = 'localhost:5173'
   vi.useFakeTimers()
@@ -40,6 +52,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe('websocket 自动重连', () => {
@@ -47,7 +60,7 @@ describe('websocket 自动重连', () => {
     const { createSubmissionWS } = await import('@/utils/websocket')
     const ws = createSubmissionWS(1, 't')
     ws.connect()
-    const first = FakeWebSocket.lastInstance
+    const first = latest()
     first.triggerServerClose(code)
     await vi.advanceTimersByTimeAsync(60000)
     expect(FakeWebSocket.lastInstance).toBe(first)
@@ -59,7 +72,7 @@ describe('websocket 自动重连', () => {
     const onMessage = vi.fn(() => { throw new Error('回调失败') })
     const ws = createSubmissionWS(1, 't', { onMessage })
     ws.connect()
-    expect(() => FakeWebSocket.lastInstance.onmessage({ data: '{"status":"Accepted"}' })).toThrow('回调失败')
+    expect(() => latest().onmessage?.({ data: '{"status":"Accepted"}' })).toThrow('回调失败')
     expect(onMessage).toHaveBeenCalledTimes(1)
     ws.close()
   })
@@ -69,11 +82,11 @@ describe('websocket 自动重连', () => {
     const onMessage = vi.fn()
     const ws = createSubmissionWS(1, 't', { onMessage })
     ws.connect()
-    const first = FakeWebSocket.lastInstance
+    const first = latest()
     ws.connect()
     expect(FakeWebSocket.lastInstance).toBe(first)
     ws.close()
-    first.onmessage({ data: '{"status":"Accepted"}' })
+    first.onmessage?.({ data: '{"status":"Accepted"}' })
     expect(onMessage).not.toHaveBeenCalled()
   })
 
@@ -82,11 +95,11 @@ describe('websocket 自动重连', () => {
     const onMessage = vi.fn(), onReconnect = vi.fn()
     const ws = createSubmissionWS(1, 't', { onMessage, onReconnect })
     ws.connect()
-    const first = FakeWebSocket.lastInstance
+    const first = latest()
     first.triggerServerClose(1006)
     await vi.advanceTimersByTimeAsync(1000)
-    const second = FakeWebSocket.lastInstance
-    first.onmessage({ data: '{"status":"Accepted"}' })
+    const second = latest()
+    first.onmessage?.({ data: '{"status":"Accepted"}' })
     first.triggerServerClose(1006)
     await vi.advanceTimersByTimeAsync(60000)
     expect(onMessage).not.toHaveBeenCalled()
@@ -102,14 +115,14 @@ describe('websocket 自动重连', () => {
     expect(FakeWebSocket.lastInstance).toBeTruthy()
     ws.close()
     await vi.advanceTimersByTimeAsync(60000)
-    expect(FakeWebSocket.lastInstance.readyState).toBe(3)
+    expect(latest().readyState).toBe(3)
   })
 
   it('服务端 1000 正常关闭不会重连', async () => {
     const { createSubmissionWS } = await import('@/utils/websocket')
     const ws = createSubmissionWS(1, 't', {})
     ws.connect()
-    const w1 = FakeWebSocket.lastInstance
+    const w1 = latest()
     expect(w1).toBeTruthy()
     w1.triggerServerClose(1000)
     await vi.advanceTimersByTimeAsync(35000)
@@ -121,7 +134,7 @@ describe('websocket 自动重连', () => {
     const onReconnect = vi.fn()
     const ws = createSubmissionWS(2, 't', { onReconnect })
     ws.connect()
-    const w1 = FakeWebSocket.lastInstance
+    const w1 = latest()
     w1.triggerServerClose(1006)
     // 第一次重连延迟 1000ms。
     await vi.advanceTimersByTimeAsync(1500)
@@ -134,10 +147,10 @@ describe('websocket 自动重连', () => {
     const onReconnect = vi.fn()
     const ws = createSubmissionWS(3, 't', { onReconnect })
     ws.connect()
-    FakeWebSocket.lastInstance.triggerServerClose(1006)
+    latest().triggerServerClose(1006)
     await vi.advanceTimersByTimeAsync(1500) // 第一次重连
     expect(onReconnect).toHaveBeenCalledTimes(1)
-    const w2 = FakeWebSocket.lastInstance
+    const w2 = latest()
     w2.triggerServerClose(1006)
     await vi.advanceTimersByTimeAsync(2500) // 第二次重连(延迟 2000ms)
     expect(onReconnect).toHaveBeenCalledTimes(2)
@@ -149,8 +162,8 @@ describe('websocket 自动重连', () => {
     const onMessage = vi.fn()
     const ws = createSubmissionWS(5, 't', { onMessage })
     ws.connect()
-    const w = FakeWebSocket.lastInstance
-    w.onmessage({ data: JSON.stringify({ status: 'Accepted', score: 100 }) })
+    const w = latest()
+    w.onmessage?.({ data: JSON.stringify({ status: 'Accepted', score: 100 }) })
     expect(onMessage).toHaveBeenCalledWith({ status: 'Accepted', score: 100 })
     ws.close()
   })
@@ -162,7 +175,7 @@ it('握手成功后立即断线仍按指数退避，并保持 30 秒上限', asy
   const ws = createSubmissionWS(1, 't', { onReconnect })
   ws.connect()
   for (const delay of [1000, 2000, 4000, 8000, 16000, 30000, 30000]) {
-    const current = FakeWebSocket.lastInstance
+    const current = latest()
     current.readyState = 1
     current.onopen?.()
     current.triggerServerClose(1006)
@@ -182,12 +195,12 @@ it('成功收到消息后恢复初始重连等待时间', async () => {
   const onReconnect = vi.fn(), onMessage = vi.fn()
   const ws = createSubmissionWS(1, 't', { onReconnect, onMessage })
   ws.connect()
-  FakeWebSocket.lastInstance.triggerServerClose(1006)
+  latest().triggerServerClose(1006)
   await vi.advanceTimersByTimeAsync(1000)
-  FakeWebSocket.lastInstance.triggerServerClose(1006)
+  latest().triggerServerClose(1006)
   await vi.advanceTimersByTimeAsync(2000)
-  const recovered = FakeWebSocket.lastInstance
-  recovered.onmessage({ data: '{"status":"Accepted","score":100}' })
+  const recovered = latest()
+  recovered.onmessage?.({ data: '{"status":"Accepted","score":100}' })
   expect(onMessage).toHaveBeenCalledOnce()
   recovered.triggerServerClose(1006)
   await vi.advanceTimersByTimeAsync(999)
@@ -203,7 +216,7 @@ it('重连通知抛错仍建立连接，并保留原始回调异常', async () =
   const error = new Error('reconnect notification failed')
   const ws = createSubmissionWS(1, 't', { onReconnect: () => { throw error } })
   ws.connect()
-  const first = FakeWebSocket.lastInstance
+  const first = latest()
   first.triggerServerClose(1006)
   await expect(vi.advanceTimersByTimeAsync(1000)).rejects.toBe(error)
   expect(FakeWebSocket.lastInstance).not.toBe(first)
@@ -213,13 +226,13 @@ it('重连通知抛错仍建立连接，并保留原始回调异常', async () =
 it('构造连接失败时错误回调抛错也不能停止后续重试', async () => {
   const { createSubmissionWS } = await import('@/utils/websocket')
   let attempts = 0
-  global.WebSocket = class extends FakeWebSocket {
-    constructor(url) {
+  vi.stubGlobal('WebSocket', class extends FakeWebSocket {
+    constructor(url: string) {
       attempts += 1
       if (attempts === 1) throw new Error('constructor failed')
       super(url)
     }
-  }
+  })
   const error = new Error('error notification failed')
   const ws = createSubmissionWS(1, 't', { onError: () => { throw error } })
   expect(() => ws.connect()).toThrow(error)
@@ -233,7 +246,7 @@ it('重连通知主动关闭时不再建立新连接', async () => {
   const { createSubmissionWS } = await import('@/utils/websocket')
   const ws = createSubmissionWS(1, 't', { onReconnect: () => ws.close() })
   ws.connect()
-  const first = FakeWebSocket.lastInstance
+  const first = latest()
   first.triggerServerClose(1006)
   await vi.advanceTimersByTimeAsync(60000)
   expect(FakeWebSocket.lastInstance).toBe(first)

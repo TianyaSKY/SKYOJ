@@ -11,7 +11,7 @@
  * 用法：
  *   import { createSubmissionWS } from '@/utils/websocket'
  *
- *   const ws = createSubmissionWS(submissionId, token, {
+ *   const ws = createSubmissionWS(submissionId: number, token: string, {
  *     onMessage: (data) => { console.log('result:', data) },
  *     onError: (err) => { console.error('ws error:', err) },
  *     onClose: () => { console.log('ws closed') },
@@ -22,20 +22,32 @@
  *   ws.close()
  */
 
+export interface SubmissionWSOptions {
+  onMessage?: (data: unknown) => void
+  onError?: (error: unknown) => void
+  onClose?: (event: CloseEvent) => void
+  onReconnect?: (attempt: number) => void
+}
+
+export interface SubmissionWS {
+  connect(): void
+  close(): void
+}
+
 const RECONNECT_INITIAL_DELAY_MS = 1000
 const RECONNECT_MAX_DELAY_MS = 30000
 const TERMINAL_CLOSE_CODES = new Set([1000, 1001, 1008, 4001, 4003, 4004])
 
-export function createSubmissionWS(submissionId, token, {
+export function createSubmissionWS(submissionId: number, token: string, {
   onMessage,
   onError,
   onClose,
   onReconnect,
-} = {}) {
-  let ws = null
+}: SubmissionWSOptions = {}): SubmissionWS {
+  let ws: WebSocket | null = null
   let closed = false
   let reconnectAttempt = 0
-  let reconnectTimer = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   function buildUrl() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -89,7 +101,7 @@ export function createSubmissionWS(submissionId, token, {
       if (closed || ws !== socket) return
       // 握手成功仍可能立即掉线；收到消息后才视为恢复，重置退避计数。
       reconnectAttempt = 0
-      let data = event.data
+      let data: unknown = event.data
       try {
         data = JSON.parse(event.data)
       } catch {

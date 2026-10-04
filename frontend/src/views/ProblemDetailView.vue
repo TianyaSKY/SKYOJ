@@ -252,6 +252,7 @@ import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 import {ArrowLeft, CircleCheckFilled, Loading, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
 import {createSubmissionWS} from '@/utils/websocket'
+import {submissionMessageSchema} from '@/schemas/submission'
 import DebugResultPanel from '@/components/DebugResultPanel.vue'
 import SolutionPanel from '@/components/SolutionPanel.vue'
 import TagPanel from '@/components/TagPanel.vue'
@@ -308,9 +309,14 @@ function startRealtimeWait(submissionId) {
   activeWS = createSubmissionWS(submissionId, token, {
     onMessage: (data) => {
       if (!isCurrentPage(version)) return
-      realtimeResult.value = data
+      const parsed = submissionMessageSchema.safeParse(data)
+      if (!parsed.success) {
+        console.warn('判题推送格式无效', parsed.error.issues)
+        return
+      }
+      realtimeResult.value = parsed.data
       realtimeStatus.value = 'received'
-      ElMessage.success(`判题完成：${data.status || ''} (${(data.score ?? 0).toFixed(1)} 分)`)
+      ElMessage.success(`判题完成：${parsed.data.status} (${(parsed.data.score ?? 0).toFixed(1)} 分)`)
     },
     onError: () => {
       if (!isCurrentPage(version)) return

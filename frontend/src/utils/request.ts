@@ -1,3 +1,5 @@
+import type { ApiClient, ApiError } from '@/types/http'
+import { isRecord } from '@/types/http'
 import axios from 'axios'
 import { ElMessageBox } from 'element-plus'
 import router from '@/router'
@@ -9,14 +11,15 @@ const tokenErrorCodes = new Set([
 let isHandlingAuthError = false
 
 // 只提取可读消息，保留字段路径；不把校验错误中的 input 等原始数据拼进提示。
-function readableMessage(value, depth = 0) {
+function readableMessage(value: unknown, depth = 0): string {
     if (typeof value === 'string') return value.trim()
     if (!value || typeof value !== 'object' || depth >= 4) return ''
     if (Array.isArray(value)) {
         return value.map(item => readableMessage(item, depth + 1)).filter(Boolean).join('；')
     }
+    if (!isRecord(value)) return ''
     if (typeof value.msg === 'string' && Array.isArray(value.loc)) {
-        const location = ['body', 'query', 'path', 'header', 'cookie'].includes(value.loc[0])
+        const location = ['body', 'query', 'path', 'header', 'cookie'].includes(String(value.loc[0]))
             ? value.loc.slice(1) : value.loc
         const field = location.filter(part => typeof part === 'string' || typeof part === 'number').join('.')
         const message = value.msg.trim()
@@ -53,18 +56,19 @@ service.interceptors.response.use(
     response => {
         return response.data
     },
-    error => {
+    (error: ApiError) => {
         // 后端统一错误信封：业务异常返回 {code, error}；HTTPException 返回 {code, detail}。
         // 兼容老接口（只有 {error} 或 {detail}），把 code 也补到错误对象上方便调用方判断。
         const data = error.response?.data || {}
-        const code = data.code
-        const message = readableMessage(data.error) || readableMessage(data.detail)
-            || readableMessage(data.message) || readableMessage(error.message) || '请求失败'
+        const payload = isRecord(data) ? data : {}
+        const code = typeof payload.code === 'string' ? payload.code : undefined
+        const message = readableMessage(payload.error) || readableMessage(payload.detail)
+            || readableMessage(payload.message) || readableMessage(error.message) || '请求失败'
 
         // 401 登录态失效：弹窗让用户重新登录。
         // 触发条件：后端返回 AUTH_REQUIRED / AUTH_TOKEN_EXPIRED / AUTH_INVALID_TOKEN，
         // 或 HTTP 401 且没有显式 code（兜底）。
-        const isAuthError = tokenErrorCodes.has(code) || (!code && error.response?.status === 401)
+        const isAuthError = Boolean(code && tokenErrorCodes.has(code)) || (!code && error.response?.status === 401)
         if (isAuthError && !isHandlingAuthError && !error.config?.skipAuthErrorHandler) {
             isHandlingAuthError = true
             ElMessageBox.confirm(
@@ -98,4 +102,5 @@ service.interceptors.response.use(
     }
 )
 
-export default service
+// 唯一的适配断言：运行时仍为同一个 Axios 实例，响应已由上面的拦截器解包。
+export default service as ApiClient

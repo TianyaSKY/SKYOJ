@@ -16,6 +16,8 @@ vi.mock('@/router', () => ({
 }))
 
 import request from '@/utils/request'
+import type { ApiError } from '@/types/http'
+import { expectTypeOf } from 'vitest'
 
 beforeEach(() => {
   localStorage.clear()
@@ -25,13 +27,13 @@ beforeEach(() => {
 afterEach(() => flushPromises())
 
 describe('request.js 响应拦截器 - 错误信封解析', () => {
-  async function rejectedRequest(data, extra = {}) {
+  async function rejectedRequest(data: unknown, extra: Partial<ApiError> = {}): Promise<ApiError> {
     const original = request.defaults.adapter
     request.defaults.adapter = () => Promise.reject({
       message: 'Request failed', response: { status: 422, data }, ...extra,
     })
     try {
-      return await request.get('/invalid').catch(error => error)
+      return await request.get<ApiError>('/invalid').catch((error: ApiError) => error)
     } finally {
       request.defaults.adapter = original
     }
@@ -76,14 +78,14 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
       },
     })
 
-    let caught = null
-    try { await request.get('/test') } catch (e) { caught = e }
+    let caught: ApiError | undefined
+    try { await request.get('/test') } catch (e) { caught = e as ApiError }
     inner.adapter = originalAdapter
 
     expect(caught).toBeTruthy()
-    expect(caught.code).toBe('AUTH_REQUIRED')
-    expect(caught.message).toBe('请先登录')
-    expect(caught.backend).toMatchObject({ code: 'AUTH_REQUIRED' })
+    expect(caught?.code).toBe('AUTH_REQUIRED')
+    expect(caught?.message).toBe('请先登录')
+    expect(caught?.backend).toMatchObject({ code: 'AUTH_REQUIRED' })
   })
 
   it('把 404 + HTTP_NOT_FOUND envelope 的 code 挂到 error 上', async () => {
@@ -94,12 +96,12 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
       response: { status: 404, data: { code: 'HTTP_NOT_FOUND', detail: '资源不存在' } },
     })
 
-    let caught = null
-    try { await request.get('/x') } catch (e) { caught = e }
+    let caught: ApiError | undefined
+    try { await request.get('/x') } catch (e) { caught = e as ApiError }
     inner.adapter = originalAdapter
 
-    expect(caught.code).toBe('HTTP_NOT_FOUND')
-    expect(caught.message).toBe('资源不存在')
+    expect(caught?.code).toBe('HTTP_NOT_FOUND')
+    expect(caught?.message).toBe('资源不存在')
   })
 
   it('成功响应直接透传 data 字段', async () => {
@@ -113,7 +115,7 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
       statusText: 'OK',
     })
 
-    const result = await request.get('/list')
+    const result = await request.get<{ items: number[] }>('/list')
     inner.adapter = originalAdapter
 
     expect(result.items).toEqual([1, 2, 3])
@@ -127,12 +129,12 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
       response: { status: 500, data: { error: '服务端错误' } },
     })
 
-    let caught = null
-    try { await request.get('/y') } catch (e) { caught = e }
+    let caught: ApiError | undefined
+    try { await request.get('/y') } catch (e) { caught = e as ApiError }
     inner.adapter = originalAdapter
 
-    expect(caught.code).toBeUndefined()
-    expect(caught.message).toBe('服务端错误')
+    expect(caught?.code).toBeUndefined()
+    expect(caught?.message).toBe('服务端错误')
   })
 
   it('5xx 错误信封同样挂载 code', async () => {
@@ -143,11 +145,16 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
       response: { status: 502, data: { code: 'EXTERNAL_SERVICE_ERROR', error: 'LLM 配置缺失' } },
     })
 
-    let caught = null
-    try { await request.get('/z') } catch (e) { caught = e }
+    let caught: ApiError | undefined
+    try { await request.get('/z') } catch (e) { caught = e as ApiError }
     inner.adapter = originalAdapter
 
-    expect(caught.code).toBe('EXTERNAL_SERVICE_ERROR')
-    expect(caught.message).toBe('LLM 配置缺失')
+    expect(caught?.code).toBe('EXTERNAL_SERVICE_ERROR')
+    expect(caught?.message).toBe('LLM 配置缺失')
   })
+})
+
+it('响应解包契约在类型检查中保持 Promise<T>，写请求配置允许跳过认证弹窗', () => {
+  expectTypeOf(request.get<{ id: number }>).returns.toEqualTypeOf<Promise<{ id: number }>>()
+  expectTypeOf(request.post<{ token: string }, { username: string }>).returns.toEqualTypeOf<Promise<{ token: string }>>()
 })
