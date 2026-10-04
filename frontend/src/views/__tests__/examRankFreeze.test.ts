@@ -1,4 +1,5 @@
 // 验证封榜中的提交显示为问号，解封后显示通过时间与既有错误次数。
+import type { RankProblemStats } from '@/types/exam'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { h } from 'vue'
@@ -12,9 +13,9 @@ import { getExamRank } from '@/api/exam'
 
 beforeEach(() => localStorage.clear())
 
-async function renderRank(stats) {
+async function renderRank(stats: RankProblemStats) {
   const row = {user_id: 1, username: 'bob', solved: stats.solved ? 1 : 0, penalty: 0, problems: {1: stats}}
-  getExamRank.mockResolvedValue({
+  vi.mocked(getExamRank).mockResolvedValue({
     exam_title: '比赛', problems: [{problem_id: 1, display_id: 'A'}], rank: [row],
   })
   const wrapper = shallowMount(ExamRankView, {

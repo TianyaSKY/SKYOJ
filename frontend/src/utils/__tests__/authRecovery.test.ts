@@ -1,4 +1,5 @@
 // 验证真实请求拦截器与用户 Store 在登录失效时保持一致。
+import type { AxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises } from '@vue/test-utils'
@@ -17,7 +18,7 @@ import request from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
 const originalAdapter = request.defaults.adapter
-let store
+let store: ReturnType<typeof useUserStore>
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -26,8 +27,8 @@ beforeEach(() => {
   localStorage.setItem('user', JSON.stringify({ id: 1, role: 'teacher' }))
   store = useUserStore()
   router.currentRoute.value.name = 'home'
-  router.push.mockResolvedValue(undefined)
-  ElMessageBox.confirm.mockResolvedValue('confirm')
+  vi.mocked(router.push).mockResolvedValue(undefined)
+  vi.mocked(ElMessageBox.confirm).mockResolvedValue('confirm' as Awaited<ReturnType<typeof ElMessageBox.confirm>>)
   request.defaults.adapter = config => Promise.reject({
     config,
     response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED', error: '登录已过期' } },
@@ -41,7 +42,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-async function expiredRequest(config) {
+async function expiredRequest(config?: AxiosRequestConfig) {
   await expect(request.get('/private', config)).rejects.toMatchObject({ code: 'AUTH_TOKEN_EXPIRED' })
 }
 
@@ -58,7 +59,7 @@ describe('登录失效后的恢复流程', () => {
   })
 
   it.each(['cancel', 'close'])('弹窗 %s 不产生未处理拒绝，也不清除登录状态', async action => {
-    ElMessageBox.confirm.mockRejectedValue(action)
+    vi.mocked(ElMessageBox.confirm).mockRejectedValue(action)
     await expiredRequest()
     await flushPromises()
 
@@ -68,8 +69,8 @@ describe('登录失效后的恢复流程', () => {
   })
 
   it('并发失效请求只显示一个弹窗，关闭后允许再次提示', async () => {
-    let dismiss
-    ElMessageBox.confirm.mockImplementationOnce(() => new Promise((resolve, reject) => { dismiss = reject }))
+    let dismiss!: (reason: unknown) => void
+    vi.mocked(ElMessageBox.confirm).mockImplementationOnce(() => new Promise((resolve, reject) => { dismiss = reject }))
     await Promise.all([expiredRequest(), expiredRequest()])
     expect(ElMessageBox.confirm).toHaveBeenCalledTimes(1)
 
@@ -97,7 +98,7 @@ describe('登录失效后的恢复流程', () => {
   it('跳转失败记录原因并释放弹窗锁，允许再次提示', async () => {
     const error = new Error('路由加载失败')
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-    router.push.mockRejectedValueOnce(error)
+    vi.mocked(router.push).mockRejectedValueOnce(error)
     await expiredRequest()
     await flushPromises()
 

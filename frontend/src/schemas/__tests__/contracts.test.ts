@@ -84,3 +84,10 @@ it('AI 代码分析仅展示结构完整的文本字段', async () => {
     expect(codeAnalysisSchema.safeParse(value).success).toBe(false)
   }
 })
+
+it('草稿结果验证可执行字段并保留任务专属 JSON', async () => {
+  const { draftResultSchema } = await import('../aiDraft')
+  expect(draftResultSchema.parse({code: 'print(3)', language: 'python', files: ['a.in']})).toEqual({code: 'print(3)', language: 'python', files: ['a.in']})
+  expect(draftResultSchema.safeParse({code: ['invalid']}).success).toBe(false)
+  expect(draftResultSchema.safeParse({problem_id: '1'}).success).toBe(false)
+})

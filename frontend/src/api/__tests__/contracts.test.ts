@@ -72,5 +72,7 @@ describe('领域 API 保持现有 HTTP 契约', () => {
     expectTypeOf(problem.downloadTestCases).returns.toEqualTypeOf<Promise<Blob>>()
     expectTypeOf<LoginInput>().toEqualTypeOf<{username: string; password: string}>()
     expectTypeOf(problem.submitSolution).parameter(0).toEqualTypeOf<SubmitCodeBody | FormData>()
+    expectTypeOf(debug.debugSolution).parameter(0).toEqualTypeOf<{problem_id: number; code: string; language: string; exam_id?: number | null}>()
+    expectTypeOf(llm.askLLM).parameter(0).toExtend<{system_setting: string; prompt: string}>()
   })
 })

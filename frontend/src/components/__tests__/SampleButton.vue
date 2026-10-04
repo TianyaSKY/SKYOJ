@@ -8,7 +8,7 @@
   </button>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * 用于测试的最小可交互按钮组件：
  * - props: label / variant / disabled
