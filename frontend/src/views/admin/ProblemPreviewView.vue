@@ -14,9 +14,11 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
+import type { ProblemDetailResponse } from '@/types/problem'
+import { parseRouteId } from '@/utils/route'
 import {getProblemDetail} from '@/api/problem'
 import {ElMessage} from 'element-plus'
 import {renderMarkdown} from '@/utils/markdown'
@@ -24,12 +26,16 @@ import {renderMarkdown} from '@/utils/markdown'
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
-const problem = ref({})
+const problem = ref<Partial<ProblemDetailResponse>>({})
 const renderedContent = computed(() => renderMarkdown(problem.value.content || ''))
 
 onMounted(async () => {
   loading.value = true
-  try { problem.value = await getProblemDetail(route.params.id) }
+  try {
+    const id = parseRouteId(route.params.id)
+    if (id === null) throw new Error('题目 ID 无效')
+    problem.value = await getProblemDetail(id)
+  }
   catch { ElMessage.error('加载题目失败') }
   finally { loading.value = false }
 })

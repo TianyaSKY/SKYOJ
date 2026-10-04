@@ -80,10 +80,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import { formatServerDateTime as formatTime } from '@/utils/date'
+import type { SubmissionDetailResponse } from '@/types/submission'
+import type { editor } from 'monaco-editor'
+import { parseRouteId } from '@/utils/route'
 import {getSubmissionDetail} from '@/api/problem'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
@@ -101,18 +104,20 @@ import {
 const route = useRoute()
 const loading = ref(false)
 const loadError = ref(false)
-let timer = null
+let timer: ReturnType<typeof setTimeout> | null = null
 let requestVersion = 0
 let disposed = false
 
-const initialSubmission = (id) => ({
-  id,
+const initialSubmission = (id: unknown): Omit<SubmissionDetailResponse, 'id'> & {id: number | null} => ({
+  id: parseRouteId(id),
   status: 'Loading...',
   score: 0,
   log: '',
   code: '',
   language: 'python',
-  created_at: ''
+  created_at: '',
+  exam_id: null,
+  case_results: []
 })
 const submission = ref(initialSubmission(route.params.id))
 
@@ -121,7 +126,7 @@ const isPending = computed(() => {
   return pendingStatuses.includes(submission.value.status)
 })
 
-const editorOptions = {
+const editorOptions: editor.IStandaloneEditorConstructionOptions = {
   readOnly: true,
   automaticLayout: true,
   minimap: {enabled: false},
@@ -131,7 +136,7 @@ const editorOptions = {
   renderWhitespace: 'selection'
 }
 
-const getStatusClass = (status) => {
+const getStatusClass = (status: string) => {
   if (!status) return ''
   const s = status.toLowerCase()
   if (s === 'accepted') return 'status-success'
@@ -140,7 +145,7 @@ const getStatusClass = (status) => {
   return 'status-warning'
 }
 
-const getScoreColor = (percentage) => {
+const getScoreColor = (percentage: number) => {
   if (percentage === 100) return '#67C23A'
   if (percentage >= 60) return '#E6A23C'
   return '#F56C6C'
@@ -149,7 +154,7 @@ const getScoreColor = (percentage) => {
 
 const copyCode = async () => {
   try {
-    await navigator.clipboard.writeText(submission.value.code)
+    await navigator.clipboard.writeText(submission.value.code || '')
     ElMessage.success('Code copied to clipboard')
   } catch (err) {
     ElMessage.error('Failed to copy code')
@@ -158,9 +163,10 @@ const copyCode = async () => {
 
 const fetchSubmission = async (silent = false) => {
   const version = ++requestVersion
-  const submissionId = route.params.id
+  const submissionId = parseRouteId(route.params.id)
   if (!silent) loading.value = true
   try {
+    if (submissionId === null) throw new Error('提交 ID 无效')
     const data = await getSubmissionDetail(submissionId)
     if (disposed || version !== requestVersion) return
     submission.value = data

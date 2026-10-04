@@ -71,7 +71,7 @@ describe('提交详情轮询生命周期', () => {
     state.route.params.id = '2'
     await nextTick()
     await flushPromises()
-    expect(getSubmissionDetail).toHaveBeenLastCalledWith('2')
+    expect(getSubmissionDetail).toHaveBeenLastCalledWith(2)
     old.resolve(result(1, 'Pending'))
     await flushPromises()
     expect(wrapper.vm.submission.id).toBe(2)
@@ -102,7 +102,7 @@ describe('提交详情轮询生命周期', () => {
     expect(ElMessage.error).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(2000)
     expect(getSubmissionDetail).toHaveBeenCalledTimes(3)
-    expect(getSubmissionDetail).toHaveBeenLastCalledWith('2')
+    expect(getSubmissionDetail).toHaveBeenLastCalledWith(2)
     expect(wrapper.vm.submission.status).toBe('Accepted')
     await vi.advanceTimersByTimeAsync(4000)
     expect(getSubmissionDetail).toHaveBeenCalledTimes(3)
@@ -162,4 +162,13 @@ it('切换提交时清除旧失败提示，旧重试响应不能覆盖新记录'
   expect(wrapper.vm.submission.id).toBe(2)
   expect(wrapper.vm.loadError).toBe(false)
   expect(ElMessage.error).toHaveBeenCalledTimes(1)
+})
+
+it.each(['invalid', '0', '-1', ['1']])('非法提交路由 ID %s 不请求或启动轮询', async id => {
+  state.route.params.id = id
+  mountPage(); await flushPromises()
+  await vi.advanceTimersByTimeAsync(6000)
+  expect(getSubmissionDetail).not.toHaveBeenCalled()
+  expect(wrapper.vm.loadError).toBe(true)
+  expect(wrapper.vm.submission.status).toBe('Load Failed')
 })
