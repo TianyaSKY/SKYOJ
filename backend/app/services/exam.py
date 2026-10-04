@@ -49,6 +49,7 @@ class UpdateExamParams:
     password: Optional[str] = None
     is_visible: Optional[bool] = None
     clear_freeze_minutes: bool = False
+    problem_ids: Optional[tuple[int, ...]] = None
 
 
 @dataclass(frozen=True)
@@ -279,13 +280,7 @@ class ExamService:
         start_time = to_utc_naive(params.start_time)
         end_time = to_utc_naive(params.end_time)
         self._validate_times(start_time, end_time)
-        if any(problem_id < 1 for problem_id in params.problem_ids):
-            raise InvalidStateError("题目 ID 必须为正整数")
-        if len(set(params.problem_ids)) != len(params.problem_ids):
-            raise InvalidStateError("考试题目不能重复")
-        existing = self._repository.existing_problem_ids(params.problem_ids)
-        if set(params.problem_ids) != existing:
-            raise ResourceNotFoundError("所选题目不存在")
+        self._validate_problem_ids(params.problem_ids)
         with self._uow.transaction():
             exam = self._repository.create(
                 title=params.title,
@@ -390,25 +385,48 @@ class ExamService:
             params.end_time if params.end_time is not None else exam.end_time
         )
         self._validate_times(start_time, end_time)
-        for field, value in (
-            ("title", params.title),
-            ("description", params.description),
-            ("start_time", start_time),
-            ("end_time", end_time),
-            ("is_visible", params.is_visible),
-            ("contest_type", params.contest_type),
-            ("freeze_minutes", params.freeze_minutes),
-        ):
-            if value is not None:
-                setattr(exam, field, value)
-        if params.clear_freeze_minutes:
-            exam.freeze_minutes = None
-        if params.password is not None:
-            exam.password = self._hash_password(params.password)
-        self._repository.update(exam)
-        self._uow.commit()
+        if params.problem_ids is not None:
+            self._validate_problem_ids(params.problem_ids)
+        with self._uow.transaction():
+            for field, value in (
+                ("title", params.title),
+                ("description", params.description),
+                ("start_time", start_time),
+                ("end_time", end_time),
+                ("is_visible", params.is_visible),
+                ("contest_type", params.contest_type),
+                ("freeze_minutes", params.freeze_minutes),
+            ):
+                if value is not None:
+                    setattr(exam, field, value)
+            if params.clear_freeze_minutes:
+                exam.freeze_minutes = None
+            if params.password is not None:
+                exam.password = self._hash_password(params.password)
+            self._repository.update(exam)
+            if params.problem_ids is not None:
+                original = self._repository.list_problems(exam_id)
+                desired = set(params.problem_ids)
+                existing = {item.problem_id for item in original}
+                for item in original:
+                    if item.problem_id not in desired:
+                        self._repository.delete_exam_problem(item)
+                for problem_id in params.problem_ids:
+                    if problem_id not in existing:
+                        self._repository.add_problem(exam_id, problem_id, None, 100)
+            detail = to_exam_detail(exam, self._repository.list_problems(exam_id))
         invalidate_rank_cache(exam_id)
-        return to_exam_detail(exam, self._repository.list_problems(exam_id))
+        return detail
+
+    def _validate_problem_ids(self, problem_ids: tuple[int, ...]) -> None:
+        """创建或替换选题前校验 ID、重复项和存在性。"""
+        if any(problem_id < 1 for problem_id in problem_ids):
+            raise InvalidStateError("题目 ID 必须为正整数")
+        if len(set(problem_ids)) != len(problem_ids):
+            raise InvalidStateError("考试题目不能重复")
+        existing = self._repository.existing_problem_ids(problem_ids)
+        if set(problem_ids) != existing:
+            raise ResourceNotFoundError("所选题目不存在")
 
     def delete_exam(self, requester_role: str, exam_id: int) -> None:
         self._require_teacher(requester_role)

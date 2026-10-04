@@ -667,3 +667,56 @@ def test_create_exam_rolls_back_exam_and_earlier_problem_on_attachment_failure(s
     assert calls == 2
     assert session.query(Exam).count() == before_exams
     assert session.query(ExamProblem).count() == before_problems
+
+
+def test_update_exam_replaces_selection_and_preserves_existing_problem_settings(seeded):
+    session = seeded['session']
+    exam_id = seeded['exam'].id
+    existing = session.query(ExamProblem).filter_by(exam_id=exam_id, problem_id=seeded['p1'].id).one()
+    existing.score = 70
+    p3 = Problem(title='P3', content='c3', type='acm', language='python')
+    session.add(p3)
+    session.commit()
+    detail = seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(
+        title='修改后', problem_ids=(seeded['p1'].id, p3.id)))
+    assert detail.title == '修改后'
+    items = {item.problem_id: item for item in seeded['repository'].list_problems(exam_id)}
+    assert set(items) == {seeded['p1'].id, p3.id}
+    assert items[seeded['p1'].id].score == 70
+    assert items[seeded['p1'].id].display_id == 'A'
+    assert items[p3.id].score == 100
+
+
+def test_update_omitted_selection_preserves_problems_empty_selection_clears(seeded):
+    service, exam_id = seeded['service'], seeded['exam'].id
+    detail = service.update_exam('teacher', exam_id, UpdateExamParams(title='更名'))
+    assert len(detail.problems) == 2
+    detail = service.update_exam('teacher', exam_id, UpdateExamParams(problem_ids=()))
+    assert detail.problems == []
+    assert seeded['repository'].list_problems(exam_id) == []
+
+
+@pytest.mark.parametrize('ids,error', [((99999,), ResourceNotFoundError), ((1, 1), InvalidStateError)])
+def test_invalid_update_selection_preserves_metadata_and_problems(seeded, ids, error):
+    exam_id = seeded['exam'].id
+    with pytest.raises(error):
+        seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(title='不应保存', problem_ids=ids))
+    assert seeded['repository'].get_by_id(exam_id).title == '期中考试'
+    assert len(seeded['repository'].list_problems(exam_id)) == 2
+
+
+def test_update_rolls_back_metadata_and_removed_problem_if_add_fails(seeded, monkeypatch):
+    session, exam_id = seeded['session'], seeded['exam'].id
+    p3 = Problem(title='P3', content='c3', type='acm', language='python')
+    session.add(p3)
+    session.commit()
+    p3_id = p3.id
+
+    def fail_add(*args):
+        raise RuntimeError('模拟添加失败')
+
+    monkeypatch.setattr(seeded['service']._repository, 'add_problem', fail_add)
+    with pytest.raises(RuntimeError, match='添加失败'):
+        seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(title='不应保存', problem_ids=(p3_id,)))
+    assert seeded['repository'].get_by_id(exam_id).title == '期中考试'
+    assert {item.problem_id for item in seeded['repository'].list_problems(exam_id)} == {seeded['p1'].id, seeded['p2'].id}

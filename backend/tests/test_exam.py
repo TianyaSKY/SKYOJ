@@ -227,3 +227,23 @@ def test_create_api_rejects_invalid_selection_without_new_exam(client, teacher_t
         'end_time': '2090-01-01T11:00:00Z', 'problem_ids': ids})
     assert response.status_code == status
     assert db_session.query(Exam).count() == before
+
+
+def test_update_api_saves_and_clears_selection_atomically(client, teacher_token, sample_problem):
+    headers = {'Authorization': f'Bearer {teacher_token}'}
+    created = client.post('/api/exams/', headers=headers, json={
+        'title': '编辑选题', 'start_time': '2090-01-01T10:00:00Z', 'end_time': '2090-01-01T11:00:00Z'})
+    exam_id = created.json()['id']
+    url = f'/api/exams/{exam_id}'
+    saved = client.put(url, headers=headers, json={'title': '有题目', 'problem_ids': [sample_problem.id]})
+    assert saved.status_code == 200
+    detail = client.get(url, headers=headers).json()
+    assert [item['problem_id'] for item in detail['problems']] == [sample_problem.id]
+    rejected = client.put(url, headers=headers, json={'title': '错误修改', 'problem_ids': [99999]})
+    assert rejected.status_code == 404
+    detail = client.get(url, headers=headers).json()
+    assert detail['title'] == '有题目'
+    assert len(detail['problems']) == 1
+    cleared = client.put(url, headers=headers, json={'problem_ids': []})
+    assert cleared.status_code == 200
+    assert client.get(url, headers=headers).json()['problems'] == []

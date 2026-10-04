@@ -31,6 +31,7 @@ class UpdateExamBody(BaseModel):
     freeze_minutes: Optional[int] = Field(default=None, ge=0)
     password: Optional[str] = None
     is_visible: Optional[bool] = None
+    problem_ids: Optional[list[Annotated[int, Field(ge=1)]]] = None
 
 
 class EnterExamBody(BaseModel):

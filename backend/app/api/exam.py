@@ -258,6 +258,7 @@ def update_exam(
             clear_freeze_minutes=(
                 "freeze_minutes" in body.model_fields_set and body.freeze_minutes is None
             ),
+            problem_ids=tuple(body.problem_ids) if body.problem_ids is not None else None,
         ),
     )
     return _exam_response(exam)

@@ -185,13 +185,11 @@
 import {createExamSchema, updateExamSchema} from '@/schemas/exam'
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {
-  addExamProblem,
   createExam,
   deleteExam,
   exportExamScores,
   getExamDetail,
   getExamList,
-  removeExamProblem,
   updateExam
 } from '@/api/exam'
 import {getProblemList} from '@/api/problem'
@@ -228,7 +226,6 @@ const isCurrentDialog = version => !disposed && dialogVisible.value && version =
 // Problem Selection
 const allProblems = ref([])
 const selectedProblemIds = ref([])
-const originalProblemIds = ref([])
 const problemSearchQuery = ref('')
 const timeRange = ref([])
 
@@ -309,7 +306,6 @@ const resetForm = () => {
   }
   timeRange.value = []
   selectedProblemIds.value = []
-  originalProblemIds.value = []
   currentExamId.value = null
 }
 
@@ -344,7 +340,6 @@ const handleEdit = async (row) => {
     } else {
       selectedProblemIds.value = []
     }
-    originalProblemIds.value = [...selectedProblemIds.value]
   } catch (error) {
     if (!isCurrentDialog(version)) return
     ElMessage.error('获取考试详情失败')
@@ -383,7 +378,7 @@ const handleExport = async (row) => {
 
 const handleSubmit = async () => {
   if (disposed || !dialogVisible.value || dialogLoading.value || submitting.value) return
-  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(isEdit.value ? form.value : { ...form.value, problem_ids: [...selectedProblemIds.value] })
+  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse({ ...form.value, problem_ids: [...selectedProblemIds.value] })
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
     return
@@ -392,22 +387,10 @@ const handleSubmit = async () => {
   const version = dialogVersion
   const editing = isEdit.value
   const examId = currentExamId.value
-  const currentIds = new Set(selectedProblemIds.value)
-  const originalIds = new Set(originalProblemIds.value)
   submitting.value = true
   try {
     if (editing) {
       await updateExam(examId, parsed.data)
-      const toAdd = [...currentIds].filter(id => !originalIds.has(id))
-      const toRemove = [...originalIds].filter(id => !currentIds.has(id))
-      const promises = []
-      for (const pid of toAdd) {
-        promises.push(addExamProblem(examId, {problem_id: pid, score: 100}))
-      }
-      for (const pid of toRemove) {
-        promises.push(removeExamProblem(examId, pid))
-      }
-      await Promise.all(promises)
       if (isCurrentDialog(version)) ElMessage.success('更新成功')
     } else {
       await createExam(parsed.data)

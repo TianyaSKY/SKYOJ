@@ -51,8 +51,9 @@ it('旧保存完成使用提交时的选题，不读取新窗口并不会关闭�
   const response = deferred(); updateExam.mockReturnValueOnce(response.promise)
   const pending = vm.handleSubmit(); vm.dialogVisible = false; await vm.handleEdit({ id: 2 }); vm.selectedProblemIds = [3]
   response.resolve({}); await pending
-  expect(addExamProblem).toHaveBeenCalledExactlyOnceWith(1, { problem_id: 2, score: 100 })
-  expect(removeExamProblem).toHaveBeenCalledExactlyOnceWith(1, 1)
+  expect(updateExam.mock.calls[0][1].problem_ids).toEqual([2])
+  expect(addExamProblem).not.toHaveBeenCalled()
+  expect(removeExamProblem).not.toHaveBeenCalled()
   expect(vm.dialogVisible).toBe(true); expect(vm.currentExamId).toBe(2); expect(vm.form.title).toBe('考试2')
   expect(vm.selectedProblemIds).toEqual([3]); expect(ElMessage.success).not.toHaveBeenCalled()
 })

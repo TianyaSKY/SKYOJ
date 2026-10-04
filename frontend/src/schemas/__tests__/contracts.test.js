@@ -60,3 +60,10 @@ it('创建考试保留选题数组，省略时为空，拒绝重复和无效题�
     expect(createExamSchema.safeParse({ ...exam, problem_ids }).success).toBe(false)
   }
 })
+it('编辑考试保留或清空选题，省略和 null 保持兼容，拒绝重复 ID', () => {
+  expect(updateExamSchema.parse({ problem_ids: [2, 1] }).problem_ids).toEqual([2, 1])
+  expect(updateExamSchema.parse({ problem_ids: [] }).problem_ids).toEqual([])
+  expect(updateExamSchema.parse({}).problem_ids).toBeUndefined()
+  expect(updateExamSchema.parse({ problem_ids: null }).problem_ids).toBeNull()
+  expect(updateExamSchema.safeParse({ problem_ids: [1, 1] }).success).toBe(false)
+})
