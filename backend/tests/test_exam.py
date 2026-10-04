@@ -247,3 +247,23 @@ def test_update_api_saves_and_clears_selection_atomically(client, teacher_token,
     cleared = client.put(url, headers=headers, json={'problem_ids': []})
     assert cleared.status_code == 200
     assert client.get(url, headers=headers).json()['problems'] == []
+
+
+def test_add_problem_api_validates_existence_and_duplicate(client, teacher_token, sample_problem, db_session):
+    from app.persistence.exam import ExamProblem
+
+    headers = {'Authorization': f'Bearer {teacher_token}'}
+    created = client.post('/api/exams/', headers=headers, json={
+        'title': '单题管理', 'start_time': '2090-01-01T10:00:00Z', 'end_time': '2090-01-01T11:00:00Z'})
+    exam_id = created.json()['id']
+    url = f'/api/exams/{exam_id}/problems'
+    missing = client.post(url, headers=headers, json={'problem_id': 99999})
+    assert missing.status_code == 404
+    assert db_session.query(ExamProblem).filter_by(exam_id=exam_id).count() == 0
+    added = client.post(url, headers=headers, json={'problem_id': sample_problem.id, 'display_id': 'A', 'score': 70})
+    assert added.status_code == 201
+    duplicate = client.post(url, headers=headers, json={'problem_id': sample_problem.id, 'display_id': 'B', 'score': 100})
+    assert duplicate.status_code == 400
+    stored = db_session.query(ExamProblem).filter_by(exam_id=exam_id).one()
+    assert stored.display_id == 'A'
+    assert stored.score == 70

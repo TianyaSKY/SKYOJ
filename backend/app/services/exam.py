@@ -439,10 +439,15 @@ class ExamService:
     ) -> None:
         self._require_teacher(requester_role)
         self._require_exam(exam_id)
-        self._repository.add_problem(
-            exam_id, params.problem_id, params.display_id, params.score
-        )
-        self._uow.commit()
+        self._validate_problem_ids((params.problem_id,))
+        with self._uow.transaction():
+            if not self._repository.lock_exam(exam_id):
+                raise ResourceNotFoundError("考试不存在")
+            if self._repository.get_exam_problem(exam_id, params.problem_id, for_update=True) is not None:
+                raise InvalidStateError("题目已在当前考试中")
+            self._repository.add_problem(
+                exam_id, params.problem_id, params.display_id, params.score
+            )
         invalidate_rank_cache(exam_id)
 
     def remove_problem(

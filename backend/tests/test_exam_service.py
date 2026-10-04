@@ -720,3 +720,35 @@ def test_update_rolls_back_metadata_and_removed_problem_if_add_fails(seeded, mon
         seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(title='不应保存', problem_ids=(p3_id,)))
     assert seeded['repository'].get_by_id(exam_id).title == '期中考试'
     assert {item.problem_id for item in seeded['repository'].list_problems(exam_id)} == {seeded['p1'].id, seeded['p2'].id}
+
+
+@pytest.mark.parametrize('problem_id,error', [(99999, ResourceNotFoundError), (1, InvalidStateError)])
+def test_add_problem_rejects_missing_or_duplicate_without_writes(seeded, problem_id, error):
+    exam_id = seeded['exam'].id
+    before = seeded['session'].query(ExamProblem).count()
+    with pytest.raises(error):
+        seeded['service'].add_problem('teacher', exam_id, AddExamProblemParams(problem_id, 'X', 50))
+    assert seeded['session'].query(ExamProblem).count() == before
+    original = seeded['repository'].get_exam_problem(exam_id, seeded['p1'].id)
+    assert original.display_id == 'A'
+    assert original.score == 100
+
+
+def test_add_problem_rolls_back_when_repository_fails_after_flush(seeded, monkeypatch):
+    session = seeded['session']
+    p3 = Problem(title='P3', content='c3', type='acm', language='python')
+    session.add(p3)
+    session.commit()
+    p3_id, exam_id = p3.id, seeded['exam'].id
+    repo = seeded['service']._repository
+    original = repo.add_problem
+
+    def fail_after_write(*args):
+        original(*args)
+        raise RuntimeError('模拟题目写入后失败')
+
+    monkeypatch.setattr(repo, 'add_problem', fail_after_write)
+    with pytest.raises(RuntimeError, match='写入后失败'):
+        seeded['service'].add_problem('teacher', exam_id, AddExamProblemParams(p3_id))
+    assert seeded['repository'].get_exam_problem(exam_id, p3_id) is None
+    assert len(seeded['repository'].list_problems(exam_id)) == 2

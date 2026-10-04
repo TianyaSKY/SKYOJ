@@ -180,12 +180,18 @@ class ExamRepository:
         self._db.refresh(item)
         return _to_exam_problem_record(item)
 
-    def get_exam_problem(self, exam_id: int, problem_id: int):
-        return _to_exam_problem_record(
-            self._db.query(ExamProblem)
-            .filter_by(exam_id=exam_id, problem_id=problem_id)
-            .first()
-        )
+    def lock_exam(self, exam_id: int) -> bool:
+        """锁定父考试行，串行化同一考试的题目添加。"""
+        # 无值变化的 UPDATE 同时适用于 MySQL 行锁和 SQLite 写锁。
+        return bool(self._db.query(Exam).filter(Exam.id == exam_id).update(
+            {Exam.id: Exam.id}, synchronize_session=False
+        ))
+
+    def get_exam_problem(self, exam_id: int, problem_id: int, *, for_update: bool = False):
+        query = self._db.query(ExamProblem).filter_by(exam_id=exam_id, problem_id=problem_id)
+        if for_update:
+            query = query.with_for_update().populate_existing()
+        return _to_exam_problem_record(query.first())
 
     def delete_exam_problem(self, item: ExamProblemRecord) -> None:
         self._db.delete(self._db.get(ExamProblem, item.id))
