@@ -6,8 +6,8 @@ import request from '@/utils/request'
  * 获取公开数据集列表
  * @param {object} params 查询参数
  */
-export function getDatasetList(params?: PaginationQuery): Promise<Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse> {
-    return request<Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse>({
+export function getDatasetList(params?: PaginationQuery): Promise<Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse | Dataset.LegacyDatasetListResponse> {
+    return request<Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse | Dataset.LegacyDatasetListResponse>({
         url: '/datasets',
         method: 'get',
         params

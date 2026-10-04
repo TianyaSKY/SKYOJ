@@ -4,9 +4,9 @@ import {getSysInfo} from '@/api/sys'
 
 export const useSysStore = defineStore('sys', () => {
     const title = ref('SKYOJ')
-    const practice = ref(true)
+    const practice = ref<boolean | 'True' | 'False'>(true)
     const info = ref('')
-    const warning = ref(false)
+    const warning = ref<boolean | 'True' | 'False'>(false)
     const loaded = ref(false)
 
     const fetchSysInfo = async () => {

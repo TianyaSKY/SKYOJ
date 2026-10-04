@@ -122,36 +122,37 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {useUserStore} from '@/stores/user'
 import {deleteDataset, downloadDataset, getDatasetList, uploadDataset} from '@/api/dataset'
-import {ElMessage} from 'element-plus'
+import {ElMessage, type UploadInstance, type UploadFile, type UploadFiles} from 'element-plus'
+import type { DatasetResponse } from '@/types/dataset'
 import {Delete, Download, Upload} from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
-const datasets = ref([])
+const datasets = ref<DatasetResponse[]>([])
 const loading = ref(false)
 const total = ref(0)
 const currentPage = ref(1)
-const deleting = ref(new Set())
+const deleting = ref(new Set<number>())
 const pageSize = ref(20)
 const uploadDialogVisible = ref(false)
 const uploading = ref(false)
-const uploadRef = ref(null)
+const uploadRef = ref<UploadInstance>()
 let uploadVersion = 0
 let listVersion = 0
 let requestedPage = 1
 let requestedPageSize = 20
 let disposed = false
-let refreshTimer = null
-const isCurrentUpload = version => !disposed && version === uploadVersion && uploadDialogVisible.value
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+const isCurrentUpload = (version: number) => !disposed && version === uploadVersion && uploadDialogVisible.value
 
 const MAX_SIZE_MB = 500
-const datasetStatuses = { pending: '处理中', ready: '可下载', failed: '处理失败' }
-const canDownload = row => !row.status || row.status === 'ready'
+const datasetStatuses: Record<string, string> = { pending: '处理中', ready: '可下载', failed: '处理失败' }
+const canDownload = (row: DatasetResponse) => !row.status || row.status === 'ready'
 
-const scheduleRefresh = delay => {
+const scheduleRefresh = (delay: number) => {
   if (disposed) return
   if (refreshTimer !== null) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
@@ -160,7 +161,7 @@ const scheduleRefresh = delay => {
   }, delay)
 }
 
-const uploadForm = ref({
+const uploadForm = ref<{name: string; description: string; file: File | null}>({
   name: '',
   description: '',
   file: null
@@ -168,7 +169,7 @@ const uploadForm = ref({
 
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
-const fetchDatasets = async (page = requestedPage, size = requestedPageSize) => {
+const fetchDatasets = async (page = requestedPage, size = requestedPageSize): Promise<void> => {
   if (disposed) return
   if (refreshTimer !== null) {
     clearTimeout(refreshTimer)
@@ -185,8 +186,8 @@ const fetchDatasets = async (page = requestedPage, size = requestedPageSize) => 
       page_size: size
     })
     if (!isCurrent()) return
-    const items = res.datasets || res.data || res
-    const count = res.datasets ? res.total : items.length
+    const items = Array.isArray(res) ? res : 'datasets' in res ? res.datasets : res.data
+    const count = !Array.isArray(res) && 'datasets' in res ? res.total : items.length
     const lastPage = Math.max(1, Math.ceil(count / size))
     if (page > lastPage) return await fetchDatasets(lastPage, size)
     datasets.value = items
@@ -206,10 +207,10 @@ const fetchDatasets = async (page = requestedPage, size = requestedPageSize) => 
   }
 }
 
-const handleSizeChange = val => fetchDatasets(1, val)
-const handleCurrentChange = val => fetchDatasets(val, pageSize.value)
+const handleSizeChange = (val: number) => fetchDatasets(1, val)
+const handleCurrentChange = (val: number) => fetchDatasets(val, pageSize.value)
 
-const handleDownload = async (row) => {
+const handleDownload = async (row: DatasetResponse) => {
   if (disposed || !canDownload(row)) return
   try {
     const blob = await downloadDataset(row.id)
@@ -226,7 +227,7 @@ const handleDownload = async (row) => {
   }
 }
 
-const handleDelete = async (row) => {
+const handleDelete = async (row: DatasetResponse) => {
   if (disposed || deleting.value.has(row.id)) return
   deleting.value.add(row.id)
   try {
@@ -241,18 +242,18 @@ const handleDelete = async (row) => {
   }
 }
 
-const handleFileChange = (file) => {
-  const isLtLimit = file.size / 1024 / 1024 < MAX_SIZE_MB
+const handleFileChange = (file: UploadFile) => {
+  const isLtLimit = (file.size ?? 0) / 1024 / 1024 < MAX_SIZE_MB
   if (!isLtLimit) {
     ElMessage.error(`上传文件大小不能超过 ${MAX_SIZE_MB}MB!`)
     uploadRef.value?.clearFiles()
     uploadForm.value.file = null
     return
   }
-  uploadForm.value.file = file.raw
+  uploadForm.value.file = file.raw || null
 }
 
-const handleFileRemove = (file, files) => {
+const handleFileRemove = (file: UploadFile, files: UploadFiles) => {
   uploadForm.value.file = files[0]?.raw || null
 }
 

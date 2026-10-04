@@ -8,6 +8,7 @@ export const cachedUserSchema = z.object({
   id: z.number().int().positive().optional(),
   username: z.string().optional(),
   role: userRoleSchema.optional(),
+  created_at: z.string().nullable().optional(),
   avatar: z.string().nullable().optional(),
 }).passthrough()
 export type CachedUser = z.output<typeof cachedUserSchema>

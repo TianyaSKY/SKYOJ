@@ -195,11 +195,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {ArrowRight, DataAnalysis, Document, InfoFilled, Setting, Reading} from '@element-plus/icons-vue'
 import {getSysInfo, getSysStatistics, updateSysInfo} from '@/api/sys'
+import type { UserProfileResponse } from '@/types/user'
 import {getAllUsers} from '@/api/user'
 import {useSysStore} from '@/stores/sys'
 import {ElMessage} from 'element-plus'
@@ -221,10 +222,10 @@ const llmEnv = ref({
 })
 
 const userListVisible = ref(false)
-const users = ref([])
+const users = ref<UserProfileResponse[]>([])
 const usersLoading = ref(false)
 
-const stats = ref([
+const stats = ref<Array<{label: string; value: string | number; icon: string; color: string}>>([
   {label: '总题目数', value: '0', icon: 'Collection', color: '#409EFF'},
   {label: '活跃考试', value: '0', icon: 'Timer', color: '#F56C6C'},
   {label: '今日提交', value: '0', icon: 'Monitor', color: '#67C23A'},
@@ -256,7 +257,7 @@ const fetchUsers = async () => {
   }
 }
 
-const handleStatClick = (index) => {
+const handleStatClick = (index: number) => {
   switch (index) {
     case 0:
       router.push({ name: 'problem-admin' })
@@ -273,7 +274,7 @@ const handleStatClick = (index) => {
   }
 }
 
-const viewUserProfile = (userId) => {
+const viewUserProfile = (userId: number) => {
   userListVisible.value = false
   router.push(`/profile/${userId}`)
 }

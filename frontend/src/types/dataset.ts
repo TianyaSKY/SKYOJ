@@ -21,3 +21,6 @@ export interface UploadDatasetResponse {
   message: string
   dataset: DatasetResponse
 }
+
+// 保留前端历史上接受的 data 包装格式。
+export interface LegacyDatasetListResponse { data: DatasetResponse[] }

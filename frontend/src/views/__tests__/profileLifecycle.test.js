@@ -42,7 +42,7 @@ it('旧用户资料不能覆盖新用户资料或继续读取旧用户提交', a
   state.route.params.id = '3'; await nextTick(); await flushPromises()
   old.resolve({ id: 2, username: 'old' }); await flushPromises()
   expect(wrapper.vm.targetUser.id).toBe(3)
-  expect(getUserSubmissions).toHaveBeenCalledExactlyOnceWith('3')
+  expect(getUserSubmissions).toHaveBeenCalledExactlyOnceWith(3)
 })
 it('旧用户提交失败不能显示错误或结束新请求的等待状态', async () => {
   const old = deferred(), current = deferred()
@@ -63,7 +63,7 @@ it('考试模式仍加载资料，模式变化后重新按权限加载提交历�
   expect(wrapper.vm.targetUser.id).toBe(2)
   expect(getUserSubmissions).not.toHaveBeenCalled()
   state.sys.practice = true; await nextTick(); await flushPromises()
-  expect(getUserSubmissions).toHaveBeenCalledExactlyOnceWith('2')
+  expect(getUserSubmissions).toHaveBeenCalledExactlyOnceWith(2)
 })
 it('切换为考试模式后旧历史响应不能恢复已隐藏的提交记录', async () => {
   const old = deferred()
@@ -227,4 +227,13 @@ it('复习完成后刷新用户正在请求的页，不强制返回此前页面'
   expect(wrapper.vm.wbPage).toBe(2)
   expect(wrapper.vm.wbItems[0].id).toBe(11)
   expect(wrapper.vm.wbStats.reviewed).toBe(1)
+})
+
+it.each(['invalid', '0', '-1', '1e3', ['2']])('非法资料路由 ID %s 不请求其他用户或当前用户历史', async id => {
+  state.route.params.id = id
+  mountPage(); await flushPromises()
+  expect(getUserProfile).not.toHaveBeenCalled()
+  expect(getUserSubmissions).not.toHaveBeenCalled()
+  expect(request).not.toHaveBeenCalled()
+  expect(ElMessage.error).toHaveBeenCalledWith('用户 ID 无效')
 })

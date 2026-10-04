@@ -178,7 +178,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed} from 'vue'
 import {ArrowRight, DataAnalysis, MagicStick, Monitor, Timer} from '@element-plus/icons-vue'
 import {useSysStore} from '@/stores/sys'
@@ -187,7 +187,7 @@ import {useUserStore} from '@/stores/user'
 const sysStore = useSysStore()
 const userStore = useUserStore()
 
-const isPracticeMode = computed(() => sysStore.practice !== false && sysStore.practice !== 'False')
+const isPracticeMode = computed(() => ![false, 'False'].includes(sysStore.practice))
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
 const resources = [
@@ -295,7 +295,7 @@ const scrollToAbout = () => {
   document.getElementById('about-section')?.scrollIntoView({behavior: 'smooth'})
 }
 
-const openLink = (url) => {
+const openLink = (url: string) => {
   window.open(url, '_blank')
 }
 </script>

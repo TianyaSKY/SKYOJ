@@ -191,7 +191,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onBeforeUnmount, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import { formatServerDateTime as formatTime, formatServerDate as formatDate } from '@/utils/date'
@@ -202,29 +202,34 @@ import {ElMessage} from 'element-plus'
 import {Calendar, List, Camera, Warning} from '@element-plus/icons-vue'
 import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
 import request from '@/utils/request'
+import type { UserProfileResponse, UserSubmissionResponse } from '@/types/user'
+import type { WrongBookItemResponse, WrongBookListResponse, WrongBookStatsResponse, ToggleReviewResponse } from '@/types/wrongBook'
+import type { UploadRequestOptions } from 'element-plus'
+import { errorMessage } from '@/utils/error'
+import { parseRouteId } from '@/utils/route'
 
 const route = useRoute()
 const userStore = useUserStore()
 const sysStore = useSysStore()
 
-const targetUser = ref({})
-const submissions = ref([])
+const targetUser = ref<Partial<UserProfileResponse> & {created_at?: string | null}>({})
+const submissions = ref<UserSubmissionResponse[]>([])
 const loading = ref(false)
 const uploadingAvatar = ref(false)
 let profileVersion = 0
 let disposed = false
-const isCurrentProfile = version => !disposed && version === profileVersion
-const wbItems = ref([])
+const isCurrentProfile = (version: number) => !disposed && version === profileVersion
+const wbItems = ref<WrongBookItemResponse[]>([])
 const wbStats = ref({ total: 0, unresolved: 0, reviewed: 0, accepted: 0 })
 const wbLoading = ref(false)
 const wbPage = ref(1)
 const wbPageSize = 10
 const wbTotal = ref(0)
-const pendingReviews = ref(new Set())
+const pendingReviews = ref(new Set<number>())
 let wbScopeVersion = 0
 let wbRequestVersion = 0
 let wbRequestedPage = 1
-const isCurrentWrongBook = version => !disposed && version === wbScopeVersion
+const isCurrentWrongBook = (version: number) => !disposed && version === wbScopeVersion
 
 const userId = computed(() => route.params.id)
 const userAvatar = computed(() => {
@@ -232,11 +237,11 @@ const userAvatar = computed(() => {
   return targetUser.value.avatar
 })
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
-const isPracticeMode = computed(() => sysStore.practice !== false && sysStore.practice !== 'False')
-const isCurrentUser = computed(() => !userId.value || Number(userId.value) === userStore.user?.id)
+const isPracticeMode = computed(() => ![false, 'False'].includes(sysStore.practice))
+const isCurrentUser = computed(() => !userId.value || parseRouteId(userId.value) === userStore.user?.id)
 const showWrongBook = computed(() => Boolean(userStore.user?.id) && isCurrentUser.value && (isPracticeMode.value || isTeacher.value))
 
-const getStatusType = (status) => {
+const getStatusType = (status: string) => {
   if (!status) return 'info'
   const s = status.toLowerCase()
   if (s === 'accepted') return 'success'
@@ -245,7 +250,7 @@ const getStatusType = (status) => {
   return 'info'
 }
 
-const getScoreClass = (score) => {
+const getScoreClass = (score: number) => {
   if (score === 100) return 'text-success'
   if (score > 0) return 'text-warning'
   return 'text-danger'
@@ -253,7 +258,7 @@ const getScoreClass = (score) => {
 
 
 
-const fetchWrongBook = async (pageNo = wbPage.value) => {
+const fetchWrongBook = async (pageNo = wbPage.value): Promise<void> => {
   if (!showWrongBook.value) return
   const scope = wbScopeVersion
   wbRequestedPage = pageNo
@@ -262,8 +267,8 @@ const fetchWrongBook = async (pageNo = wbPage.value) => {
   wbLoading.value = true
   try {
     const [statsRes, listRes] = await Promise.all([
-      request({ url: '/wrong-book/stats', method: 'get' }),
-      request({ url: '/wrong-book/', method: 'get', params: { page: pageNo, page_size: wbPageSize } }),
+      request<WrongBookStatsResponse>({ url: '/wrong-book/stats', method: 'get' }),
+      request<WrongBookListResponse>({ url: '/wrong-book/', method: 'get', params: { page: pageNo, page_size: wbPageSize } }),
     ])
     if (!isCurrent()) return
     const lastPage = Math.max(1, Math.ceil((listRes.total || 0) / wbPageSize))
@@ -273,18 +278,18 @@ const fetchWrongBook = async (pageNo = wbPage.value) => {
     wbStats.value = statsRes
     wbItems.value = listRes.items || []
   } catch (error) {
-    if (isCurrent()) ElMessage.error(error.message || '加载错题本失败')
+    if (isCurrent()) ElMessage.error(errorMessage(error, '加载错题本失败'))
   } finally {
     if (isCurrent()) wbLoading.value = false
   }
 }
 
-const toggleReview = async (item) => {
+const toggleReview = async (item: WrongBookItemResponse) => {
   if (!showWrongBook.value || item.accepted || pendingReviews.value.has(item.id)) return
   const scope = wbScopeVersion
   pendingReviews.value.add(item.id)
   try {
-    const res = await request({
+    const res = await request<ToggleReviewResponse>({
       url: `/wrong-book/${item.id}/toggle-review`,
       method: 'post',
     })
@@ -295,13 +300,13 @@ const toggleReview = async (item) => {
     // 重新读取服务端统计，并使较早的查询失效；保留正在翻到的页码。
     await fetchWrongBook(wbRequestedPage)
   } catch (error) {
-    if (isCurrentWrongBook(scope)) ElMessage.error(error.message || '操作失败')
+    if (isCurrentWrongBook(scope)) ElMessage.error(errorMessage(error, '操作失败'))
   } finally {
     if (isCurrentWrongBook(scope)) pendingReviews.value.delete(item.id)
   }
 }
 
-const beforeAvatarUpload = (file) => {
+const beforeAvatarUpload = (file: File) => {
   const isJPGorPNG = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'].includes(file.type)
   const isLt2M = file.size / 1024 / 1024 < 2
 
@@ -314,7 +319,7 @@ const beforeAvatarUpload = (file) => {
   return isJPGorPNG && isLt2M
 }
 
-const handleAvatarUpload = async (options) => {
+const handleAvatarUpload = async (options: UploadRequestOptions) => {
   if (!isCurrentUser.value || !userStore.user?.id || uploadingAvatar.value) return
   const version = profileVersion
   const ownerId = userStore.user.id
@@ -341,12 +346,16 @@ const handleAvatarUpload = async (options) => {
 
 const fetchData = async () => {
   const version = ++profileVersion
-  const id = userId.value
+  const id = userId.value ? parseRouteId(userId.value) : null
   const showHistory = isPracticeMode.value || isTeacher.value
   targetUser.value = id ? {} : { ...userStore.user }
   submissions.value = []
   loading.value = true
   try {
+    if (userId.value && id === null) {
+      ElMessage.error('用户 ID 无效')
+      return
+    }
     if (id) {
       const profile = await getUserProfile(id)
       if (!isCurrentProfile(version)) return

@@ -59,18 +59,18 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {loginSchema} from '@/schemas/auth'
 import {reactive, ref} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
-import {ElMessage} from 'element-plus'
+import {ElMessage, type FormInstance, type FormRules, type FormItemRule} from 'element-plus'
 import {Lock, User} from '@element-plus/icons-vue'
 import {useUserStore} from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const loginFormRef = ref(null)
+const loginFormRef = ref<FormInstance>()
 const loading = ref(false)
 
 const loginForm = reactive({
@@ -79,7 +79,7 @@ const loginForm = reactive({
   rememberMe: false,
 })
 
-const loginRules = reactive({
+const loginRules = reactive<FormRules>({
   username: [{required: true, message: 'Please enter your username', trigger: 'blur'}],
   password: [
     {required: true, message: 'Please enter your password', trigger: 'blur'},
@@ -116,7 +116,7 @@ const handleLogin = async () => {
       }
     } else {
       ElMessage.error('Please check your input.')
-      return false
+      return
     }
   })
 }

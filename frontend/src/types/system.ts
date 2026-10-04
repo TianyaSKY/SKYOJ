@@ -2,9 +2,12 @@ import type { JsonValue } from './common'
 
 export interface SystemConfig {
   title?: string
-  practice?: boolean
+  practice?: boolean | 'True' | 'False'
   info?: string
-  warning?: boolean
+  warning?: boolean | 'True' | 'False'
+  llm_env_ready?: boolean
+  llm_api_url?: string
+  llm_model_name?: string
   [key: string]: JsonValue | undefined
 }
 export interface UpdateSysConfigResponse {

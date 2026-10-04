@@ -133,38 +133,41 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {Monitor, Search, Timer} from '@element-plus/icons-vue'
 import {getProblemList, searchProblems} from '@/api/problem'
 import {ElMessage} from 'element-plus'
 import request from '@/utils/request'
+import type { ProblemListResponse, SearchProblemResponse, ProblemQuery, SearchQuery } from '@/types/problem'
+import type { TagResponse } from '@/types/community'
+import type { TagProps } from 'element-plus'
 
 const loading = ref(false)
-const problems = ref([])
-const searchResults = ref([])
+const problems = ref<ProblemListResponse[]>([])
+const searchResults = ref<SearchProblemResponse[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const searchQuery = ref('')
-const typeFilter = ref('')
-const tagFilter = ref('')
-const allTags = ref([])
+const typeFilter = ref<'' | 'acm' | 'oop' | 'kaggle'>('')
+const tagFilter = ref<number | ''>('')
+const allTags = ref<TagResponse[]>([])
 let requestVersion = 0
 let disposed = false
 
-const capitalize = (str) => {
+const capitalize = (str: string | null | undefined) => {
   if (!str) return ''
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
-const getLanguages = (langStr) => {
+const getLanguages = (langStr: string | null | undefined) => {
   if (!langStr) return []
   return langStr.split(',').map(s => s.trim()).filter(s => s)
 }
 
-const getTypeTag = (type) => {
-  const map = {
+const getTypeTag = (type: string) => {
+  const map: Record<string, TagProps['type']> = {
     'acm': 'primary',
     'kaggle': 'success',
     'oop': 'warning'
@@ -188,7 +191,7 @@ const handleSearch = async () => {
   const isCurrent = () => !disposed && version === requestVersion && query === searchQuery.value && tag === tagFilter.value && type === typeFilter.value
   loading.value = true
   try {
-    const params = { query, top_k: 50 }
+    const params: SearchQuery = { query, top_k: 50 }
     if (tag) params.tag_id = tag
     if (type) params.problem_type = type
     const data = await searchProblems(params)
@@ -210,7 +213,7 @@ const handleSearch = async () => {
 // 类型和知识点过滤均由服务端在计数和分页前完成。
 const filteredProblems = computed(() => searchQuery.value ? searchResults.value : problems.value)
 
-let debounceTimer = null
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 watch(searchQuery, (newVal) => {
   requestVersion += 1
   searchResults.value = []
@@ -228,14 +231,14 @@ watch(searchQuery, (newVal) => {
   }
 })
 
-const fetchProblems = async (page = currentPage.value, size = pageSize.value) => {
+const fetchProblems = async (page = currentPage.value, size = pageSize.value): Promise<void> => {
   if (disposed || searchQuery.value) return
   const version = ++requestVersion
   const tag = tagFilter.value, type = typeFilter.value
   const isCurrent = () => !disposed && version === requestVersion && !searchQuery.value && tag === tagFilter.value && type === typeFilter.value
   loading.value = true
   try {
-    const params = {
+    const params: ProblemQuery = {
       page,
       page_size: size
     }
@@ -245,8 +248,8 @@ const fetchProblems = async (page = currentPage.value, size = pageSize.value) =>
     }
     const res = await getProblemList(params)
     if (!isCurrent()) return
-    const items = res.problems || res
-    const count = res.problems ? res.total : items.length
+    const items = Array.isArray(res) ? res : res.problems
+    const count = Array.isArray(res) ? items.length : res.total
     const lastPage = Math.max(1, Math.ceil(count / size))
     if (page > lastPage) return await fetchProblems(lastPage, size)
     problems.value = items
@@ -265,7 +268,7 @@ const fetchProblems = async (page = currentPage.value, size = pageSize.value) =>
 
 const fetchTags = async () => {
   try {
-    const res = await request({ url: '/tags', method: 'get' })
+    const res = await request<TagResponse[]>({ url: '/tags', method: 'get' })
     if (!disposed) allTags.value = res || []
   } catch {
     // 标签加载失败不影响题目列表
@@ -288,8 +291,8 @@ const handleTypeChange = () => {
   return fetchProblems()
 }
 
-const handleSizeChange = val => fetchProblems(1, val)
-const handleCurrentChange = val => fetchProblems(val, pageSize.value)
+const handleSizeChange = (val: number) => fetchProblems(1, val)
+const handleCurrentChange = (val: number) => fetchProblems(val, pageSize.value)
 
 onBeforeUnmount(() => {
   disposed = true

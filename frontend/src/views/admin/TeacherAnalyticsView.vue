@@ -99,13 +99,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+import type { PlatformAnalyticsResponse } from '@/types/analytics'
 
 const loading = ref(false)
-const analyticsData = ref(null)
+const analyticsData = ref<PlatformAnalyticsResponse | null>(null)
 
 const overviewStats = computed(() => {
   if (!analyticsData.value) return []
@@ -128,13 +129,13 @@ const maxDailyCount = computed(() => {
   return Math.max(...arr.map(i => i.count))
 })
 
-const passRateColor = (rate) => {
+const passRateColor = (rate: number) => {
   if (rate >= 0.6) return '#67C23A'
   if (rate >= 0.3) return '#E6A23C'
   return '#F56C6C'
 }
 
-const difficultyColor = (score) => {
+const difficultyColor = (score: number) => {
   if (score <= 20) return '#e7f7e7'
   if (score <= 40) return '#fff8e1'
   if (score <= 60) return '#ffe0b2'
@@ -142,13 +143,13 @@ const difficultyColor = (score) => {
   return '#ef9a9a'
 }
 
-const truncate = (s, n) => s.length > n ? s.slice(0, n) + '…' : s
-const shortDate = (s) => s ? s.slice(5) : ''
+const truncate = (s: string, n: number) => s.length > n ? s.slice(0, n) + '…' : s
+const shortDate = (s: string) => s ? s.slice(5) : ''
 
 const fetchAnalytics = async () => {
   loading.value = true
   try {
-    const res = await request({ url: '/admin/analytics', method: 'get' })
+    const res = await request<PlatformAnalyticsResponse>({ url: '/admin/analytics', method: 'get' })
     analyticsData.value = res
   } catch {
     ElMessage.error('获取学情数据失败')

@@ -64,16 +64,17 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {registerSchema} from '@/schemas/auth'
 import {reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
-import {ElMessage} from 'element-plus'
+import {ElMessage, type FormInstance, type FormRules, type FormItemRule} from 'element-plus'
 import {Lock, User} from '@element-plus/icons-vue'
 import {register} from '@/api/user'
+import { backendErrorMessage } from '@/utils/error'
 
 const router = useRouter()
-const registerFormRef = ref(null)
+const registerFormRef = ref<FormInstance>()
 const loading = ref(false)
 
 const registerForm = reactive({
@@ -82,7 +83,7 @@ const registerForm = reactive({
   confirmPassword: '',
 })
 
-const validatePass = (rule, value, callback) => {
+const validatePass: NonNullable<FormItemRule['validator']> = (rule, value: string, callback) => {
   if (value === '') {
     callback(new Error('Please input the password again'))
   } else if (value !== registerForm.password) {
@@ -92,7 +93,7 @@ const validatePass = (rule, value, callback) => {
   }
 }
 
-const registerRules = reactive({
+const registerRules = reactive<FormRules>({
   username: [
     {required: true, message: 'Please enter your username', trigger: 'blur'},
     {min: 1, max: 80, message: 'Length should be 1 to 80', trigger: 'blur'},
@@ -126,16 +127,14 @@ const handleRegister = async () => {
         router.push('/login')
       } catch (error) {
         ElMessage.error(
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Registration failed'
+          backendErrorMessage(error, 'Registration failed')
         )
       } finally {
         loading.value = false
       }
     } else {
       ElMessage.error('Please check your input.')
-      return false
+      return
     }
   })
 }
