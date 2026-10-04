@@ -1,7 +1,10 @@
 import request from '@/utils/request'
 import type { TagResponse } from '@/types/community'
 
-export interface AttachTagBody { tag_id: number; approved: boolean }
+export interface AttachTagBody {
+  tag_id: number
+  approved: boolean
+}
 
 export function getTags(): Promise<TagResponse[]> {
   return request<TagResponse[]>({ url: '/tags', method: 'get' })

@@ -17,7 +17,7 @@ class FakeWebSocket {
   onclose: ((event: { code: number; reason?: string }) => void) | null = null
   onerror: ((event: unknown) => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null
-  constructor (url: string) {
+  constructor(url: string) {
     this.url = url
     this.readyState = 0
     this.onopen = null
@@ -26,11 +26,11 @@ class FakeWebSocket {
     this.onmessage = null
     FakeWebSocket.lastInstance = this
   }
-  close (code?: number, reason?: string) {
+  close(code?: number, reason?: string) {
     this.readyState = 3
     if (this.onclose) this.onclose({ code: code ?? 1000, reason })
   }
-  triggerServerClose (code: number) {
+  triggerServerClose(code: number) {
     this.readyState = 3
     if (this.onclose) this.onclose({ code })
   }
@@ -69,7 +69,9 @@ describe('websocket 自动重连', () => {
 
   it('消息回调异常不会将同一条 JSON 再作为文本发送', async () => {
     const { createSubmissionWS } = await import('@/utils/websocket')
-    const onMessage = vi.fn(() => { throw new Error('回调失败') })
+    const onMessage = vi.fn(() => {
+      throw new Error('回调失败')
+    })
     const ws = createSubmissionWS(1, 't', { onMessage })
     ws.connect()
     expect(() => latest().onmessage?.({ data: '{"status":"Accepted"}' })).toThrow('回调失败')
@@ -92,7 +94,8 @@ describe('websocket 自动重连', () => {
 
   it('重连后旧连接的消息与关闭事件不影响当前连接', async () => {
     const { createSubmissionWS } = await import('@/utils/websocket')
-    const onMessage = vi.fn(), onReconnect = vi.fn()
+    const onMessage = vi.fn(),
+      onReconnect = vi.fn()
     const ws = createSubmissionWS(1, 't', { onMessage, onReconnect })
     ws.connect()
     const first = latest()
@@ -192,7 +195,8 @@ it('握手成功后立即断线仍按指数退避，并保持 30 秒上限', asy
 
 it('成功收到消息后恢复初始重连等待时间', async () => {
   const { createSubmissionWS } = await import('@/utils/websocket')
-  const onReconnect = vi.fn(), onMessage = vi.fn()
+  const onReconnect = vi.fn(),
+    onMessage = vi.fn()
   const ws = createSubmissionWS(1, 't', { onReconnect, onMessage })
   ws.connect()
   latest().triggerServerClose(1006)
@@ -214,7 +218,11 @@ it('成功收到消息后恢复初始重连等待时间', async () => {
 it('重连通知抛错仍建立连接，并保留原始回调异常', async () => {
   const { createSubmissionWS } = await import('@/utils/websocket')
   const error = new Error('reconnect notification failed')
-  const ws = createSubmissionWS(1, 't', { onReconnect: () => { throw error } })
+  const ws = createSubmissionWS(1, 't', {
+    onReconnect: () => {
+      throw error
+    },
+  })
   ws.connect()
   const first = latest()
   first.triggerServerClose(1006)
@@ -226,15 +234,22 @@ it('重连通知抛错仍建立连接，并保留原始回调异常', async () =
 it('构造连接失败时错误回调抛错也不能停止后续重试', async () => {
   const { createSubmissionWS } = await import('@/utils/websocket')
   let attempts = 0
-  vi.stubGlobal('WebSocket', class extends FakeWebSocket {
-    constructor(url: string) {
-      attempts += 1
-      if (attempts === 1) throw new Error('constructor failed')
-      super(url)
-    }
-  })
+  vi.stubGlobal(
+    'WebSocket',
+    class extends FakeWebSocket {
+      constructor(url: string) {
+        attempts += 1
+        if (attempts === 1) throw new Error('constructor failed')
+        super(url)
+      }
+    },
+  )
   const error = new Error('error notification failed')
-  const ws = createSubmissionWS(1, 't', { onError: () => { throw error } })
+  const ws = createSubmissionWS(1, 't', {
+    onError: () => {
+      throw error
+    },
+  })
   expect(() => ws.connect()).toThrow(error)
   await vi.advanceTimersByTimeAsync(1000)
   expect(attempts).toBe(2)

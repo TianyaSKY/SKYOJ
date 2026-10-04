@@ -7,50 +7,50 @@
         </div>
       </template>
       <el-form
-          ref="registerFormRef"
-          :model="registerForm"
-          :rules="registerRules"
-          label-position="top"
-          @submit.prevent="handleRegister"
+        ref="registerFormRef"
+        :model="registerForm"
+        :rules="registerRules"
+        label-position="top"
+        @submit.prevent="handleRegister"
       >
         <el-form-item label="Username" prop="username">
           <el-input
-              v-model="registerForm.username"
-              :prefix-icon="User"
-              clearable
-              placeholder="Enter your username"
-              size="large"
+            v-model="registerForm.username"
+            :prefix-icon="User"
+            clearable
+            placeholder="Enter your username"
+            size="large"
           />
         </el-form-item>
         <el-form-item label="Password" prop="password">
           <el-input
-              v-model="registerForm.password"
-              :prefix-icon="Lock"
-              clearable
-              placeholder="Enter your password"
-              show-password
-              size="large"
-              type="password"
+            v-model="registerForm.password"
+            :prefix-icon="Lock"
+            clearable
+            placeholder="Enter your password"
+            show-password
+            size="large"
+            type="password"
           />
         </el-form-item>
         <el-form-item label="Confirm Password" prop="confirmPassword">
           <el-input
-              v-model="registerForm.confirmPassword"
-              :prefix-icon="Lock"
-              clearable
-              placeholder="Confirm your password"
-              show-password
-              size="large"
-              type="password"
+            v-model="registerForm.confirmPassword"
+            :prefix-icon="Lock"
+            clearable
+            placeholder="Confirm your password"
+            show-password
+            size="large"
+            type="password"
           />
         </el-form-item>
         <el-form-item>
           <el-button
-              :loading="loading"
-              class="register-button"
-              native-type="submit"
-              size="large"
-              type="primary"
+            :loading="loading"
+            class="register-button"
+            native-type="submit"
+            size="large"
+            type="primary"
           >
             Register
           </el-button>
@@ -65,12 +65,12 @@
 </template>
 
 <script setup lang="ts">
-import {registerSchema} from '@/schemas/auth'
-import {reactive, ref} from 'vue'
-import {useRouter} from 'vue-router'
-import {ElMessage, type FormInstance, type FormRules, type FormItemRule} from 'element-plus'
-import {Lock, User} from '@element-plus/icons-vue'
-import {register} from '@/api/user'
+import { registerSchema } from '@/schemas/auth'
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, type FormInstance, type FormRules, type FormItemRule } from 'element-plus'
+import { Lock, User } from '@element-plus/icons-vue'
+import { register } from '@/api/user'
 import { backendErrorMessage } from '@/utils/error'
 
 const router = useRouter()
@@ -95,16 +95,14 @@ const validatePass: NonNullable<FormItemRule['validator']> = (rule, value: strin
 
 const registerRules = reactive<FormRules>({
   username: [
-    {required: true, message: 'Please enter your username', trigger: 'blur'},
-    {min: 1, max: 80, message: 'Length should be 1 to 80', trigger: 'blur'},
+    { required: true, message: 'Please enter your username', trigger: 'blur' },
+    { min: 1, max: 80, message: 'Length should be 1 to 80', trigger: 'blur' },
   ],
   password: [
-    {required: true, message: 'Please enter your password', trigger: 'blur'},
-    {min: 6, message: 'Password must be at least 6 characters long', trigger: 'blur'},
+    { required: true, message: 'Please enter your password', trigger: 'blur' },
+    { min: 6, message: 'Password must be at least 6 characters long', trigger: 'blur' },
   ],
-  confirmPassword: [
-    {required: true, validator: validatePass, trigger: 'blur'},
-  ],
+  confirmPassword: [{ required: true, validator: validatePass, trigger: 'blur' }],
 })
 
 const handleRegister = async () => {
@@ -126,9 +124,7 @@ const handleRegister = async () => {
         ElMessage.success('Registration successful! Please log in.')
         router.push('/login')
       } catch (error) {
-        ElMessage.error(
-          backendErrorMessage(error, 'Registration failed')
-        )
+        ElMessage.error(backendErrorMessage(error, 'Registration failed'))
       } finally {
         loading.value = false
       }

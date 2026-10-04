@@ -10,7 +10,7 @@
           left: b.x + '%',
           backgroundColor: b.color,
           animationDuration: b.duration + 's',
-          animationDelay: b.delay + 's'
+          animationDelay: b.delay + 's',
         }"
       >
         <div class="balloon-string"></div>
@@ -37,7 +37,13 @@
               <span class="control-label">自动刷新</span>
               <el-switch v-model="autoRefresh" @change="handleAutoRefreshChange" />
             </div>
-            <el-button :icon="Refresh" :loading="loading" plain type="primary" @click="fetchRankData">
+            <el-button
+              :icon="Refresh"
+              :loading="loading"
+              plain
+              type="primary"
+              @click="fetchRankData"
+            >
               手动刷新
             </el-button>
           </div>
@@ -49,7 +55,11 @@
         <div class="podium-item silver">
           <div class="rank-badge">2</div>
           <div class="user-avatar-wrapper">
-            <el-avatar :size="64" :src="rankData[1].avatar ? `/api${rankData[1].avatar}` : ''" class="user-avatar">
+            <el-avatar
+              :size="64"
+              :src="rankData[1].avatar ? `/api${rankData[1].avatar}` : ''"
+              class="user-avatar"
+            >
               {{ rankData[1].username?.charAt(0).toUpperCase() }}
             </el-avatar>
           </div>
@@ -67,7 +77,11 @@
           </div>
           <div class="rank-badge">1</div>
           <div class="user-avatar-wrapper">
-            <el-avatar :size="80" :src="rankData[0].avatar ? `/api${rankData[0].avatar}` : ''" class="user-avatar">
+            <el-avatar
+              :size="80"
+              :src="rankData[0].avatar ? `/api${rankData[0].avatar}` : ''"
+              class="user-avatar"
+            >
               {{ rankData[0].username?.charAt(0).toUpperCase() }}
             </el-avatar>
           </div>
@@ -82,7 +96,11 @@
         <div class="podium-item bronze">
           <div class="rank-badge">3</div>
           <div class="user-avatar-wrapper">
-            <el-avatar :size="64" :src="rankData[2].avatar ? `/api${rankData[2].avatar}` : ''" class="user-avatar">
+            <el-avatar
+              :size="64"
+              :src="rankData[2].avatar ? `/api${rankData[2].avatar}` : ''"
+              class="user-avatar"
+            >
               {{ rankData[2].username?.charAt(0).toUpperCase() }}
             </el-avatar>
           </div>
@@ -110,8 +128,12 @@
           <template #default="scope">
             <div class="rank-num-cell">
               <el-icon v-if="scope.$index === 0" class="rank-icon gold-icon"><Trophy /></el-icon>
-              <el-icon v-else-if="scope.$index === 1" class="rank-icon silver-icon"><Trophy /></el-icon>
-              <el-icon v-else-if="scope.$index === 2" class="rank-icon bronze-icon"><Trophy /></el-icon>
+              <el-icon v-else-if="scope.$index === 1" class="rank-icon silver-icon"
+                ><Trophy
+              /></el-icon>
+              <el-icon v-else-if="scope.$index === 2" class="rank-icon bronze-icon"
+                ><Trophy
+              /></el-icon>
               <span v-else class="rank-num">{{ scope.$index + 1 }}</span>
             </div>
           </template>
@@ -120,7 +142,11 @@
         <el-table-column label="参赛者" prop="username" width="220" fixed>
           <template #default="scope">
             <div class="user-info-cell">
-              <el-avatar :size="28" :src="scope.row.avatar ? `/api${scope.row.avatar}` : ''" class="table-avatar">
+              <el-avatar
+                :size="28"
+                :src="scope.row.avatar ? `/api${scope.row.avatar}` : ''"
+                class="table-avatar"
+              >
                 {{ scope.row.username?.charAt(0).toUpperCase() }}
               </el-avatar>
               <span class="username-text">{{ scope.row.username }}</span>
@@ -135,27 +161,40 @@
         </el-table-column>
 
         <el-table-column
-            v-for="(problem, index) in problems"
-            :key="problem.problem_id"
-            :label="getProblemLabel(problem, index)"
-            align="center"
-            min-width="100"
+          v-for="(problem, index) in problems"
+          :key="problem.problem_id"
+          :label="getProblemLabel(problem, index)"
+          align="center"
+          min-width="100"
         >
           <template #default="scope">
             <div v-if="getProblemStatus(scope.row, problem.problem_id)" class="status-wrapper">
-              <div :class="getStatusClass(getProblemStatus(scope.row, problem.problem_id))" class="status-box">
+              <div
+                :class="getStatusClass(getProblemStatus(scope.row, problem.problem_id))"
+                class="status-box"
+              >
                 <div class="main-info">
                   <span v-if="getProblemStatus(scope.row, problem.problem_id).solved">
                     {{ formatTime(getProblemStatus(scope.row, problem.problem_id).time) }}
                   </span>
-                  <span v-else-if="getProblemStatus(scope.row, problem.problem_id).pending_attempts > 0">
+                  <span
+                    v-else-if="getProblemStatus(scope.row, problem.problem_id).pending_attempts > 0"
+                  >
                     ? {{ getProblemStatus(scope.row, problem.problem_id).pending_attempts }}
                   </span>
-                  <span v-else-if="getProblemStatus(scope.row, problem.problem_id).failed_attempts > 0">
+                  <span
+                    v-else-if="getProblemStatus(scope.row, problem.problem_id).failed_attempts > 0"
+                  >
                     -{{ getProblemStatus(scope.row, problem.problem_id).failed_attempts }}
                   </span>
                 </div>
-                <div v-if="getProblemStatus(scope.row, problem.problem_id).solved && getProblemStatus(scope.row, problem.problem_id).failed_attempts > 0" class="sub-info">
+                <div
+                  v-if="
+                    getProblemStatus(scope.row, problem.problem_id).solved &&
+                    getProblemStatus(scope.row, problem.problem_id).failed_attempts > 0
+                  "
+                  class="sub-info"
+                >
                   (+{{ getProblemStatus(scope.row, problem.problem_id).failed_attempts }})
                 </div>
               </div>
@@ -181,26 +220,33 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, onUnmounted, ref, watch} from 'vue'
-import {useRoute} from 'vue-router'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { RankEntry, RankProblemInfo, RankProblemStats } from '@/types/exam'
 import { parseRouteId } from '@/utils/route'
-import {getExamRank} from '@/api/exam'
-import {Refresh, Top, Trophy} from '@element-plus/icons-vue'
-import {ElMessage} from 'element-plus'
+import { getExamRank } from '@/api/exam'
+import { Refresh, Top, Trophy } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 
 const route = useRoute()
 const examId = parseRouteId(route.params.id)
 const examTitle = ref('加载中...')
 const loading = ref(false)
-const rankData = ref<Array<RankEntry & {avatar?: string | null}>>([])
+const rankData = ref<Array<RankEntry & { avatar?: string | null }>>([])
 const problems = ref<RankProblemInfo[]>([])
 const autoRefresh = ref(localStorage.getItem('exam_rank_auto_refresh') === 'true')
 const lastUpdateTime = ref('')
 const rankChangedUsers = ref(new Set<string>())
 const showFullscreenBalloons = ref(false)
-interface Balloon { id: number; x: number; color: string; duration: number; delay: number; text: string }
+interface Balloon {
+  id: number
+  x: number
+  color: string
+  duration: number
+  delay: number
+  text: string
+}
 const balloons = ref<Balloon[]>([])
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined
@@ -219,7 +265,7 @@ const triggerFullscreenBalloons = (users: Set<string>) => {
       color: BALLOON_COLORS[Math.floor(Math.random() * BALLOON_COLORS.length)],
       duration: 4 + Math.random() * 3,
       delay: Math.random() * 2,
-      text: i < userList.length ? userList[i] : ''
+      text: i < userList.length ? userList[i] : '',
     })
   }
 
@@ -305,7 +351,7 @@ const formatDuration = (seconds: number) => {
   return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-const tableRowClassName = ({ row, rowIndex }: {row: RankEntry; rowIndex: number}) => {
+const tableRowClassName = ({ row, rowIndex }: { row: RankEntry; rowIndex: number }) => {
   let classes = []
   if (rowIndex === 0) classes.push('gold-row')
   else if (rowIndex === 1) classes.push('silver-row')
@@ -318,10 +364,14 @@ const tableRowClassName = ({ row, rowIndex }: {row: RankEntry; rowIndex: number}
   return classes.join(' ')
 }
 
-watch(autoRefresh, (val: boolean) => {
-  if (val) refreshTimer = setInterval(() => fetchRankData(true), 30000)
-  else clearInterval(refreshTimer)
-}, { immediate: true })
+watch(
+  autoRefresh,
+  (val: boolean) => {
+    if (val) refreshTimer = setInterval(() => fetchRankData(true), 30000)
+    else clearInterval(refreshTimer)
+  },
+  { immediate: true },
+)
 
 onMounted(fetchRankData)
 onUnmounted(() => clearInterval(refreshTimer))
@@ -359,7 +409,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+  box-shadow: inset -5px -5px 10px rgba(0, 0, 0, 0.1);
 }
 
 .balloon-string {
@@ -367,24 +417,34 @@ onUnmounted(() => clearInterval(refreshTimer))
   bottom: -40px;
   width: 2px;
   height: 40px;
-  background: rgba(0,0,0,0.1);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .balloon-text {
   color: white;
   font-size: 12px;
   font-weight: bold;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
   text-align: center;
   padding: 0 5px;
   word-break: break-all;
 }
 
 @keyframes float-up {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(-120vh) rotate(20deg); opacity: 0; }
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120vh) rotate(20deg);
+    opacity: 0;
+  }
 }
 
 /* Original Styles */
@@ -455,7 +515,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   margin-bottom: 12px;
   border: 4px solid white;
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   display: flex;
 }
@@ -511,22 +571,51 @@ onUnmounted(() => clearInterval(refreshTimer))
 }
 
 /* Gold */
-.gold .podium-base { height: 100px; background: linear-gradient(to bottom, #fbbf24, #d97706); }
-.gold .user-avatar-wrapper { border-color: #fbbf24; }
-.gold .rank-badge { background: #d97706; right: 40px; }
-.crown { position: absolute; top: -35px; font-size: 32px; color: #fbbf24; animation: float 2s infinite ease-in-out; }
+.gold .podium-base {
+  height: 100px;
+  background: linear-gradient(to bottom, #fbbf24, #d97706);
+}
+.gold .user-avatar-wrapper {
+  border-color: #fbbf24;
+}
+.gold .rank-badge {
+  background: #d97706;
+  right: 40px;
+}
+.crown {
+  position: absolute;
+  top: -35px;
+  font-size: 32px;
+  color: #fbbf24;
+  animation: float 2s infinite ease-in-out;
+}
 
 /* Silver */
-.silver .podium-base { height: 70px; background: linear-gradient(to bottom, #cbd5e1, #64748b); }
-.silver .rank-badge { background: #64748b; }
+.silver .podium-base {
+  height: 70px;
+  background: linear-gradient(to bottom, #cbd5e1, #64748b);
+}
+.silver .rank-badge {
+  background: #64748b;
+}
 
 /* Bronze */
-.bronze .podium-base { height: 50px; background: linear-gradient(to bottom, #d97706, #92400e); }
-.bronze .rank-badge { background: #92400e; }
+.bronze .podium-base {
+  height: 50px;
+  background: linear-gradient(to bottom, #d97706, #92400e);
+}
+.bronze .rank-badge {
+  background: #92400e;
+}
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 /* Table Styles */
@@ -552,9 +641,15 @@ onUnmounted(() => clearInterval(refreshTimer))
   font-size: 20px;
 }
 
-.gold-icon { color: #fbbf24; }
-.silver-icon { color: #94a3b8; }
-.bronze-icon { color: #d97706; }
+.gold-icon {
+  color: #fbbf24;
+}
+.silver-icon {
+  color: #94a3b8;
+}
+.bronze-icon {
+  color: #d97706;
+}
 
 .rank-num {
   font-weight: 600;
@@ -596,8 +691,14 @@ onUnmounted(() => clearInterval(refreshTimer))
 }
 
 @keyframes balloon-pop {
-  0% { transform: scale(0) translateY(10px); opacity: 0; }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+  0% {
+    transform: scale(0) translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 .balloon-pop-enter-active {
@@ -650,20 +751,32 @@ onUnmounted(() => clearInterval(refreshTimer))
 }
 
 /* Row Highlighting */
-:deep(.gold-row) { background-color: rgba(251, 191, 36, 0.05) !important; }
-:deep(.silver-row) { background-color: rgba(148, 163, 184, 0.05) !important; }
-:deep(.bronze-row) { background-color: rgba(217, 119, 6, 0.05) !important; }
+:deep(.gold-row) {
+  background-color: rgba(251, 191, 36, 0.05) !important;
+}
+:deep(.silver-row) {
+  background-color: rgba(148, 163, 184, 0.05) !important;
+}
+:deep(.bronze-row) {
+  background-color: rgba(217, 119, 6, 0.05) !important;
+}
 
 :deep(.rank-up-row) {
   animation: highlight-fade 5s ease-out;
 }
 
 @keyframes highlight-fade {
-  0% { background-color: rgba(16, 185, 129, 0.15) !important; }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 @media screen and (max-width: 768px) {
-  .podium-container { display: none; }
+  .podium-container {
+    display: none;
+  }
 }
 </style>

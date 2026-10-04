@@ -8,13 +8,13 @@
             {{ targetUser.username?.charAt(0).toUpperCase() }}
           </el-avatar>
           <el-upload
-              v-if="isCurrentUser"
-              class="avatar-uploader"
-              action="#"
-              :show-file-list="false"
-              :http-request="handleAvatarUpload"
-              :before-upload="beforeAvatarUpload"
-              :disabled="uploadingAvatar"
+            v-if="isCurrentUser"
+            class="avatar-uploader"
+            action="#"
+            :show-file-list="false"
+            :http-request="handleAvatarUpload"
+            :before-upload="beforeAvatarUpload"
+            :disabled="uploadingAvatar"
           >
             <div class="avatar-edit-overlay">
               <el-icon><Camera /></el-icon>
@@ -43,15 +43,27 @@
               错题本
             </h3>
             <div class="wrongbook-stats">
-              <el-tag type="danger" effect="plain" size="small">未解决 {{ wbStats.unresolved }}</el-tag>
-              <el-tag type="success" effect="plain" size="small">已掌握 {{ wbStats.accepted }}</el-tag>
-              <el-tag type="warning" effect="plain" size="small">已复习 {{ wbStats.reviewed }}</el-tag>
+              <el-tag type="danger" effect="plain" size="small"
+                >未解决 {{ wbStats.unresolved }}</el-tag
+              >
+              <el-tag type="success" effect="plain" size="small"
+                >已掌握 {{ wbStats.accepted }}</el-tag
+              >
+              <el-tag type="warning" effect="plain" size="small"
+                >已复习 {{ wbStats.reviewed }}</el-tag
+              >
             </div>
           </div>
         </template>
-        <el-table v-loading="wbLoading" :data="wbItems" stripe style="width: 100%" :max-height="300">
-          <el-table-column align="center" label="#" prop="problem_id" width="80"/>
-          <el-table-column label="题目" min-width="200" prop="problem_title"/>
+        <el-table
+          v-loading="wbLoading"
+          :data="wbItems"
+          stripe
+          style="width: 100%"
+          :max-height="300"
+        >
+          <el-table-column align="center" label="#" prop="problem_id" width="80" />
+          <el-table-column label="题目" min-width="200" prop="problem_title" />
           <el-table-column align="center" label="首次出错" min-width="160">
             <template #default="scope">
               <span class="text-secondary">{{ formatTime(scope.row.first_wrong_at) }}</span>
@@ -83,7 +95,12 @@
           </el-table-column>
           <el-table-column align="center" fixed="right" label="操作" width="90">
             <template #default="scope">
-              <el-button plain size="small" type="primary" @click="$router.push(`/problem/${scope.row.problem_id}`)">
+              <el-button
+                plain
+                size="small"
+                type="primary"
+                @click="$router.push(`/problem/${scope.row.problem_id}`)"
+              >
                 去练
               </el-button>
             </template>
@@ -107,13 +124,13 @@
           <div class="card-header">
             <h3 class="header-title">
               <el-icon>
-                <Calendar/>
+                <Calendar />
               </el-icon>
               Activity
             </h3>
           </div>
         </template>
-        <submission-heatmap v-loading="loading" :submissions="submissions"/>
+        <submission-heatmap v-loading="loading" :submissions="submissions" />
       </el-card>
 
       <!-- Submissions Table -->
@@ -122,7 +139,7 @@
           <div class="card-header">
             <h3 class="header-title">
               <el-icon>
-                <List/>
+                <List />
               </el-icon>
               Submission History
             </h3>
@@ -130,25 +147,36 @@
         </template>
 
         <el-table
-            v-loading="loading"
-            :data="submissions"
-            :default-sort="{ prop: 'created_at', order: 'descending' }"
-            stripe
-            style="width: 100%"
+          v-loading="loading"
+          :data="submissions"
+          :default-sort="{ prop: 'created_at', order: 'descending' }"
+          stripe
+          style="width: 100%"
         >
-          <el-table-column align="center" label="#" prop="id" width="80"/>
+          <el-table-column align="center" label="#" prop="id" width="80" />
 
           <el-table-column label="Problem" min-width="200" prop="problem_title">
             <template #default="scope">
-              <el-link :underline="false" type="primary" @click="$router.push(`/problem/${scope.row.problem_id}`)">
-                <span class="problem-link">{{ scope.row.problem_id }}. {{ scope.row.problem_title }}</span>
+              <el-link
+                :underline="false"
+                type="primary"
+                @click="$router.push(`/problem/${scope.row.problem_id}`)"
+              >
+                <span class="problem-link"
+                  >{{ scope.row.problem_id }}. {{ scope.row.problem_title }}</span
+                >
               </el-link>
             </template>
           </el-table-column>
 
           <el-table-column align="center" label="Status" prop="status" width="140">
             <template #default="scope">
-              <el-tag :type="getStatusType(scope.row.status)" class="status-tag" effect="light" size="small">
+              <el-tag
+                :type="getStatusType(scope.row.status)"
+                class="status-tag"
+                effect="light"
+                size="small"
+              >
                 {{ scope.row.status }}
               </el-tag>
             </template>
@@ -156,15 +184,21 @@
 
           <el-table-column align="center" label="Score" prop="score" width="80">
             <template #default="scope">
-              <span :class="getScoreClass(scope.row.score)" class="score-text">{{ scope.row.score }}</span>
+              <span :class="getScoreClass(scope.row.score)" class="score-text">{{
+                scope.row.score
+              }}</span>
             </template>
           </el-table-column>
 
-          <el-table-column align="center" label="Lang" prop="language" width="100"/>
+          <el-table-column align="center" label="Lang" prop="language" width="100" />
 
           <el-table-column align="center" label="Exam" prop="exam_id" width="100">
             <template #default="scope">
-              <el-tag v-if="scope.row.exam_id !== null && scope.row.exam_id !== -1" size="small" type="info">
+              <el-tag
+                v-if="scope.row.exam_id !== null && scope.row.exam_id !== -1"
+                size="small"
+                type="info"
+              >
                 ID: {{ scope.row.exam_id }}
               </el-tag>
               <span v-else>-</span>
@@ -179,7 +213,12 @@
 
           <el-table-column align="center" fixed="right" label="Action" width="100">
             <template #default="scope">
-              <el-button plain size="small" type="primary" @click="$router.push(`/submission/${scope.row.id}`)">
+              <el-button
+                plain
+                size="small"
+                type="primary"
+                @click="$router.push(`/submission/${scope.row.id}`)"
+              >
                 Details
               </el-button>
             </template>
@@ -192,14 +231,14 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onBeforeUnmount, ref, watch} from 'vue'
-import {useRoute} from 'vue-router'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { formatServerDateTime as formatTime, formatServerDate as formatDate } from '@/utils/date'
-import {useUserStore} from '@/stores/user'
-import {useSysStore} from '@/stores/sys'
-import {getUserProfile, getUserSubmissions, uploadAvatar} from '@/api/user'
-import {ElMessage} from 'element-plus'
-import {Calendar, List, Camera, Warning} from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
+import { useSysStore } from '@/stores/sys'
+import { getUserProfile, getUserSubmissions, uploadAvatar } from '@/api/user'
+import { ElMessage } from 'element-plus'
+import { Calendar, List, Camera, Warning } from '@element-plus/icons-vue'
 import SubmissionHeatmap from '@/components/SubmissionHeatmap.vue'
 import { getWrongBookStats, getWrongBook, toggleWrongBookReview } from '@/api/wrongBook'
 import type { UserProfileResponse, UserSubmissionResponse } from '@/types/user'
@@ -212,7 +251,7 @@ const route = useRoute()
 const userStore = useUserStore()
 const sysStore = useSysStore()
 
-const targetUser = ref<Partial<UserProfileResponse> & {created_at?: string | null}>({})
+const targetUser = ref<Partial<UserProfileResponse> & { created_at?: string | null }>({})
 const submissions = ref<UserSubmissionResponse[]>([])
 const loading = ref(false)
 const uploadingAvatar = ref(false)
@@ -238,8 +277,13 @@ const userAvatar = computed(() => {
 })
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 const isPracticeMode = computed(() => ![false, 'False'].includes(sysStore.practice))
-const isCurrentUser = computed(() => !userId.value || parseRouteId(userId.value) === userStore.user?.id)
-const showWrongBook = computed(() => Boolean(userStore.user?.id) && isCurrentUser.value && (isPracticeMode.value || isTeacher.value))
+const isCurrentUser = computed(
+  () => !userId.value || parseRouteId(userId.value) === userStore.user?.id,
+)
+const showWrongBook = computed(
+  () =>
+    Boolean(userStore.user?.id) && isCurrentUser.value && (isPracticeMode.value || isTeacher.value),
+)
 
 const getStatusType = (status: string) => {
   if (!status) return 'info'
@@ -255,8 +299,6 @@ const getScoreClass = (score: number) => {
   if (score > 0) return 'text-warning'
   return 'text-danger'
 }
-
-
 
 const fetchWrongBook = async (pageNo = wbPage.value): Promise<void> => {
   if (!showWrongBook.value) return
@@ -292,7 +334,7 @@ const toggleReview = async (item: WrongBookItemResponse) => {
     const res = await toggleWrongBookReview(item.id)
     if (!isCurrentWrongBook(scope)) return
     item.reviewed = res.reviewed
-    const current = wbItems.value.find(entry => entry.id === item.id)
+    const current = wbItems.value.find((entry) => entry.id === item.id)
     if (current) current.reviewed = res.reviewed
     // 重新读取服务端统计，并使较早的查询失效；保留正在翻到的页码。
     await fetchWrongBook(wbRequestedPage)
@@ -370,19 +412,26 @@ const fetchData = async () => {
 }
 
 watch([userId, () => userStore.user?.id, isPracticeMode, isTeacher], fetchData, { immediate: true })
-onBeforeUnmount(() => { disposed = true; profileVersion += 1 })
+onBeforeUnmount(() => {
+  disposed = true
+  profileVersion += 1
+})
 
-watch([userId, () => userStore.user?.id, showWrongBook], () => {
-  wbScopeVersion += 1
-  wbItems.value = []
-  wbStats.value = { total: 0, unresolved: 0, reviewed: 0, accepted: 0 }
-  wbPage.value = 1
-  wbRequestedPage = 1
-  wbTotal.value = 0
-  wbLoading.value = false
-  pendingReviews.value.clear()
-  fetchWrongBook()
-}, { immediate: true })
+watch(
+  [userId, () => userStore.user?.id, showWrongBook],
+  () => {
+    wbScopeVersion += 1
+    wbItems.value = []
+    wbStats.value = { total: 0, unresolved: 0, reviewed: 0, accepted: 0 }
+    wbPage.value = 1
+    wbRequestedPage = 1
+    wbTotal.value = 0
+    wbLoading.value = false
+    pendingReviews.value.clear()
+    fetchWrongBook()
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>

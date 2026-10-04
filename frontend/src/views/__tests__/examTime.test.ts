@@ -6,32 +6,96 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import dayjs from 'dayjs'
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '1' } }), useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/api/exam', () => ({ getExamList: vi.fn(), getExamDetail: vi.fn(), getMyExamStatus: vi.fn(), enterExam: vi.fn(), exitExam: vi.fn(), createExam: vi.fn(), updateExam: vi.fn(), deleteExam: vi.fn(), exportExamScores: vi.fn(), addExamProblem: vi.fn(), removeExamProblem: vi.fn() }))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: { id: '1' } }),
+  useRouter: () => ({ push: vi.fn() }),
+}))
+vi.mock('@/api/exam', () => ({
+  getExamList: vi.fn(),
+  getExamDetail: vi.fn(),
+  getMyExamStatus: vi.fn(),
+  enterExam: vi.fn(),
+  exitExam: vi.fn(),
+  createExam: vi.fn(),
+  updateExam: vi.fn(),
+  deleteExam: vi.fn(),
+  exportExamScores: vi.fn(),
+  addExamProblem: vi.fn(),
+  removeExamProblem: vi.fn(),
+}))
 vi.mock('@/api/problem', () => ({ getProblemList: vi.fn() }))
-vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() }, ElMessageBox: { alert: vi.fn(), confirm: vi.fn() } }))
+vi.mock('element-plus', () => ({
+  ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  ElMessageBox: { alert: vi.fn(), confirm: vi.fn() },
+}))
 import ExamView from '../ExamView.vue'
 import ExamDetailView from '../ExamDetailView.vue'
 import ExamAdminView from '../admin/ExamAdminView.vue'
 import { getExamList, getExamDetail, getMyExamStatus, updateExam } from '@/api/exam'
 import { getProblemList } from '@/api/problem'
 import { ElMessageBox } from 'element-plus'
-interface TimeState { formatTime?: (time: string) => string; formatTimeShort?: (time: string) => string }
-interface DetailState extends TimeState { remainingTimeStr: string; timerStatus: { label: string } }
-interface ListState extends TimeState { getExamStatus(exam: ExamListResponse): { text: string }; filteredExams: ExamListResponse[] }
+interface TimeState {
+  formatTime?: (time: string) => string
+  formatTimeShort?: (time: string) => string
+}
+interface DetailState extends TimeState {
+  remainingTimeStr: string
+  timerStatus: { label: string }
+}
+interface ListState extends TimeState {
+  getExamStatus(exam: ExamListResponse): { text: string }
+  filteredExams: ExamListResponse[]
+}
 interface AdminState extends TimeState {
-  timeRange: (Date | null)[]; form: { start_time: string; end_time: string };
-  handleEdit(exam: ExamListResponse): Promise<void>; handleSubmit(): Promise<void>; handleTimeChange(range: [Date, Date]): void;
-  getExamStatus(exam: ExamListResponse): { label: string };
+  timeRange: (Date | null)[]
+  form: { start_time: string; end_time: string }
+  handleEdit(exam: ExamListResponse): Promise<void>
+  handleSubmit(): Promise<void>
+  handleTimeChange(range: [Date, Date]): void
+  getExamStatus(exam: ExamListResponse): { label: string }
 }
 let wrapper: ReturnType<typeof shallowMount> | undefined
 function mountedWrapper() {
   if (!wrapper) throw new Error('考试页面未挂载')
   return wrapper
 }
-const exam = examResponse(1, { title: '考试', start_time: '2026-06-15T10:00:01', end_time: '2026-06-15T10:00:03' })
+const exam = examResponse(1, {
+  title: '考试',
+  start_time: '2026-06-15T10:00:01',
+  end_time: '2026-06-15T10:00:03',
+})
 function mountPage<T extends TimeState = TimeState>(component: Component) {
-  wrapper = shallowMount(component, { global: { directives: { loading: () => {} }, stubs: Object.fromEntries(['el-icon','el-tag','el-table','el-table-column','el-link','el-button','el-card','el-col','el-row','el-progress','el-divider','el-alert','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm','el-checkbox'].map(name => [name, true])) } })
+  wrapper = shallowMount(component, {
+    global: {
+      directives: { loading: () => {} },
+      stubs: Object.fromEntries(
+        [
+          'el-icon',
+          'el-tag',
+          'el-table',
+          'el-table-column',
+          'el-link',
+          'el-button',
+          'el-card',
+          'el-col',
+          'el-row',
+          'el-progress',
+          'el-divider',
+          'el-alert',
+          'el-input',
+          'el-dialog',
+          'el-form',
+          'el-form-item',
+          'el-date-picker',
+          'el-switch',
+          'el-transfer',
+          'el-tooltip',
+          'el-popconfirm',
+          'el-checkbox',
+        ].map((name) => [name, true]),
+      ),
+    },
+  })
   return wrapper.vm as unknown as T
 }
 beforeEach(() => {
@@ -39,57 +103,104 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
   vi.setSystemTime(new Date('2026-06-15T10:00:00Z'))
-  vi.mocked(getExamList).mockResolvedValue([exam]); vi.mocked(getExamDetail).mockResolvedValue(exam)
-  vi.mocked(getMyExamStatus).mockResolvedValue([]); vi.mocked(getProblemList).mockResolvedValue([]); vi.mocked(updateExam).mockResolvedValue(exam)
+  vi.mocked(getExamList).mockResolvedValue([exam])
+  vi.mocked(getExamDetail).mockResolvedValue(exam)
+  vi.mocked(getMyExamStatus).mockResolvedValue([])
+  vi.mocked(getProblemList).mockResolvedValue([])
+  vi.mocked(updateExam).mockResolvedValue(exam)
 })
-afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.clearAllTimers(); vi.useRealTimers() })
+afterEach(() => {
+  wrapper?.unmount()
+  wrapper = undefined
+  vi.clearAllTimers()
+  vi.useRealTimers()
+})
 it('详情按 UTC 倒计时，开考和结束时更新标签，结束只提示一次', async () => {
-  const vm = mountPage<DetailState>(ExamDetailView); await flushPromises()
-  expect(vm.remainingTimeStr).toBe('00:00:01'); expect(vm.timerStatus.label).toBe('距离开始')
+  const vm = mountPage<DetailState>(ExamDetailView)
+  await flushPromises()
+  expect(vm.remainingTimeStr).toBe('00:00:01')
+  expect(vm.timerStatus.label).toBe('距离开始')
   await vi.advanceTimersByTimeAsync(1000)
-  expect(vm.timerStatus.label).toBe('剩余时间'); expect(vm.remainingTimeStr).toBe('00:00:02')
+  expect(vm.timerStatus.label).toBe('剩余时间')
+  expect(vm.remainingTimeStr).toBe('00:00:02')
   await vi.advanceTimersByTimeAsync(2000)
-  expect(vm.timerStatus.label).toBe('已结束'); expect(vm.remainingTimeStr).toBe('00:00:00')
+  expect(vm.timerStatus.label).toBe('已结束')
+  expect(vm.remainingTimeStr).toBe('00:00:00')
   expect(ElMessageBox.alert).toHaveBeenCalledOnce()
-  await vi.advanceTimersByTimeAsync(2000); expect(ElMessageBox.alert).toHaveBeenCalledOnce()
-  mountedWrapper().unmount(); wrapper = undefined; expect(vi.getTimerCount()).toBe(0)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(ElMessageBox.alert).toHaveBeenCalledOnce()
+  mountedWrapper().unmount()
+  wrapper = undefined
+  expect(vi.getTimerCount()).toBe(0)
 })
 it('列表随时间更新，结束瞬间移除过期考试', async () => {
-  const vm = mountPage<ListState>(ExamView); await flushPromises()
-  expect(vm.getExamStatus(exam).text).toBe('未开始'); expect(vm.filteredExams).toHaveLength(1)
-  await vi.advanceTimersByTimeAsync(1000); expect(vm.getExamStatus(exam).text).toBe('进行中')
+  const vm = mountPage<ListState>(ExamView)
+  await flushPromises()
+  expect(vm.getExamStatus(exam).text).toBe('未开始')
+  expect(vm.filteredExams).toHaveLength(1)
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(vm.getExamStatus(exam).text).toBe('进行中')
   await vi.advanceTimersByTimeAsync(2000)
-  expect(vm.getExamStatus(exam).text).toBe('已结束'); expect(vm.filteredExams).toEqual([])
+  expect(vm.getExamStatus(exam).text).toBe('已结束')
+  expect(vm.filteredExams).toEqual([])
 })
 it('已结束考试首次加载也提示退出', async () => {
   vi.setSystemTime(new Date('2026-06-15T10:00:04Z'))
-  mountPage<DetailState>(ExamDetailView); await flushPromises(); expect(ElMessageBox.alert).toHaveBeenCalledOnce()
+  mountPage<DetailState>(ExamDetailView)
+  await flushPromises()
+  expect(ElMessageBox.alert).toHaveBeenCalledOnce()
 })
 it('离开详情后迟到响应不能启动时钟或结束提示', async () => {
   const detail = deferred<ExamDetailResponse>()
   vi.mocked(getExamDetail).mockReturnValue(detail.promise)
-  mountPage<DetailState>(ExamDetailView); mountedWrapper().unmount(); wrapper = undefined
-  detail.resolve(exam); await flushPromises(); await vi.advanceTimersByTimeAsync(5000)
-  expect(vi.getTimerCount()).toBe(0); expect(ElMessageBox.alert).not.toHaveBeenCalled(); expect(getMyExamStatus).not.toHaveBeenCalled()
+  mountPage<DetailState>(ExamDetailView)
+  mountedWrapper().unmount()
+  wrapper = undefined
+  detail.resolve(exam)
+  await flushPromises()
+  await vi.advanceTimersByTimeAsync(5000)
+  expect(vi.getTimerCount()).toBe(0)
+  expect(ElMessageBox.alert).not.toHaveBeenCalled()
+  expect(getMyExamStatus).not.toHaveBeenCalled()
 })
 it('列表、详情和管理页按本地时间展示同一 UTC 时刻', async () => {
   for (const component of [ExamView, ExamDetailView, ExamAdminView]) {
-    const vm = mountPage(component); await flushPromises()
-    const pattern = component === ExamView ? 'YYYY-MM-DD HH:mm' : component === ExamDetailView ? 'YYYY-MM-DD HH:mm:ss' : 'MM-DD HH:mm'
+    const vm = mountPage(component)
+    await flushPromises()
+    const pattern =
+      component === ExamView
+        ? 'YYYY-MM-DD HH:mm'
+        : component === ExamDetailView
+          ? 'YYYY-MM-DD HH:mm:ss'
+          : 'MM-DD HH:mm'
     const format = vm.formatTime || vm.formatTimeShort
     if (!format) throw new Error('页面缺少时间格式化函数')
     expect(format(exam.start_time)).toBe(dayjs(new Date(`${exam.start_time}Z`)).format(pattern))
-    mountedWrapper().unmount(); wrapper = undefined
+    mountedWrapper().unmount()
+    wrapper = undefined
   }
 })
 it('编辑直接保存保留时刻，日期选择器发送带时区时间，管理状态实时更新', async () => {
-  const vm = mountPage<AdminState>(ExamAdminView); await flushPromises(); await vm.handleEdit(exam)
-  expect(vm.timeRange.map(date => date?.toISOString())).toEqual(['2026-06-15T10:00:01.000Z', '2026-06-15T10:00:03.000Z'])
+  const vm = mountPage<AdminState>(ExamAdminView)
+  await flushPromises()
+  await vm.handleEdit(exam)
+  expect(vm.timeRange.map((date) => date?.toISOString())).toEqual([
+    '2026-06-15T10:00:01.000Z',
+    '2026-06-15T10:00:03.000Z',
+  ])
   await vm.handleSubmit()
-  expect(vi.mocked(updateExam).mock.calls[0][1]).toMatchObject({ start_time: '2026-06-15T10:00:01.000Z', end_time: '2026-06-15T10:00:03.000Z' })
-  const start = new Date(2026, 5, 16, 18, 30), end = new Date(2026, 5, 16, 19, 30)
-  vm.handleTimeChange([start, end]); expect(vm.form.start_time).toBe(start.toISOString()); expect(vm.form.end_time).toBe(end.toISOString())
+  expect(vi.mocked(updateExam).mock.calls[0][1]).toMatchObject({
+    start_time: '2026-06-15T10:00:01.000Z',
+    end_time: '2026-06-15T10:00:03.000Z',
+  })
+  const start = new Date(2026, 5, 16, 18, 30),
+    end = new Date(2026, 5, 16, 19, 30)
+  vm.handleTimeChange([start, end])
+  expect(vm.form.start_time).toBe(start.toISOString())
+  expect(vm.form.end_time).toBe(end.toISOString())
   expect(vm.getExamStatus(exam).label).toBe('未开始')
-  await vi.advanceTimersByTimeAsync(1000); expect(vm.getExamStatus(exam).label).toBe('进行中')
-  await vi.advanceTimersByTimeAsync(2000); expect(vm.getExamStatus(exam).label).toBe('已结束')
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(vm.getExamStatus(exam).label).toBe('进行中')
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(vm.getExamStatus(exam).label).toBe('已结束')
 })

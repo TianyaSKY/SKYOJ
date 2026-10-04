@@ -13,7 +13,15 @@ import { ElMessage } from 'element-plus'
 
 let wrapper: ReturnType<typeof mountPage> | undefined
 const result = (id: number): SubmissionListResponse => ({
-  id, user_id: 1, username: 'student', problem_id: 1, exam_id: null, status: 'Accepted', score: 100, language: 'python', created_at: null,
+  id,
+  user_id: 1,
+  username: 'student',
+  problem_id: 1,
+  exam_id: null,
+  status: 'Accepted',
+  score: 100,
+  language: 'python',
+  created_at: null,
 })
 function mountedWrapper() {
   if (!wrapper) throw new Error('提交管理页未挂载')
@@ -22,8 +30,12 @@ function mountedWrapper() {
 // 测试读取 setup 内部状态，公共组件类型只暴露对外接口。
 function setupState() {
   return mountedWrapper().vm as unknown as {
-    filterForm: { status: string; username: string }; loading: boolean; submissions: SubmissionListResponse[];
-    pagination: { total: number; page: number }; handleFilter(): void; handleCurrentChange(page: number): void;
+    filterForm: { status: string; username: string }
+    loading: boolean
+    submissions: SubmissionListResponse[]
+    pagination: { total: number; page: number }
+    handleFilter(): void
+    handleCurrentChange(page: number): void
   }
 }
 beforeEach(() => {
@@ -32,26 +44,48 @@ beforeEach(() => {
   vi.mocked(getSubmissions).mockReset()
   vi.mocked(getSubmissions).mockResolvedValue({ items: [], total: 0 })
 })
-afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.restoreAllMocks() })
+afterEach(() => {
+  wrapper?.unmount()
+  wrapper = undefined
+  vi.restoreAllMocks()
+})
 
 function mountPage(renderFilter = false) {
   const mounted = shallowMount(SubmissionAdminView, {
     global: {
       directives: { loading: () => {} },
-      stubs: { ...Object.fromEntries([
-        'el-button', 'el-page-header', 'el-input', 'el-form-item', 'el-option', 'el-select',
-        'el-form', 'el-card', 'el-table-column', 'el-link', 'el-tag', 'el-table', 'el-pagination',
-      ].map(name => [name, true])),
-        ...(renderFilter ? Object.fromEntries(['el-card', 'el-form', 'el-form-item', 'el-select']
-          .map(name => [name, { template: '<div><slot /></div>' }])) : {}),
+      stubs: {
+        ...Object.fromEntries(
+          [
+            'el-button',
+            'el-page-header',
+            'el-input',
+            'el-form-item',
+            'el-option',
+            'el-select',
+            'el-form',
+            'el-card',
+            'el-table-column',
+            'el-link',
+            'el-tag',
+            'el-table',
+            'el-pagination',
+          ].map((name) => [name, true]),
+        ),
+        ...(renderFilter
+          ? Object.fromEntries(
+              ['el-card', 'el-form', 'el-form-item', 'el-select'].map((name) => [
+                name,
+                { template: '<div><slot /></div>' },
+              ]),
+            )
+          : {}),
       },
     },
   })
   wrapper = mounted
   return mounted
 }
-
-
 
 describe('提交管理的筛选恢复与请求顺序', () => {
   it.each(['Compile Error', 'System Error'])('错误筛选使用后端状态 %s', async (status) => {
@@ -73,27 +107,43 @@ describe('提交管理的筛选恢复与请求顺序', () => {
     expect(getSubmissions).toHaveBeenCalledWith({ status: 'Compile Error', page: 1, per_page: 20 })
     expect(setupState().filterForm.status).toBe('Compile Error')
   })
-  it.each(['{broken', 'null', '[]', '"text"', '42'])('损坏的筛选缓存 %s 不阻止页面加载', async (cached) => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-    localStorage.setItem('skyoj_submission_filter', cached)
-    mountPage()
-    await flushPromises()
-    expect(getSubmissions).toHaveBeenCalledWith({ page: 1, per_page: 20 })
-    expect(localStorage.getItem('skyoj_submission_filter')).toBeNull()
-    expect(console.warn).toHaveBeenCalled()
-  })
+  it.each(['{broken', 'null', '[]', '"text"', '42'])(
+    '损坏的筛选缓存 %s 不阻止页面加载',
+    async (cached) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      localStorage.setItem('skyoj_submission_filter', cached)
+      mountPage()
+      await flushPromises()
+      expect(getSubmissions).toHaveBeenCalledWith({ page: 1, per_page: 20 })
+      expect(localStorage.getItem('skyoj_submission_filter')).toBeNull()
+      expect(console.warn).toHaveBeenCalled()
+    },
+  )
 
   it('恢复有效字段，忽略非字符串字段和额外字段', async () => {
-    localStorage.setItem('skyoj_submission_filter', JSON.stringify({
-      problem_id: '12', username: 'alice', user_id: result(3), status: ['Accepted'], extra: 'ignored',
-    }))
+    localStorage.setItem(
+      'skyoj_submission_filter',
+      JSON.stringify({
+        problem_id: '12',
+        username: 'alice',
+        user_id: result(3),
+        status: ['Accepted'],
+        extra: 'ignored',
+      }),
+    )
     mountPage()
     await flushPromises()
-    expect(getSubmissions).toHaveBeenCalledWith({ problem_id: 12, username: 'alice', page: 1, per_page: 20 })
+    expect(getSubmissions).toHaveBeenCalledWith({
+      problem_id: 12,
+      username: 'alice',
+      page: 1,
+      per_page: 20,
+    })
   })
 
   it('较早请求迟到时不能覆盖最新筛选结果或提前关闭加载状态', async () => {
-    const first = deferred<LegacySubmissionsResponse>(), second = deferred<LegacySubmissionsResponse>()
+    const first = deferred<LegacySubmissionsResponse>(),
+      second = deferred<LegacySubmissionsResponse>()
     vi.mocked(getSubmissions).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     mountPage()
     setupState().filterForm.username = 'alice'
@@ -111,7 +161,8 @@ describe('提交管理的筛选恢复与请求顺序', () => {
 
   it('最新请求完成后，过期请求失败不弹出错误或替换结果', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    const first = deferred<LegacySubmissionsResponse>(), second = deferred<LegacySubmissionsResponse>()
+    const first = deferred<LegacySubmissionsResponse>(),
+      second = deferred<LegacySubmissionsResponse>()
     vi.mocked(getSubmissions).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     mountPage()
     setupState().handleFilter()
@@ -124,7 +175,8 @@ describe('提交管理的筛选恢复与请求顺序', () => {
   })
 
   it('较早请求在最新结果之后返回也不能覆盖结果', async () => {
-    const first = deferred<LegacySubmissionsResponse>(), second = deferred<LegacySubmissionsResponse>()
+    const first = deferred<LegacySubmissionsResponse>(),
+      second = deferred<LegacySubmissionsResponse>()
     vi.mocked(getSubmissions).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     mountPage()
     setupState().handleCurrentChange(2)

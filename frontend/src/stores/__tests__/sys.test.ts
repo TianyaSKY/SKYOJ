@@ -1,10 +1,10 @@
 /** 系统配置 Store 的真实接口与降级行为。 */
-import {describe, it, expect, beforeEach, vi} from 'vitest'
-import {setActivePinia, createPinia} from 'pinia'
-import {useSysStore} from '@/stores/sys'
-import {getSysInfo} from '@/api/sys'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+import { useSysStore } from '@/stores/sys'
+import { getSysInfo } from '@/api/sys'
 
-vi.mock('@/api/sys', () => ({getSysInfo: vi.fn()}))
+vi.mock('@/api/sys', () => ({ getSysInfo: vi.fn() }))
 
 describe('useSysStore', () => {
   beforeEach(() => {
@@ -21,7 +21,12 @@ describe('useSysStore', () => {
   })
 
   it('获取系统配置并更新文档标题', async () => {
-    vi.mocked(getSysInfo).mockResolvedValue({title: '课堂 OJ', practice: false, warning: true, info: '通知'})
+    vi.mocked(getSysInfo).mockResolvedValue({
+      title: '课堂 OJ',
+      practice: false,
+      warning: true,
+      info: '通知',
+    })
     const store = useSysStore()
     await store.fetchSysInfo()
     expect(getSysInfo).toHaveBeenCalledOnce()

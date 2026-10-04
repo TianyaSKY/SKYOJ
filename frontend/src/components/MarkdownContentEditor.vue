@@ -12,28 +12,28 @@
     <div class="md-body" :class="`mode-${mode}`" :style="{ minHeight: minHeight }">
       <div v-show="mode === 'edit' || mode === 'split'" class="md-pane md-source">
         <el-input
-            :model-value="modelValue"
-            :placeholder="placeholder"
-            :readonly="readonly"
-            :rows="rows"
-            class="md-textarea"
-            resize="vertical"
-            type="textarea"
-            @update:model-value="onInput"
+          :model-value="modelValue"
+          :placeholder="placeholder"
+          :readonly="readonly"
+          :rows="rows"
+          class="md-textarea"
+          resize="vertical"
+          type="textarea"
+          @update:model-value="onInput"
         />
       </div>
 
       <div
-          v-show="mode === 'preview' || mode === 'split'"
-          class="md-pane md-preview markdown-body"
-          v-html="renderedHtml"
+        v-show="mode === 'preview' || mode === 'split'"
+        class="md-pane md-preview markdown-body"
+        v-html="renderedHtml"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import {computed, ref} from 'vue'
+import { computed, ref } from 'vue'
 import md from '@/utils/markdown'
 
 const props = defineProps({
@@ -68,9 +68,7 @@ const props = defineProps({
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const mode = ref(
-    ['edit', 'preview', 'split'].includes(props.defaultMode)
-        ? props.defaultMode
-        : 'edit'
+  ['edit', 'preview', 'split'].includes(props.defaultMode) ? props.defaultMode : 'edit',
 )
 
 const modeHint = computed(() => {

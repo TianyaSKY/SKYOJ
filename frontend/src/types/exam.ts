@@ -99,4 +99,8 @@ export interface ExamProblemStatusResponse {
   last_submitted_at: string | null
 }
 
-export interface AddExamProblem { problem_id: number; display_id?: string | null; score?: number }
+export interface AddExamProblem {
+  problem_id: number
+  display_id?: string | null
+  score?: number
+}

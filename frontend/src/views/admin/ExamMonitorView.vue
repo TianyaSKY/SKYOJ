@@ -10,7 +10,7 @@
           left: b.x + '%',
           backgroundColor: b.color,
           animationDuration: b.duration + 's',
-          animationDelay: b.delay + 's'
+          animationDelay: b.delay + 's',
         }"
       >
         <div class="balloon-string"></div>
@@ -43,7 +43,7 @@
               <span class="control-label">自动刷新</span>
               <el-switch v-model="autoRefresh" @change="handleAutoRefreshChange" />
             </div>
-            <el-button :icon="Refresh" :loading="loading" circle @click="fetchMonitorData"/>
+            <el-button :icon="Refresh" :loading="loading" circle @click="fetchMonitorData" />
           </div>
         </template>
       </el-page-header>
@@ -77,7 +77,11 @@
           <el-table-column label="选手" prop="username" min-width="180">
             <template #default="scope">
               <div class="user-cell">
-                <el-avatar :size="24" :src="scope.row.avatar ? `/api${scope.row.avatar}` : ''" class="mini-avatar">
+                <el-avatar
+                  :size="24"
+                  :src="scope.row.avatar ? `/api${scope.row.avatar}` : ''"
+                  class="mini-avatar"
+                >
                   {{ scope.row.username?.charAt(0).toUpperCase() }}
                 </el-avatar>
                 <span class="username-text">{{ scope.row.username }}</span>
@@ -90,7 +94,9 @@
           <el-table-column label="解题进度" min-width="200">
             <template #default="scope">
               <el-progress
-                :percentage="problems.length > 0 ? Math.round((scope.row.solved / problems.length) * 100) : 0"
+                :percentage="
+                  problems.length > 0 ? Math.round((scope.row.solved / problems.length) * 100) : 0
+                "
                 :stroke-width="8"
                 :format="() => `${scope.row.solved} / ${problems.length}`"
                 :color="getProgressColor(scope.row.solved)"
@@ -126,27 +132,42 @@
           <template #default="scope">
             <div class="participant-cell">
               <div class="user-info">
-                <el-avatar :size="24" :src="scope.row.avatar ? `/api${scope.row.avatar}` : ''" class="mini-avatar">
+                <el-avatar
+                  :size="24"
+                  :src="scope.row.avatar ? `/api${scope.row.avatar}` : ''"
+                  class="mini-avatar"
+                >
                   {{ scope.row.username?.charAt(0).toUpperCase() }}
                 </el-avatar>
                 <span class="username">{{ scope.row.username }}</span>
               </div>
-              <el-tag v-if="scope.row.total_score >= maxPossibleScore" size="small" type="success" effect="dark">AC</el-tag>
+              <el-tag
+                v-if="scope.row.total_score >= maxPossibleScore"
+                size="small"
+                type="success"
+                effect="dark"
+                >AC</el-tag
+              >
             </div>
           </template>
         </el-table-column>
 
         <el-table-column
-            v-for="(problem, index) in problems"
-            :key="problem.problem_id"
-            :label="getProblemLabel(problem, index)"
-            align="center"
-            min-width="100"
+          v-for="(problem, index) in problems"
+          :key="problem.problem_id"
+          :label="getProblemLabel(problem, index)"
+          align="center"
+          min-width="100"
         >
           <template #default="scope">
             <div v-if="getSubmission(scope.row.user_id, problem.problem_id)" class="score-cell">
               <div
-                :class="['score-box', getScoreStatusClass(getSubmission(scope.row.user_id, problem.problem_id)?.score ?? 0)]"
+                :class="[
+                  'score-box',
+                  getScoreStatusClass(
+                    getSubmission(scope.row.user_id, problem.problem_id)?.score ?? 0,
+                  ),
+                ]"
                 @click="openLevel2(scope.row.user_id, problem.problem_id)"
               >
                 {{ getSubmission(scope.row.user_id, problem.problem_id)?.score }}
@@ -156,7 +177,14 @@
           </template>
         </el-table-column>
 
-        <el-table-column align="center" fixed="right" label="总分" prop="total_score" sortable width="100">
+        <el-table-column
+          align="center"
+          fixed="right"
+          label="总分"
+          prop="total_score"
+          sortable
+          width="100"
+        >
           <template #default="scope">
             <span class="total-score-text">{{ scope.row.total_score }}</span>
           </template>
@@ -174,26 +202,51 @@
           </div>
           <el-descriptions :column="1" border>
             <el-descriptions-item label="状态">
-              <el-tag :type="getStatusType(currentSubmission.status)">{{ currentSubmission.status }}</el-tag>
+              <el-tag :type="getStatusType(currentSubmission.status)">{{
+                currentSubmission.status
+              }}</el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="最终得分">
-              <span :class="['score-display', getScoreStatusClass(currentSubmission.score)]">{{ currentSubmission.score }}</span>
+              <span :class="['score-display', getScoreStatusClass(currentSubmission.score)]">{{
+                currentSubmission.score
+              }}</span>
             </el-descriptions-item>
-            <el-descriptions-item label="编程语言">{{ currentSubmission.language }}</el-descriptions-item>
-            <el-descriptions-item label="提交时间">{{ formatTime(currentSubmission.created_at) }}</el-descriptions-item>
+            <el-descriptions-item label="编程语言">{{
+              currentSubmission.language
+            }}</el-descriptions-item>
+            <el-descriptions-item label="提交时间">{{
+              formatTime(currentSubmission.created_at)
+            }}</el-descriptions-item>
           </el-descriptions>
         </div>
         <div class="detail-section mt-6">
           <h4>得分分析</h4>
-          <el-alert :closable="false" show-icon :title="currentSubmission.status === 'Accepted' ? '所有测试点已通过' : `未完全通过: ${currentSubmission.status}`" :type="currentSubmission.status === 'Accepted' ? 'success' : 'error'" />
+          <el-alert
+            :closable="false"
+            show-icon
+            :title="
+              currentSubmission.status === 'Accepted'
+                ? '所有测试点已通过'
+                : `未完全通过: ${currentSubmission.status}`
+            "
+            :type="currentSubmission.status === 'Accepted' ? 'success' : 'error'"
+          />
           <div class="mt-6 text-center">
-            <el-button :icon="View" type="primary" size="large" @click="openLevel3">查看解题代码</el-button>
+            <el-button :icon="View" type="primary" size="large" @click="openLevel3"
+              >查看解题代码</el-button
+            >
           </div>
         </div>
       </div>
     </el-drawer>
 
-    <el-dialog v-model="codeDialogVisible" append-to-body title="解题代码查看" top="5vh" width="85%">
+    <el-dialog
+      v-model="codeDialogVisible"
+      append-to-body
+      title="解题代码查看"
+      top="5vh"
+      width="85%"
+    >
       <el-row :gutter="20">
         <el-col :span="17">
           <div class="code-container">
@@ -215,7 +268,9 @@
             <template #header>
               <div class="flex justify-between items-center">
                 <span>AI 代码分析</span>
-                <el-button :loading="aiLoading" size="small" type="primary" @click="analyzeCode">开始分析</el-button>
+                <el-button :loading="aiLoading" size="small" type="primary" @click="analyzeCode"
+                  >开始分析</el-button
+                >
               </div>
             </template>
             <div v-if="aiResult" class="ai-result">
@@ -232,7 +287,7 @@
                 <p>{{ aiResult.suggestion }}</p>
               </div>
             </div>
-            <el-empty v-else description="点击按钮开始 AI 分析"/>
+            <el-empty v-else description="点击按钮开始 AI 分析" />
           </el-card>
         </el-col>
       </el-row>
@@ -247,15 +302,11 @@ import type { SubmissionDetailResponse } from '@/types/submission'
 import type { ProblemDetailResponse } from '@/types/problem'
 import { codeAnalysisSchema, type CodeAnalysis } from '@/schemas/aiDraft'
 import { parseRouteId } from '@/utils/route'
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
-import {useRoute} from 'vue-router'
-import {
-  getExamMonitor,
-  getExamRank,
-  getSubmissionDetail
-} from '@/api/exam'
-import {getProblemDetail} from '@/api/problem'
-import {askLLM} from '@/api/llm'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { getExamMonitor, getExamRank, getSubmissionDetail } from '@/api/exam'
+import { getProblemDetail } from '@/api/problem'
+import { askLLM } from '@/api/llm'
 import {
   ArrowRight,
   Grid,
@@ -264,9 +315,9 @@ import {
   Trophy,
   Upload,
   User,
-  View
+  View,
 } from '@element-plus/icons-vue'
-import {ElMessage} from 'element-plus'
+import { ElMessage } from 'element-plus'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/vs2015.css'
 import dayjs from 'dayjs'
@@ -275,10 +326,10 @@ const route = useRoute()
 const examId = parseRouteId(route.params.id)
 const examTitle = ref('加载中...')
 const loading = ref(false)
-const participants = ref<Array<MonitorEntry & {avatar?: string | null}>>([])
+const participants = ref<Array<MonitorEntry & { avatar?: string | null }>>([])
 const problems = ref<MonitorProblemInfo[]>([])
 const totalSubmissions = ref(0)
-const rankData = ref<Array<RankEntry & {avatar?: string | null}>>([])
+const rankData = ref<Array<RankEntry & { avatar?: string | null }>>([])
 
 // L2 & L3 State
 const drawerVisible = ref(false)
@@ -293,7 +344,14 @@ const aiResult = ref<CodeAnalysis | null>(null)
 
 // Balloon State
 const showFullscreenBalloons = ref(false)
-interface Balloon {id: number; x: number; color: string; duration: number; delay: number; text: string}
+interface Balloon {
+  id: number
+  x: number
+  color: string
+  duration: number
+  delay: number
+  text: string
+}
 const balloons = ref<Balloon[]>([])
 const rankChangedUsers = ref(new Set<string>())
 let previousRankMap = new Map<string, number>()
@@ -301,13 +359,15 @@ const BALLOON_COLORS = ['#ff4d4f', '#1890ff', '#52c41a', '#fadb14', '#722ed1', '
 
 // Viewer Settings
 const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
-const fontFamily = ref(localStorage.getItem('editorFontFamily') || "'Fira Code', 'Courier New', monospace")
+const fontFamily = ref(
+  localStorage.getItem('editorFontFamily') || "'Fira Code', 'Courier New', monospace",
+)
 const fontLigatures = ref(localStorage.getItem('editorFontLigatures') !== 'false')
 
 const viewerStyle = computed<CSSProperties>(() => ({
   fontSize: fontSize.value + 'px',
   fontFamily: fontFamily.value,
-  fontVariantLigatures: fontLigatures.value ? 'normal' : 'none'
+  fontVariantLigatures: fontLigatures.value ? 'normal' : 'none',
 }))
 
 const autoRefresh = ref(localStorage.getItem('exam_monitor_auto_refresh') === 'true')
@@ -321,14 +381,14 @@ const maxPossibleScore = computed(() => {
 const fullScoreCount = computed(() => {
   if (!participants.value.length) return 0
   const max = maxPossibleScore.value
-  return participants.value.filter(u => u.total_score >= max).length
+  return participants.value.filter((u) => u.total_score >= max).length
 })
 
 const highlightedCode = computed(() => {
   if (!currentSubmission.value?.code) return ''
   const lang = currentSubmission.value.language?.toLowerCase() || 'plaintext'
   try {
-    return hljs.highlight(currentSubmission.value.code, {language: lang}).value
+    return hljs.highlight(currentSubmission.value.code, { language: lang }).value
   } catch (e) {
     return hljs.highlightAuto(currentSubmission.value.code).value
   }
@@ -344,29 +404,28 @@ const triggerFullscreenBalloons = (users: Set<string>) => {
       color: BALLOON_COLORS[Math.floor(Math.random() * BALLOON_COLORS.length)],
       duration: 4 + Math.random() * 3,
       delay: Math.random() * 1.5,
-      text: i < userList.length ? userList[i] : ''
+      text: i < userList.length ? userList[i] : '',
     })
   }
   balloons.value = newBalloons
   showFullscreenBalloons.value = true
-  setTimeout(() => { showFullscreenBalloons.value = false }, 7000)
+  setTimeout(() => {
+    showFullscreenBalloons.value = false
+  }, 7000)
 }
 
 const fetchMonitorData = async (isAuto = false) => {
   if (!isAuto) loading.value = true
   try {
     if (examId === null) throw new Error('考试 ID 无效')
-    const [monitorRes, rankRes] = await Promise.all([
-      getExamMonitor(examId),
-      getExamRank(examId)
-    ])
+    const [monitorRes, rankRes] = await Promise.all([getExamMonitor(examId), getExamRank(examId)])
 
     if (monitorRes) {
       examTitle.value = monitorRes.exam_title || '未知考试'
       participants.value = monitorRes.users || []
       problems.value = monitorRes.problems || []
       let count = 0
-      participants.value.forEach(user => {
+      participants.value.forEach((user) => {
         if (user.submissions) count += Object.keys(user.submissions).length
       })
       totalSubmissions.value = count
@@ -391,7 +450,9 @@ const fetchMonitorData = async (isAuto = false) => {
       if (improvedUsers.size > 0) {
         rankChangedUsers.value = improvedUsers
         triggerFullscreenBalloons(improvedUsers)
-        setTimeout(() => { rankChangedUsers.value = new Set<string>() }, 5000)
+        setTimeout(() => {
+          rankChangedUsers.value = new Set<string>()
+        }, 5000)
       }
     }
 
@@ -412,7 +473,7 @@ const getProblemLabel = (problem: MonitorProblemInfo, index: number) => {
 }
 
 const getSubmission = (userId: number, problemId: number) => {
-  const user = participants.value.find(u => u.user_id === userId)
+  const user = participants.value.find((u) => u.user_id === userId)
   return user?.submissions?.[problemId] || null
 }
 
@@ -440,7 +501,7 @@ const openLevel2 = async (userId: number, problemId: number) => {
   try {
     const [subDetail, probDetail] = await Promise.all([
       getSubmissionDetail(sub.submission_id),
-      getProblemDetail(problemId)
+      getProblemDetail(problemId),
     ])
     currentSubmission.value = subDetail
     currentProblem.value = probDetail
@@ -462,13 +523,14 @@ const analyzeCode = async () => {
   aiLoading.value = true
   try {
     const res = await askLLM({
-      system_setting: "你是一个专业的编程导师，负责分析学生的解题代码。请结合题目内容和学生的得分情况，分析代码的逻辑、质量并给出改进建议。",
+      system_setting:
+        '你是一个专业的编程导师，负责分析学生的解题代码。请结合题目内容和学生的得分情况，分析代码的逻辑、质量并给出改进建议。',
       prompt: `题目名称: ${currentProblem.value.title}\n题目内容: ${currentProblem.value.content}\n编程语言: ${currentSubmission.value.language}\n判题状态: ${currentSubmission.value.status}\n得分: ${currentSubmission.value.score}\n学生代码:\n${currentSubmission.value.code}`,
       output_format: {
-        rating: "优秀/良好/及格/需改进",
-        logic: "代码核心逻辑简述",
-        suggestion: "结合得分情况给出具体的改进建议"
-      }
+        rating: '优秀/良好/及格/需改进',
+        logic: '代码核心逻辑简述',
+        suggestion: '结合得分情况给出具体的改进建议',
+      },
     })
     aiResult.value = codeAnalysisSchema.parse(res)
   } catch (error) {
@@ -493,7 +555,8 @@ const getStatusType = (status: string | null | undefined) => {
   return 'danger'
 }
 
-const formatTime = (time: string | null | undefined) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : ''
+const formatTime = (time: string | null | undefined) =>
+  time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : ''
 
 const formatDuration = (seconds: number) => {
   if (!seconds) return '0'
@@ -510,10 +573,14 @@ const copyCode = () => {
   }
 }
 
-watch(autoRefresh, (val: boolean) => {
-  if (val) refreshTimer = setInterval(() => fetchMonitorData(true), 10000)
-  else clearInterval(refreshTimer)
-}, { immediate: true })
+watch(
+  autoRefresh,
+  (val: boolean) => {
+    if (val) refreshTimer = setInterval(() => fetchMonitorData(true), 10000)
+    else clearInterval(refreshTimer)
+  },
+  { immediate: true },
+)
 
 onMounted(fetchMonitorData)
 onUnmounted(() => clearInterval(refreshTimer))
@@ -549,7 +616,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+  box-shadow: inset -5px -5px 10px rgba(0, 0, 0, 0.1);
 }
 
 .balloon-string {
@@ -557,7 +624,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   bottom: -30px;
   width: 1px;
   height: 30px;
-  background: rgba(0,0,0,0.1);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .balloon-text {
@@ -569,10 +636,20 @@ onUnmounted(() => clearInterval(refreshTimer))
 }
 
 @keyframes float-up {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(-120vh) rotate(15deg); opacity: 0; }
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120vh) rotate(15deg);
+    opacity: 0;
+  }
 }
 
 /* Header */
@@ -580,7 +657,7 @@ onUnmounted(() => clearInterval(refreshTimer))
   background: white;
   padding: 16px 24px;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   margin-bottom: 24px;
 }
 
@@ -648,9 +725,15 @@ onUnmounted(() => clearInterval(refreshTimer))
   font-size: 18px;
 }
 
-.medal.gold { color: #fbbf24; }
-.medal.silver { color: #94a3b8; }
-.medal.bronze { color: #d97706; }
+.medal.gold {
+  color: #fbbf24;
+}
+.medal.silver {
+  color: #94a3b8;
+}
+.medal.bronze {
+  color: #d97706;
+}
 
 .rank-num {
   font-weight: bold;
@@ -713,9 +796,15 @@ onUnmounted(() => clearInterval(refreshTimer))
   border-radius: 50%;
 }
 
-.dot.success { background: #10b981; }
-.dot.warning { background: #f59e0b; }
-.dot.danger { background: #ef4444; }
+.dot.success {
+  background: #10b981;
+}
+.dot.warning {
+  background: #f59e0b;
+}
+.dot.danger {
+  background: #ef4444;
+}
 
 .participant-cell {
   display: flex;
@@ -752,11 +841,25 @@ onUnmounted(() => clearInterval(refreshTimer))
   transform: scale(1.1);
 }
 
-.score-success { background: #ecfdf5; color: #10b981; border: 1px solid #10b981; }
-.score-warning { background: #fffbeb; color: #f59e0b; border: 1px solid #f59e0b; }
-.score-danger { background: #fef2f2; color: #ef4444; border: 1px solid #ef4444; }
+.score-success {
+  background: #ecfdf5;
+  color: #10b981;
+  border: 1px solid #10b981;
+}
+.score-warning {
+  background: #fffbeb;
+  color: #f59e0b;
+  border: 1px solid #f59e0b;
+}
+.score-danger {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
 
-.empty-score { color: #cbd5e1; }
+.empty-score {
+  color: #cbd5e1;
+}
 
 .total-score-text {
   font-weight: 800;
@@ -803,10 +906,18 @@ onUnmounted(() => clearInterval(refreshTimer))
   overflow: auto;
 }
 
-.hljs { padding: 20px; }
+.hljs {
+  padding: 20px;
+}
 
 @keyframes balloon-pop {
-  0% { transform: scale(0); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 </style>

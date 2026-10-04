@@ -1,4 +1,4 @@
-import {z} from 'zod'
+import { z } from 'zod'
 
 const username = z.string().min(1, '请输入用户名').max(80, '用户名最多 80 个字符')
 export const loginSchema = z.object({

@@ -11,7 +11,9 @@
         <div class="status-block">
           <el-tag :type="statusTagType" effect="plain">{{ statusText }}</el-tag>
           <el-tag class="ml-2" effect="plain">{{ detail?.language || '-' }}</el-tag>
-          <el-tag v-if="detail?.case_name" class="ml-2" effect="plain">用例 {{ detail.case_name }}</el-tag>
+          <el-tag v-if="detail?.case_name" class="ml-2" effect="plain"
+            >用例 {{ detail.case_name }}</el-tag
+          >
         </div>
       </div>
     </el-card>
@@ -34,8 +36,8 @@
         <div class="diff-col">
           <div class="col-title">你的输出</div>
           <pre :class="['io-block', isWrongAnswer ? 'is-wrong' : '']">{{
-              detail?.actual_output ?? '(运行后才有输出)'
-            }}</pre>
+            detail?.actual_output ?? '(运行后才有输出)'
+          }}</pre>
         </div>
       </div>
     </el-card>
@@ -52,16 +54,16 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onBeforeUnmount, ref, watch} from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { DebugRunResponse } from '@/types/debug'
-import {getDebugRun} from '@/api/debug'
-import {ElMessage} from 'element-plus'
+import { getDebugRun } from '@/api/debug'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   debugRunId: {
     type: Number,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const detail = ref<DebugRunResponse | null>(null)
@@ -70,7 +72,7 @@ let timer: ReturnType<typeof setTimeout> | null = null
 let timeoutTimer: ReturnType<typeof setTimeout> | null = null
 let generation = 0
 let disposed = false
-const MAX_POLL_DURATION_MS = 180000  // 每次运行最多等待三分钟
+const MAX_POLL_DURATION_MS = 180000 // 每次运行最多等待三分钟
 
 const isWrongAnswer = computed(() => detail.value?.status === 'Wrong Answer')
 
@@ -177,23 +179,23 @@ const stopPolling = () => {
 }
 
 watch(
-    () => props.debugRunId,
-    (newId) => {
-      generation++
-      stopPolling()
-      detail.value = null
-      loading.value = false
-      if (newId) {
-        timeoutTimer = setTimeout(() => {
-          generation++
-          stopPolling()
-          loading.value = false
-          ElMessage.warning('判题超时，请稍后刷新重试')
-        }, MAX_POLL_DURATION_MS)
-        fetchDebugRun()
-      }
-    },
-    {immediate: true}
+  () => props.debugRunId,
+  (newId) => {
+    generation++
+    stopPolling()
+    detail.value = null
+    loading.value = false
+    if (newId) {
+      timeoutTimer = setTimeout(() => {
+        generation++
+        stopPolling()
+        loading.value = false
+        ElMessage.warning('判题超时，请稍后刷新重试')
+      }, MAX_POLL_DURATION_MS)
+      fetchDebugRun()
+    }
+  },
+  { immediate: true },
 )
 
 onBeforeUnmount(() => {
@@ -201,7 +203,6 @@ onBeforeUnmount(() => {
   generation++
   stopPolling()
 })
-
 </script>
 
 <style scoped>

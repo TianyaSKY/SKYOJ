@@ -7,30 +7,30 @@
         </div>
       </template>
       <el-form
-          ref="loginFormRef"
-          :model="loginForm"
-          :rules="loginRules"
-          label-position="top"
-          @submit.prevent="handleLogin"
+        ref="loginFormRef"
+        :model="loginForm"
+        :rules="loginRules"
+        label-position="top"
+        @submit.prevent="handleLogin"
       >
         <el-form-item label="Username" prop="username">
           <el-input
-              v-model="loginForm.username"
-              :prefix-icon="User"
-              clearable
-              placeholder="Enter your username"
-              size="large"
+            v-model="loginForm.username"
+            :prefix-icon="User"
+            clearable
+            placeholder="Enter your username"
+            size="large"
           />
         </el-form-item>
         <el-form-item label="Password" prop="password">
           <el-input
-              v-model="loginForm.password"
-              :prefix-icon="Lock"
-              clearable
-              placeholder="Enter your password"
-              show-password
-              size="large"
-              type="password"
+            v-model="loginForm.password"
+            :prefix-icon="Lock"
+            clearable
+            placeholder="Enter your password"
+            show-password
+            size="large"
+            type="password"
           />
         </el-form-item>
         <el-form-item>
@@ -41,11 +41,11 @@
         </el-form-item>
         <el-form-item>
           <el-button
-              :loading="loading"
-              class="login-button"
-              native-type="submit"
-              size="large"
-              type="primary"
+            :loading="loading"
+            class="login-button"
+            native-type="submit"
+            size="large"
+            type="primary"
           >
             Login
           </el-button>
@@ -60,12 +60,12 @@
 </template>
 
 <script setup lang="ts">
-import {loginSchema} from '@/schemas/auth'
-import {reactive, ref} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {ElMessage, type FormInstance, type FormRules, type FormItemRule} from 'element-plus'
-import {Lock, User} from '@element-plus/icons-vue'
-import {useUserStore} from '@/stores/user'
+import { loginSchema } from '@/schemas/auth'
+import { reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, type FormInstance, type FormRules, type FormItemRule } from 'element-plus'
+import { Lock, User } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
@@ -80,10 +80,10 @@ const loginForm = reactive({
 })
 
 const loginRules = reactive<FormRules>({
-  username: [{required: true, message: 'Please enter your username', trigger: 'blur'}],
+  username: [{ required: true, message: 'Please enter your username', trigger: 'blur' }],
   password: [
-    {required: true, message: 'Please enter your password', trigger: 'blur'},
-    {max: 128, message: 'Password must be at most 128 characters long', trigger: 'blur'},
+    { required: true, message: 'Please enter your password', trigger: 'blur' },
+    { max: 128, message: 'Password must be at most 128 characters long', trigger: 'blur' },
   ],
 })
 
@@ -100,13 +100,14 @@ const handleLogin = async () => {
       loading.value = true
       try {
         await userStore.login({
-          ...parsed.data
+          ...parsed.data,
         })
         ElMessage.success('Login successful!')
         const redirect = route.query.redirect
-        const destination = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
-          ? redirect
-          : '/'
+        const destination =
+          typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+            ? redirect
+            : '/'
         router.replace(destination)
       } catch (error) {
         // Error handling is done in the store or interceptor, but we can add specific UI logic here if needed

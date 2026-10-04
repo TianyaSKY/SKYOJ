@@ -6,7 +6,9 @@ export function useNow() {
   let timer: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
     now.value = Date.now()
-    timer = setInterval(() => { now.value = Date.now() }, 1000)
+    timer = setInterval(() => {
+      now.value = Date.now()
+    }, 1000)
   })
   onUnmounted(() => clearInterval(timer))
   return now

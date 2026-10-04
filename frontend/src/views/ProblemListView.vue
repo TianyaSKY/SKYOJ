@@ -8,43 +8,49 @@
     <el-card class="table-card" shadow="never">
       <div class="filter-container">
         <el-input
-            v-model="searchQuery"
-            :prefix-icon="Search"
-            class="search-input"
-            clearable
-            placeholder="搜索题目名称或内容..."
-            style="width: 350px"
+          v-model="searchQuery"
+          :prefix-icon="Search"
+          class="search-input"
+          clearable
+          placeholder="搜索题目名称或内容..."
+          style="width: 350px"
         />
         <div class="filter-group">
-          <el-select v-model="typeFilter" @change="handleTypeChange" clearable placeholder="题目类型" style="width: 140px">
-            <el-option label="ACM" value="acm"/>
-            <el-option label="Kaggle" value="kaggle"/>
-            <el-option label="OOP" value="oop"/>
+          <el-select
+            v-model="typeFilter"
+            @change="handleTypeChange"
+            clearable
+            placeholder="题目类型"
+            style="width: 140px"
+          >
+            <el-option label="ACM" value="acm" />
+            <el-option label="Kaggle" value="kaggle" />
+            <el-option label="OOP" value="oop" />
           </el-select>
           <el-select
-              v-model="tagFilter"
-              clearable
-              filterable
-              placeholder="知识点"
-              style="width: 160px"
-              @change="handleTagChange"
+            v-model="tagFilter"
+            clearable
+            filterable
+            placeholder="知识点"
+            style="width: 160px"
+            @change="handleTagChange"
           >
             <el-option
-                v-for="tag in allTags"
-                :key="tag.id"
-                :label="tag.name + (tag.category ? ' (' + tag.category + ')' : '')"
-                :value="tag.id"
+              v-for="tag in allTags"
+              :key="tag.id"
+              :label="tag.name + (tag.category ? ' (' + tag.category + ')' : '')"
+              :value="tag.id"
             />
           </el-select>
         </div>
       </div>
 
       <el-table
-          v-loading="loading"
-          :data="filteredProblems"
-          :header-cell-style="{ background: '#f8f9fa', color: '#606266', fontWeight: 'bold' }"
-          class="problem-table"
-          style="width: 100%"
+        v-loading="loading"
+        :data="filteredProblems"
+        :header-cell-style="{ background: '#f8f9fa', color: '#606266', fontWeight: 'bold' }"
+        class="problem-table"
+        style="width: 100%"
       >
         <el-table-column align="center" label="ID" prop="id" width="100">
           <template #default="scope">
@@ -56,19 +62,19 @@
           <template #default="scope">
             <div class="title-cell">
               <el-link
-                  :underline="false"
-                  class="problem-link"
-                  type="primary"
-                  @click="$router.push(`/problem/${scope.row.id}`)"
+                :underline="false"
+                class="problem-link"
+                type="primary"
+                @click="$router.push(`/problem/${scope.row.id}`)"
               >
                 {{ scope.row.title }}
               </el-link>
               <el-tag
-                  v-if="scope.row.type"
-                  :type="getTypeTag(scope.row.type)"
-                  class="type-tag"
-                  effect="light"
-                  size="small"
+                v-if="scope.row.type"
+                :type="getTypeTag(scope.row.type)"
+                class="type-tag"
+                effect="light"
+                size="small"
               >
                 {{ scope.row.type.toUpperCase() }}
               </el-tag>
@@ -80,11 +86,11 @@
           <template #default="scope">
             <div class="language-tags">
               <el-tag
-                  v-for="lang in getLanguages(scope.row.language)"
-                  :key="lang"
-                  class="lang-tag"
-                  effect="plain"
-                  size="small"
+                v-for="lang in getLanguages(scope.row.language)"
+                :key="lang"
+                class="lang-tag"
+                effect="plain"
+                size="small"
               >
                 {{ capitalize(lang) }}
               </el-tag>
@@ -96,8 +102,12 @@
         <el-table-column label="限制" width="200">
           <template #default="scope">
             <div class="limit-info">
-              <span title="时间限制"><el-icon><Timer/></el-icon> {{ scope.row.time_limit }}ms</span>
-              <span title="内存限制"><el-icon><Monitor/></el-icon> {{ scope.row.memory_limit }}MB</span>
+              <span title="时间限制"
+                ><el-icon><Timer /></el-icon> {{ scope.row.time_limit }}ms</span
+              >
+              <span title="内存限制"
+                ><el-icon><Monitor /></el-icon> {{ scope.row.memory_limit }}MB</span
+              >
             </div>
           </template>
         </el-table-column>
@@ -105,11 +115,11 @@
         <el-table-column align="center" label="操作" width="120">
           <template #default="scope">
             <el-button
-                plain
-                round
-                size="small"
-                type="primary"
-                @click="$router.push(`/problem/${scope.row.id}`)"
+              plain
+              round
+              size="small"
+              type="primary"
+              @click="$router.push(`/problem/${scope.row.id}`)"
             >
               去挑战
             </el-button>
@@ -119,14 +129,14 @@
 
       <div class="pagination-container">
         <el-pagination
-            :current-page="currentPage"
-            :page-size="pageSize"
-            :disabled="loading || !!searchQuery"
-            :page-sizes="[10, 20, 50]"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :disabled="loading || !!searchQuery"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -134,12 +144,17 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import {Monitor, Search, Timer} from '@element-plus/icons-vue'
-import {getProblemList, searchProblems} from '@/api/problem'
-import {ElMessage} from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Monitor, Search, Timer } from '@element-plus/icons-vue'
+import { getProblemList, searchProblems } from '@/api/problem'
+import { ElMessage } from 'element-plus'
 import { getTags } from '@/api/tag'
-import type { ProblemListResponse, SearchProblemResponse, ProblemQuery, SearchQuery } from '@/types/problem'
+import type {
+  ProblemListResponse,
+  SearchProblemResponse,
+  ProblemQuery,
+  SearchQuery,
+} from '@/types/problem'
 import type { TagResponse } from '@/types/community'
 import type { TagProps } from 'element-plus'
 
@@ -163,14 +178,17 @@ const capitalize = (str: string | null | undefined) => {
 
 const getLanguages = (langStr: string | null | undefined) => {
   if (!langStr) return []
-  return langStr.split(',').map(s => s.trim()).filter(s => s)
+  return langStr
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s)
 }
 
 const getTypeTag = (type: string) => {
   const map: Record<string, TagProps['type']> = {
-    'acm': 'primary',
-    'kaggle': 'success',
-    'oop': 'warning'
+    acm: 'primary',
+    kaggle: 'success',
+    oop: 'warning',
   }
   return map[type.toLowerCase()] || 'info'
 }
@@ -188,7 +206,12 @@ const handleSearch = async () => {
   const query = searchQuery.value
   const tag = tagFilter.value
   const type = typeFilter.value
-  const isCurrent = () => !disposed && version === requestVersion && query === searchQuery.value && tag === tagFilter.value && type === typeFilter.value
+  const isCurrent = () =>
+    !disposed &&
+    version === requestVersion &&
+    query === searchQuery.value &&
+    tag === tagFilter.value &&
+    type === typeFilter.value
   loading.value = true
   try {
     const params: SearchQuery = { query, top_k: 50 }
@@ -211,7 +234,7 @@ const handleSearch = async () => {
 }
 
 // 类型和知识点过滤均由服务端在计数和分页前完成。
-const filteredProblems = computed(() => searchQuery.value ? searchResults.value : problems.value)
+const filteredProblems = computed(() => (searchQuery.value ? searchResults.value : problems.value))
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 watch(searchQuery, (newVal) => {
@@ -234,13 +257,19 @@ watch(searchQuery, (newVal) => {
 const fetchProblems = async (page = currentPage.value, size = pageSize.value): Promise<void> => {
   if (disposed || searchQuery.value) return
   const version = ++requestVersion
-  const tag = tagFilter.value, type = typeFilter.value
-  const isCurrent = () => !disposed && version === requestVersion && !searchQuery.value && tag === tagFilter.value && type === typeFilter.value
+  const tag = tagFilter.value,
+    type = typeFilter.value
+  const isCurrent = () =>
+    !disposed &&
+    version === requestVersion &&
+    !searchQuery.value &&
+    tag === tagFilter.value &&
+    type === typeFilter.value
   loading.value = true
   try {
     const params: ProblemQuery = {
       page,
-      page_size: size
+      page_size: size,
     }
     if (type) params.problem_type = type
     if (tag) {

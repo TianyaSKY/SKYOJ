@@ -6,7 +6,7 @@
       </template>
       <template #extra>
         <div class="flex items-center">
-          <el-button :icon="Refresh" :loading="loading" circle @click="fetchSubmissions"/>
+          <el-button :icon="Refresh" :loading="loading" circle @click="fetchSubmissions" />
         </div>
       </template>
     </el-page-header>
@@ -14,19 +14,49 @@
     <el-card shadow="never" class="mb-4">
       <el-form :inline="true" :model="filterForm" class="filter-form">
         <el-form-item label="题目 ID">
-          <el-input v-model="filterForm.problem_id" placeholder="题目 ID" clearable style="width: 120px" @change="handleFilter"/>
+          <el-input
+            v-model="filterForm.problem_id"
+            placeholder="题目 ID"
+            clearable
+            style="width: 120px"
+            @change="handleFilter"
+          />
         </el-form-item>
         <el-form-item label="用户 ID">
-          <el-input v-model="filterForm.user_id" placeholder="用户 ID" clearable style="width: 120px" @change="handleFilter"/>
+          <el-input
+            v-model="filterForm.user_id"
+            placeholder="用户 ID"
+            clearable
+            style="width: 120px"
+            @change="handleFilter"
+          />
         </el-form-item>
         <el-form-item label="用户名">
-          <el-input v-model="filterForm.username" placeholder="用户名模糊搜索" clearable style="width: 150px" @change="handleFilter"/>
+          <el-input
+            v-model="filterForm.username"
+            placeholder="用户名模糊搜索"
+            clearable
+            style="width: 150px"
+            @change="handleFilter"
+          />
         </el-form-item>
         <el-form-item label="考试 ID">
-          <el-input v-model="filterForm.exam_id" placeholder="考试 ID" clearable style="width: 120px" @change="handleFilter"/>
+          <el-input
+            v-model="filterForm.exam_id"
+            placeholder="考试 ID"
+            clearable
+            style="width: 120px"
+            @change="handleFilter"
+          />
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="filterForm.status" placeholder="选择状态" clearable style="width: 150px" @change="handleFilter">
+          <el-select
+            v-model="filterForm.status"
+            placeholder="选择状态"
+            clearable
+            style="width: 150px"
+            @change="handleFilter"
+          >
             <el-option label="Accepted" value="Accepted" />
             <el-option label="Wrong Answer" value="Wrong Answer" />
             <el-option label="Time Limit Exceeded" value="Time Limit Exceeded" />
@@ -46,13 +76,8 @@
     </el-card>
 
     <el-card shadow="never">
-      <el-table
-        v-loading="loading"
-        :data="submissions"
-        stripe
-        style="width: 100%"
-      >
-        <el-table-column prop="id" label="ID" width="80" align="center"/>
+      <el-table v-loading="loading" :data="submissions" stripe style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column label="用户" min-width="150">
           <template #default="scope">
             <div class="user-info">
@@ -63,7 +88,12 @@
         </el-table-column>
         <el-table-column prop="problem_id" label="题目 ID" width="100" align="center">
           <template #default="scope">
-            <el-link type="primary" @click="$router.push({ name: 'problem-detail', params: { id: scope.row.problem_id } })">
+            <el-link
+              type="primary"
+              @click="
+                $router.push({ name: 'problem-detail', params: { id: scope.row.problem_id } })
+              "
+            >
               #{{ scope.row.problem_id }}
             </el-link>
           </template>
@@ -84,7 +114,7 @@
             <span :class="getScoreClass(scope.row.score)">{{ scope.row.score }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="language" label="语言" width="100" align="center"/>
+        <el-table-column prop="language" label="语言" width="100" align="center" />
         <el-table-column prop="created_at" label="提交时间" width="180">
           <template #default="scope">
             {{ formatTime(scope.row.created_at) }}
@@ -145,28 +175,33 @@ const loadSavedFilter = (): Record<string, unknown> => {
   }
 }
 const savedFilter = loadSavedFilter()
-const savedField = (key: string) => typeof savedFilter[key] === 'string' ? savedFilter[key] : ''
+const savedField = (key: string) => (typeof savedFilter[key] === 'string' ? savedFilter[key] : '')
 // 兼容旧版管理页面保存的错误状态名称。
-const savedStatus = savedField('status') === 'Compilation Error' ? 'Compile Error' : savedField('status')
+const savedStatus =
+  savedField('status') === 'Compilation Error' ? 'Compile Error' : savedField('status')
 
 const filterForm = reactive({
   problem_id: savedField('problem_id'),
   user_id: savedField('user_id'),
   username: savedField('username'),
   exam_id: savedField('exam_id'),
-  status: savedStatus
+  status: savedStatus,
 })
 
 const pagination = reactive({
   page: 1,
   per_page: 20,
-  total: 0
+  total: 0,
 })
 
 // 监听表单变化并保存到 localStorage
-watch(filterForm, (newVal) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal))
-}, { deep: true })
+watch(
+  filterForm,
+  (newVal) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal))
+  },
+  { deep: true },
+)
 
 // 快速筛选、翻页或刷新时，只采用最新请求的响应。
 let latestRequestId = 0
@@ -189,8 +224,12 @@ const fetchSubmissions = async () => {
     if (requestId !== latestRequestId) return
 
     if (res) {
-      const list = Array.isArray(res) ? res : 'submissions' in res ? res.submissions : res.items || res.data || []
-      const total = Array.isArray(res) ? res.length : res.total ?? 0
+      const list = Array.isArray(res)
+        ? res
+        : 'submissions' in res
+          ? res.submissions
+          : res.items || res.data || []
+      const total = Array.isArray(res) ? res.length : (res.total ?? 0)
 
       submissions.value = list
       pagination.total = total
@@ -212,7 +251,8 @@ const handleFilter = () => {
 }
 
 const resetFilter = () => {
-  for (const key of ['problem_id', 'user_id', 'username', 'exam_id', 'status'] as const) filterForm[key] = ''
+  for (const key of ['problem_id', 'user_id', 'username', 'exam_id', 'status'] as const)
+    filterForm[key] = ''
   localStorage.removeItem(STORAGE_KEY)
   handleFilter()
 }
@@ -234,15 +274,15 @@ const viewDetail = (id: number) => {
 
 const getStatusType = (status: string) => {
   const map: Record<string, TagProps['type']> = {
-    'Accepted': 'success',
+    Accepted: 'success',
     'Wrong Answer': 'danger',
-    'Pending': 'info',
-    'Judging': 'warning',
+    Pending: 'info',
+    Judging: 'warning',
     'Compile Error': 'info',
     'System Error': 'danger',
     'Runtime Error': 'danger',
     'Time Limit Exceeded': 'warning',
-    'Memory Limit Exceeded': 'warning'
+    'Memory Limit Exceeded': 'warning',
   }
   return map[status] || 'info'
 }
@@ -253,7 +293,7 @@ const getScoreClass = (score: number) => {
   return 'text-danger'
 }
 
-const formatTime = (time: string | null) => time ? new Date(time).toLocaleString() : ''
+const formatTime = (time: string | null) => (time ? new Date(time).toLocaleString() : '')
 
 onMounted(() => {
   fetchSubmissions()
@@ -290,10 +330,18 @@ onMounted(() => {
   color: #909399;
 }
 
-.text-success { color: #67C23A; }
-.text-warning { color: #E6A23C; }
-.text-danger { color: #F56C6C; }
-.text-gray { color: #909399; }
+.text-success {
+  color: #67c23a;
+}
+.text-warning {
+  color: #e6a23c;
+}
+.text-danger {
+  color: #f56c6c;
+}
+.text-gray {
+  color: #909399;
+}
 
 .pagination-container {
   display: flex;

@@ -28,11 +28,14 @@ beforeEach(() => {
   store = useUserStore()
   router.currentRoute.value.name = 'home'
   vi.mocked(router.push).mockResolvedValue(undefined)
-  vi.mocked(ElMessageBox.confirm).mockResolvedValue('confirm' as Awaited<ReturnType<typeof ElMessageBox.confirm>>)
-  request.defaults.adapter = config => Promise.reject({
-    config,
-    response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED', error: '登录已过期' } },
-  })
+  vi.mocked(ElMessageBox.confirm).mockResolvedValue(
+    'confirm' as Awaited<ReturnType<typeof ElMessageBox.confirm>>,
+  )
+  request.defaults.adapter = (config) =>
+    Promise.reject({
+      config,
+      response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED', error: '登录已过期' } },
+    })
 })
 
 afterEach(async () => {
@@ -43,7 +46,9 @@ afterEach(async () => {
 })
 
 async function expiredRequest(config?: AxiosRequestConfig) {
-  await expect(request.get('/private', config)).rejects.toMatchObject({ code: 'AUTH_TOKEN_EXPIRED' })
+  await expect(request.get('/private', config)).rejects.toMatchObject({
+    code: 'AUTH_TOKEN_EXPIRED',
+  })
 }
 
 describe('登录失效后的恢复流程', () => {
@@ -58,7 +63,7 @@ describe('登录失效后的恢复流程', () => {
     expect(router.push).toHaveBeenCalledWith('/login')
   })
 
-  it.each(['cancel', 'close'])('弹窗 %s 不产生未处理拒绝，也不清除登录状态', async action => {
+  it.each(['cancel', 'close'])('弹窗 %s 不产生未处理拒绝，也不清除登录状态', async (action) => {
     vi.mocked(ElMessageBox.confirm).mockRejectedValue(action)
     await expiredRequest()
     await flushPromises()
@@ -70,7 +75,12 @@ describe('登录失效后的恢复流程', () => {
 
   it('并发失效请求只显示一个弹窗，关闭后允许再次提示', async () => {
     let dismiss!: (reason: unknown) => void
-    vi.mocked(ElMessageBox.confirm).mockImplementationOnce(() => new Promise((resolve, reject) => { dismiss = reject }))
+    vi.mocked(ElMessageBox.confirm).mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          dismiss = reject
+        }),
+    )
     await Promise.all([expiredRequest(), expiredRequest()])
     expect(ElMessageBox.confirm).toHaveBeenCalledTimes(1)
 

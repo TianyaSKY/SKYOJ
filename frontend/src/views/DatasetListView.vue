@@ -4,26 +4,31 @@
       <template #header>
         <div class="card-header">
           <h2 class="header-title">公开数据集</h2>
-          <el-button :loading="loading" :disabled="loading" @click="fetchDatasets()">刷新</el-button>
-          <el-button
-              v-if="isTeacher"
-              :icon="Upload"
-              type="primary"
-              @click="openUpload"
+          <el-button :loading="loading" :disabled="loading" @click="fetchDatasets()"
+            >刷新</el-button
           >
+          <el-button v-if="isTeacher" :icon="Upload" type="primary" @click="openUpload">
             上传数据集
           </el-button>
         </div>
       </template>
 
       <el-table v-loading="loading" :data="datasets" stripe style="width: 100%">
-        <el-table-column label="名称" min-width="200" prop="name"/>
-        <el-table-column label="描述" min-width="300" prop="description"/>
-        <el-table-column label="上传者" prop="uploader" width="120"/>
-        <el-table-column label="大小" prop="file_size" width="100"/>
+        <el-table-column label="名称" min-width="200" prop="name" />
+        <el-table-column label="描述" min-width="300" prop="description" />
+        <el-table-column label="上传者" prop="uploader" width="120" />
+        <el-table-column label="大小" prop="file_size" width="100" />
         <el-table-column label="状态" width="100">
           <template #default="scope">
-            <el-tag :type="scope.row.status === 'failed' ? 'danger' : scope.row.status === 'pending' ? 'warning' : 'success'">
+            <el-tag
+              :type="
+                scope.row.status === 'failed'
+                  ? 'danger'
+                  : scope.row.status === 'pending'
+                    ? 'warning'
+                    : 'success'
+              "
+            >
               {{ datasetStatuses[scope.row.status || 'ready'] || scope.row.status }}
             </el-tag>
           </template>
@@ -37,28 +42,28 @@
           <template #default="scope">
             <el-button-group>
               <el-button
-                  :icon="Download"
-                  size="small"
-                  type="success"
-                  :disabled="!canDownload(scope.row)"
-                  @click="handleDownload(scope.row)"
+                :icon="Download"
+                size="small"
+                type="success"
+                :disabled="!canDownload(scope.row)"
+                @click="handleDownload(scope.row)"
               >
                 下载
               </el-button>
               <el-popconfirm
-                  v-if="isTeacher"
-                  cancel-button-text="取消"
-                  confirm-button-text="确定"
-                  title="确定要删除这个数据集吗？"
-                  @confirm="handleDelete(scope.row)"
+                v-if="isTeacher"
+                cancel-button-text="取消"
+                confirm-button-text="确定"
+                title="确定要删除这个数据集吗？"
+                @confirm="handleDelete(scope.row)"
               >
                 <template #reference>
                   <el-button
-                      :icon="Delete"
-                      size="small"
-                      type="danger"
-                      :loading="deleting.has(scope.row.id)"
-                      :disabled="deleting.has(scope.row.id)"
+                    :icon="Delete"
+                    size="small"
+                    type="danger"
+                    :loading="deleting.has(scope.row.id)"
+                    :disabled="deleting.has(scope.row.id)"
                   >
                     删除
                   </el-button>
@@ -71,14 +76,14 @@
 
       <div class="pagination-container">
         <el-pagination
-            :current-page="currentPage"
-            :page-size="pageSize"
-            :disabled="loading"
-            :page-sizes="[10, 20, 50]"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :disabled="loading"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -90,22 +95,24 @@
           <el-input v-model="uploadForm.name" placeholder="请输入数据集名称"></el-input>
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="uploadForm.description" placeholder="请输入数据集描述" type="textarea"></el-input>
+          <el-input
+            v-model="uploadForm.description"
+            placeholder="请输入数据集描述"
+            type="textarea"
+          ></el-input>
         </el-form-item>
         <el-form-item label="数据集文件">
           <el-upload
-              ref="uploadRef"
-              :auto-upload="false"
-              :limit="1"
-              :on-change="handleFileChange"
-              :on-remove="handleFileRemove"
-              action="#"
+            ref="uploadRef"
+            :auto-upload="false"
+            :limit="1"
+            :on-change="handleFileChange"
+            :on-remove="handleFileRemove"
+            action="#"
           >
             <el-button type="primary">选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">
-                请上传 ZIP, CSV, JSON 等格式的文件，最大限制 500MB。
-              </div>
+              <div class="el-upload__tip">请上传 ZIP, CSV, JSON 等格式的文件，最大限制 500MB。</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -113,7 +120,12 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="uploadDialogVisible = false">取消</el-button>
-          <el-button :loading="uploading" :disabled="uploading" type="primary" @click="handleUpload">
+          <el-button
+            :loading="uploading"
+            :disabled="uploading"
+            type="primary"
+            @click="handleUpload"
+          >
             确认上传
           </el-button>
         </span>
@@ -123,12 +135,12 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import {useUserStore} from '@/stores/user'
-import {deleteDataset, downloadDataset, getDatasetList, uploadDataset} from '@/api/dataset'
-import {ElMessage, type UploadInstance, type UploadFile, type UploadFiles} from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
+import { deleteDataset, downloadDataset, getDatasetList, uploadDataset } from '@/api/dataset'
+import { ElMessage, type UploadInstance, type UploadFile, type UploadFiles } from 'element-plus'
 import type { DatasetResponse } from '@/types/dataset'
-import {Delete, Download, Upload} from '@element-plus/icons-vue'
+import { Delete, Download, Upload } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const datasets = ref<DatasetResponse[]>([])
@@ -146,10 +158,15 @@ let requestedPage = 1
 let requestedPageSize = 20
 let disposed = false
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
-const isCurrentUpload = (version: number) => !disposed && version === uploadVersion && uploadDialogVisible.value
+const isCurrentUpload = (version: number) =>
+  !disposed && version === uploadVersion && uploadDialogVisible.value
 
 const MAX_SIZE_MB = 500
-const datasetStatuses: Record<string, string> = { pending: '处理中', ready: '可下载', failed: '处理失败' }
+const datasetStatuses: Record<string, string> = {
+  pending: '处理中',
+  ready: '可下载',
+  failed: '处理失败',
+}
 const canDownload = (row: DatasetResponse) => !row.status || row.status === 'ready'
 
 const scheduleRefresh = (delay: number) => {
@@ -161,10 +178,10 @@ const scheduleRefresh = (delay: number) => {
   }, delay)
 }
 
-const uploadForm = ref<{name: string; description: string; file: File | null}>({
+const uploadForm = ref<{ name: string; description: string; file: File | null }>({
   name: '',
   description: '',
-  file: null
+  file: null,
 })
 
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
@@ -183,7 +200,7 @@ const fetchDatasets = async (page = requestedPage, size = requestedPageSize): Pr
   try {
     const res = await getDatasetList({
       page,
-      page_size: size
+      page_size: size,
     })
     if (!isCurrent()) return
     const items = Array.isArray(res) ? res : 'datasets' in res ? res.datasets : res.data
@@ -195,7 +212,7 @@ const fetchDatasets = async (page = requestedPage, size = requestedPageSize): Pr
     currentPage.value = page
     pageSize.value = size
     // 等本次查询结束再安排下一次查询，避免慢请求重叠。
-    if (items.some(item => item.status === 'pending')) scheduleRefresh(2000)
+    if (items.some((item) => item.status === 'pending')) scheduleRefresh(2000)
   } catch (error) {
     if (isCurrent()) {
       requestedPage = currentPage.value
@@ -258,7 +275,7 @@ const handleFileRemove = (file: UploadFile, files: UploadFiles) => {
 }
 
 const resetUploadForm = () => {
-  uploadForm.value = {name: '', description: '', file: null}
+  uploadForm.value = { name: '', description: '', file: null }
   uploadRef.value?.clearFiles()
 }
 
@@ -269,13 +286,17 @@ const openUpload = () => {
   uploadDialogVisible.value = true
 }
 
-watch(uploadDialogVisible, visible => {
-  if (!visible) {
-    uploadVersion += 1
-    uploading.value = false
-    resetUploadForm()
-  }
-}, { flush: 'sync' })
+watch(
+  uploadDialogVisible,
+  (visible) => {
+    if (!visible) {
+      uploadVersion += 1
+      uploading.value = false
+      resetUploadForm()
+    }
+  },
+  { flush: 'sync' },
+)
 
 const handleUpload = async () => {
   if (!uploadDialogVisible.value || uploading.value) return

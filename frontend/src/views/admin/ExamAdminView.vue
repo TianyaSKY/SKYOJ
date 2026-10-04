@@ -12,14 +12,15 @@
 
     <el-card class="table-card" shadow="never">
       <el-table v-loading="loading" :data="exams" border stripe style="width: 100%">
-        <el-table-column label="ID" prop="id" width="70"/>
+        <el-table-column label="ID" prop="id" width="70" />
         <el-table-column label="考试名称" min-width="220">
           <template #default="scope">
             <div class="exam-title-cell">
               <span class="exam-name">{{ scope.row.title }}</span>
               <div class="exam-time-range">
                 <el-icon><Calendar /></el-icon>
-                {{ formatTimeShort(scope.row.start_time) }} ~ {{ formatTimeShort(scope.row.end_time) }}
+                {{ formatTimeShort(scope.row.start_time) }} ~
+                {{ formatTimeShort(scope.row.end_time) }}
               </div>
             </div>
           </template>
@@ -64,20 +65,37 @@
         <el-table-column align="center" fixed="right" label="管理操作" width="380">
           <template #default="scope">
             <div class="operation-buttons">
-              <el-button :icon="Monitor" plain size="small" type="success"
-                         @click="$router.push({ name: 'exam-monitor', params: { id: scope.row.id } })">
+              <el-button
+                :icon="Monitor"
+                plain
+                size="small"
+                type="success"
+                @click="$router.push({ name: 'exam-monitor', params: { id: scope.row.id } })"
+              >
                 监控
               </el-button>
-              <el-button :icon="Download" plain size="small" type="warning" @click="handleExport(scope.row)">
+              <el-button
+                :icon="Download"
+                plain
+                size="small"
+                type="warning"
+                @click="handleExport(scope.row)"
+              >
                 成绩
               </el-button>
-              <el-button :icon="Edit" plain size="small" type="primary" @click="handleEdit(scope.row)">
+              <el-button
+                :icon="Edit"
+                plain
+                size="small"
+                type="primary"
+                @click="handleEdit(scope.row)"
+              >
                 编辑
               </el-button>
               <el-divider direction="vertical" />
               <el-popconfirm
-                  title="确定要删除这场考试吗？此操作不可恢复。"
-                  @confirm="handleDelete(scope.row.id)"
+                title="确定要删除这场考试吗？此操作不可恢复。"
+                @confirm="handleDelete(scope.row.id)"
               >
                 <template #reference>
                   <el-button :icon="Delete" link size="small" type="danger">删除</el-button>
@@ -90,22 +108,27 @@
     </el-card>
 
     <!-- Edit/Create Dialog -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="900px"
-      class="exam-dialog"
-    >
-      <el-form ref="formRef" v-loading="dialogLoading || submitting" :model="form" label-position="top">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="900px" class="exam-dialog">
+      <el-form
+        ref="formRef"
+        v-loading="dialogLoading || submitting"
+        :model="form"
+        label-position="top"
+      >
         <el-row :gutter="30">
           <!-- Left Side: Basic Info -->
           <el-col :span="10">
             <div class="form-section-title">基本信息</div>
             <el-form-item label="考试名称" prop="title" required>
-              <el-input v-model="form.title" placeholder="请输入考试名称"/>
+              <el-input v-model="form.title" placeholder="请输入考试名称" />
             </el-form-item>
             <el-form-item label="考试描述" prop="description">
-              <el-input v-model="form.description" :rows="4" type="textarea" placeholder="考试规则、注意事项等..."/>
+              <el-input
+                v-model="form.description"
+                :rows="4"
+                type="textarea"
+                placeholder="考试规则、注意事项等..."
+              />
             </el-form-item>
 
             <div class="form-section-title mt-4">时间与安全</div>
@@ -124,9 +147,14 @@
             <el-row :gutter="20">
               <el-col :span="14">
                 <el-form-item label="考试密码" prop="password">
-                  <el-input v-model="form.password"
-                            :placeholder="isEdit && form.has_password ? '留空保留现有密码，填写则替换' : '留空则公开'"
-                            :disabled="removePassword" show-password/>
+                  <el-input
+                    v-model="form.password"
+                    :placeholder="
+                      isEdit && form.has_password ? '留空保留现有密码，填写则替换' : '留空则公开'
+                    "
+                    :disabled="removePassword"
+                    show-password
+                  />
                   <el-checkbox v-if="isEdit && form.has_password" v-model="removePassword">
                     移除现有密码
                   </el-checkbox>
@@ -134,7 +162,12 @@
               </el-col>
               <el-col :span="10">
                 <el-form-item label="学生可见">
-                  <el-switch v-model="form.is_visible" active-text="可见" inactive-text="隐藏" inline-prompt />
+                  <el-switch
+                    v-model="form.is_visible"
+                    active-text="可见"
+                    inactive-text="隐藏"
+                    inline-prompt
+                  />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -146,19 +179,19 @@
             <div class="problem-selector-container">
               <div class="selector-header">
                 <el-input
-                    v-model="problemSearchQuery"
-                    clearable
-                    placeholder="搜索题目库..."
-                    prefix-icon="Search"
+                  v-model="problemSearchQuery"
+                  clearable
+                  placeholder="搜索题目库..."
+                  prefix-icon="Search"
                 />
               </div>
               <el-transfer
-                  v-model="selectedProblemIds"
-                  :data="filteredProblems"
-                  :filter-method="filterMethod"
-                  :props="{ key: 'id', label: 'label' }"
-                  :titles="['题库', '已选题目']"
-                  filterable
+                v-model="selectedProblemIds"
+                :data="filteredProblems"
+                :filter-method="filterMethod"
+                :props="{ key: 'id', label: 'label' }"
+                :titles="['题库', '已选题目']"
+                filterable
               >
                 <template #default="{ option }">
                   <div class="problem-option">
@@ -177,7 +210,13 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button :loading="submitting" :disabled="submitting || dialogLoading" type="primary" size="large" @click="handleSubmit">
+          <el-button
+            :loading="submitting"
+            :disabled="submitting || dialogLoading"
+            type="primary"
+            size="large"
+            @click="handleSubmit"
+          >
             {{ isEdit ? '保存修改' : '立即创建' }}
           </el-button>
         </div>
@@ -189,18 +228,18 @@
 <script setup lang="ts">
 import type { CreateExamInput } from '@/schemas/exam'
 import type { ExamListResponse, ExamProblemItem } from '@/types/exam'
-import {createExamSchema, updateExamSchema} from '@/schemas/exam'
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import { createExamSchema, updateExamSchema } from '@/schemas/exam'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   createExam,
   deleteExam,
   exportExamScores,
   getExamDetail,
   getExamList,
-  updateExam
+  updateExam,
 } from '@/api/exam'
-import {getProblemList} from '@/api/problem'
-import {ElMessage} from 'element-plus'
+import { getProblemList } from '@/api/problem'
+import { ElMessage } from 'element-plus'
 import {
   Calendar,
   Delete,
@@ -210,7 +249,7 @@ import {
   Monitor,
   Plus,
   Search,
-  View
+  View,
 } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import { parseServerDate } from '@/utils/date'
@@ -229,10 +268,16 @@ const removePassword = ref(false)
 let dialogVersion = 0
 let listVersion = 0
 let disposed = false
-const isCurrentDialog = (version: number) => !disposed && dialogVisible.value && version === dialogVersion
+const isCurrentDialog = (version: number) =>
+  !disposed && dialogVisible.value && version === dialogVersion
 
 // Problem Selection
-interface SelectableProblem { id: number; title: string; label: string; disabled: boolean }
+interface SelectableProblem {
+  id: number
+  title: string
+  label: string
+  disabled: boolean
+}
 const allProblems = ref<SelectableProblem[]>([])
 const selectedProblemIds = ref<number[]>([])
 const problemSearchQuery = ref('')
@@ -242,11 +287,17 @@ const filteredProblems = computed(() => {
   if (!query) return allProblems.value
   const selected = new Set(selectedProblemIds.value)
   // 保留右侧已选题目，搜索只筛选左侧候选项。
-  return allProblems.value.filter(problem => selected.has(problem.id) ||
-    problem.label.toLowerCase().includes(query))
+  return allProblems.value.filter(
+    (problem) => selected.has(problem.id) || problem.label.toLowerCase().includes(query),
+  )
 })
 
-type ExamForm = Omit<CreateExamInput, 'password' | 'problem_ids' | 'contest_type'> & {password?: string; problem_ids?: string; contest_type?: string; has_password?: boolean}
+type ExamForm = Omit<CreateExamInput, 'password' | 'problem_ids' | 'contest_type'> & {
+  password?: string
+  problem_ids?: string
+  contest_type?: string
+  has_password?: boolean
+}
 const form = ref<ExamForm>({
   title: '',
   description: '',
@@ -254,7 +305,7 @@ const form = ref<ExamForm>({
   end_time: '',
   password: '',
   is_visible: true,
-  problem_ids: ''
+  problem_ids: '',
 })
 
 const dialogTitle = computed(() => (isEdit.value ? '编辑考试配置' : '创建新考试'))
@@ -276,11 +327,11 @@ const fetchProblems = async () => {
   try {
     const data = await getProblemList()
     if (disposed) return
-    allProblems.value = (Array.isArray(data) ? data : data.problems).map(p => ({
+    allProblems.value = (Array.isArray(data) ? data : data.problems).map((p) => ({
       id: p.id,
       title: p.title,
       label: `${p.id} - ${p.title}`,
-      disabled: false
+      disabled: false,
     }))
   } catch (error) {
     if (!disposed) ElMessage.error('获取题目列表失败')
@@ -289,12 +340,14 @@ const fetchProblems = async () => {
 
 const getExamStatus = (exam: ExamListResponse) => {
   const phase = getExamTiming(exam, now.value).phase
-  return ({
-    upcoming: {label: '未开始', type: 'info'},
-    ongoing: {label: '进行中', type: 'success'},
-    ended: {label: '已结束', type: 'danger'},
-    unknown: {label: '时间无效', type: 'info'},
-  } as const)[phase]
+  return (
+    {
+      upcoming: { label: '未开始', type: 'info' },
+      ongoing: { label: '进行中', type: 'success' },
+      ended: { label: '已结束', type: 'danger' },
+      unknown: { label: '时间无效', type: 'info' },
+    } as const
+  )[phase]
 }
 
 const formatTimeShort = (time: unknown) => {
@@ -321,7 +374,7 @@ const resetForm = () => {
     end_time: '',
     password: '',
     is_visible: true,
-    problem_ids: ''
+    problem_ids: '',
   }
   timeRange.value = []
   selectedProblemIds.value = []
@@ -350,13 +403,15 @@ const handleEdit = async (row: ExamListResponse) => {
   try {
     const detail = await getExamDetail(row.id)
     if (!isCurrentDialog(version)) return
-    form.value = {...detail, password: ''}
+    form.value = { ...detail, password: '' }
     timeRange.value = [parseServerDate(detail.start_time), parseServerDate(detail.end_time)]
     form.value.start_time = timeRange.value[0]?.toISOString() || ''
     form.value.end_time = timeRange.value[1]?.toISOString() || ''
 
     if (detail.problems && Array.isArray(detail.problems)) {
-      selectedProblemIds.value = detail.problems.map((p: ExamProblemItem & {id?: number}) => p.problem_id || p.id).filter((id): id is number => id !== undefined)
+      selectedProblemIds.value = detail.problems
+        .map((p: ExamProblemItem & { id?: number }) => p.problem_id || p.id)
+        .filter((id): id is number => id !== undefined)
     } else {
       selectedProblemIds.value = []
     }
@@ -402,8 +457,8 @@ const handleSubmit = async () => {
   if (isEdit.value && removePassword.value) body.password = ''
   else if (isEdit.value && form.value.has_password && !body.password) delete body.password
   const validation = isEdit.value
-    ? {editing: true as const, parsed: updateExamSchema.safeParse(body)}
-    : {editing: false as const, parsed: createExamSchema.safeParse(body)}
+    ? { editing: true as const, parsed: updateExamSchema.safeParse(body) }
+    : { editing: false as const, parsed: createExamSchema.safeParse(body) }
   if (!validation.parsed.success) {
     ElMessage.warning(validation.parsed.error.issues[0]?.message || '请检查输入')
     return
@@ -435,16 +490,24 @@ const filterMethod = (query: string, item: SelectableProblem) => {
   return item.label.toLowerCase().includes(query.toLowerCase())
 }
 
-watch(dialogVisible, visible => {
-  if (!visible) {
-    dialogVersion += 1
-    dialogLoading.value = false
-    submitting.value = false
-    resetForm()
-  }
-}, {flush: 'sync'})
+watch(
+  dialogVisible,
+  (visible) => {
+    if (!visible) {
+      dialogVersion += 1
+      dialogLoading.value = false
+      submitting.value = false
+      resetForm()
+    }
+  },
+  { flush: 'sync' },
+)
 
-onUnmounted(() => { disposed = true; dialogVersion += 1; listVersion += 1 })
+onUnmounted(() => {
+  disposed = true
+  dialogVersion += 1
+  listVersion += 1
+})
 
 onMounted(() => {
   fetchExams()

@@ -15,8 +15,15 @@ export interface ApiError extends Error {
   config?: AxiosRequestConfig
 }
 
-type RequestMethod = <T = unknown, D = unknown>(url: string, config?: AxiosRequestConfig<D>) => Promise<T>
-type DataMethod = <T = unknown, D = unknown>(url: string, data?: D, config?: AxiosRequestConfig<D>) => Promise<T>
+type RequestMethod = <T = unknown, D = unknown>(
+  url: string,
+  config?: AxiosRequestConfig<D>,
+) => Promise<T>
+type DataMethod = <T = unknown, D = unknown>(
+  url: string,
+  data?: D,
+  config?: AxiosRequestConfig<D>,
+) => Promise<T>
 
 // 响应拦截器返回 data，保留实例的 defaults 和 interceptors 供现有调用方使用。
 export interface ApiClient extends Pick<AxiosInstance, 'defaults' | 'interceptors' | 'getUri'> {

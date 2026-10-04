@@ -1,4 +1,4 @@
-import {z} from 'zod'
+import { z } from 'zod'
 
 const fields = z.object({
   title: z.string().min(1, '请输入题目标题').max(200, '标题最多 200 个字符'),

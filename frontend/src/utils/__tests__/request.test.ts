@@ -29,9 +29,12 @@ afterEach(() => flushPromises())
 describe('request.js 响应拦截器 - 错误信封解析', () => {
   async function rejectedRequest(data: unknown, extra: Partial<ApiError> = {}): Promise<ApiError> {
     const original = request.defaults.adapter
-    request.defaults.adapter = () => Promise.reject({
-      message: 'Request failed', response: { status: 422, data }, ...extra,
-    })
+    request.defaults.adapter = () =>
+      Promise.reject({
+        message: 'Request failed',
+        response: { status: 422, data },
+        ...extra,
+      })
     try {
       return await request.get<ApiError>('/invalid').catch((error: ApiError) => error)
     } finally {
@@ -45,10 +48,12 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
   })
 
   it('将字段校验数组转为可读字符串，保留原始报文', async () => {
-    const data = { detail: [
-      { loc: ['body', 'title'], msg: 'Field required', input: 'private input' },
-      { loc: ['query', 'page'], msg: 'Must be greater than 0' },
-    ] }
+    const data = {
+      detail: [
+        { loc: ['body', 'title'], msg: 'Field required', input: 'private input' },
+        { loc: ['query', 'page'], msg: 'Must be greater than 0' },
+      ],
+    }
     const error = await rejectedRequest(data)
     expect(error.message).toBe('title: Field required；page: Must be greater than 0')
     expect(error.backend).toEqual(data)
@@ -56,12 +61,18 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
   })
 
   it('支持旧版嵌套错误消息，忽略没有可读消息的对象', async () => {
-    expect((await rejectedRequest({ detail: { message: '参数格式无效' } })).message).toBe('参数格式无效')
+    expect((await rejectedRequest({ detail: { message: '参数格式无效' } })).message).toBe(
+      '参数格式无效',
+    )
     expect((await rejectedRequest({ error: { unknown: true } })).message).toBe('Request failed')
   })
 
   it('后端未返回错误码时保留网络或取消请求的原始代码', async () => {
-    const error = await rejectedRequest(undefined, { code: 'ERR_CANCELED', message: 'canceled', response: undefined })
+    const error = await rejectedRequest(undefined, {
+      code: 'ERR_CANCELED',
+      message: 'canceled',
+      response: undefined,
+    })
     expect(error.code).toBe('ERR_CANCELED')
     expect(error.message).toBe('canceled')
   })
@@ -70,16 +81,21 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
     // 通过替换 request 内部的 axios adapter 拦截 _request 调用。
     const inner = request.defaults
     const originalAdapter = inner.adapter
-    inner.adapter = () => Promise.reject({
-      message: 'Network Error',
-      response: {
-        status: 401,
-        data: { code: 'AUTH_REQUIRED', error: '请先登录' },
-      },
-    })
+    inner.adapter = () =>
+      Promise.reject({
+        message: 'Network Error',
+        response: {
+          status: 401,
+          data: { code: 'AUTH_REQUIRED', error: '请先登录' },
+        },
+      })
 
     let caught: ApiError | undefined
-    try { await request.get('/test') } catch (e) { caught = e as ApiError }
+    try {
+      await request.get('/test')
+    } catch (e) {
+      caught = e as ApiError
+    }
     inner.adapter = originalAdapter
 
     expect(caught).toBeTruthy()
@@ -91,13 +107,18 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
   it('把 404 + HTTP_NOT_FOUND envelope 的 code 挂到 error 上', async () => {
     const inner = request.defaults
     const originalAdapter = inner.adapter
-    inner.adapter = () => Promise.reject({
-      message: 'Request failed',
-      response: { status: 404, data: { code: 'HTTP_NOT_FOUND', detail: '资源不存在' } },
-    })
+    inner.adapter = () =>
+      Promise.reject({
+        message: 'Request failed',
+        response: { status: 404, data: { code: 'HTTP_NOT_FOUND', detail: '资源不存在' } },
+      })
 
     let caught: ApiError | undefined
-    try { await request.get('/x') } catch (e) { caught = e as ApiError }
+    try {
+      await request.get('/x')
+    } catch (e) {
+      caught = e as ApiError
+    }
     inner.adapter = originalAdapter
 
     expect(caught?.code).toBe('HTTP_NOT_FOUND')
@@ -107,13 +128,14 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
   it('成功响应直接透传 data 字段', async () => {
     const inner = request.defaults
     const originalAdapter = inner.adapter
-    inner.adapter = (config) => Promise.resolve({
-      status: 200,
-      data: { items: [1, 2, 3] },
-      headers: {},
-      config,
-      statusText: 'OK',
-    })
+    inner.adapter = (config) =>
+      Promise.resolve({
+        status: 200,
+        data: { items: [1, 2, 3] },
+        headers: {},
+        config,
+        statusText: 'OK',
+      })
 
     const result = await request.get<{ items: number[] }>('/list')
     inner.adapter = originalAdapter
@@ -124,13 +146,18 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
   it('未带 code 字段的旧 envelope 也能 fallback 到 message', async () => {
     const inner = request.defaults
     const originalAdapter = inner.adapter
-    inner.adapter = () => Promise.reject({
-      message: 'Network Error',
-      response: { status: 500, data: { error: '服务端错误' } },
-    })
+    inner.adapter = () =>
+      Promise.reject({
+        message: 'Network Error',
+        response: { status: 500, data: { error: '服务端错误' } },
+      })
 
     let caught: ApiError | undefined
-    try { await request.get('/y') } catch (e) { caught = e as ApiError }
+    try {
+      await request.get('/y')
+    } catch (e) {
+      caught = e as ApiError
+    }
     inner.adapter = originalAdapter
 
     expect(caught?.code).toBeUndefined()
@@ -140,13 +167,18 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
   it('5xx 错误信封同样挂载 code', async () => {
     const inner = request.defaults
     const originalAdapter = inner.adapter
-    inner.adapter = () => Promise.reject({
-      message: 'Network Error',
-      response: { status: 502, data: { code: 'EXTERNAL_SERVICE_ERROR', error: 'LLM 配置缺失' } },
-    })
+    inner.adapter = () =>
+      Promise.reject({
+        message: 'Network Error',
+        response: { status: 502, data: { code: 'EXTERNAL_SERVICE_ERROR', error: 'LLM 配置缺失' } },
+      })
 
     let caught: ApiError | undefined
-    try { await request.get('/z') } catch (e) { caught = e as ApiError }
+    try {
+      await request.get('/z')
+    } catch (e) {
+      caught = e as ApiError
+    }
     inner.adapter = originalAdapter
 
     expect(caught?.code).toBe('EXTERNAL_SERVICE_ERROR')
@@ -156,5 +188,7 @@ describe('request.js 响应拦截器 - 错误信封解析', () => {
 
 it('响应解包契约在类型检查中保持 Promise<T>，写请求配置允许跳过认证弹窗', () => {
   expectTypeOf(request.get<{ id: number }>).returns.toEqualTypeOf<Promise<{ id: number }>>()
-  expectTypeOf(request.post<{ token: string }, { username: string }>).returns.toEqualTypeOf<Promise<{ token: string }>>()
+  expectTypeOf(request.post<{ token: string }, { username: string }>).returns.toEqualTypeOf<
+    Promise<{ token: string }>
+  >()
 })

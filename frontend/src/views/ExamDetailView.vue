@@ -39,7 +39,11 @@
             <el-table-column label="题目名称" min-width="200">
               <template #default="scope">
                 <div class="problem-name-cell">
-                  <el-link :underline="false" class="problem-link" @click="goToProblem(scope.row.problem_id)">
+                  <el-link
+                    :underline="false"
+                    class="problem-link"
+                    @click="goToProblem(scope.row.problem_id)"
+                  >
                     {{ scope.row.title }}
                   </el-link>
                 </div>
@@ -94,7 +98,9 @@
               <span class="score-ratio">{{ totalCurrentScore }} / {{ totalMaxScore }}</span>
             </div>
             <el-progress
-              :percentage="totalMaxScore > 0 ? Math.round((totalCurrentScore / totalMaxScore) * 100) : 0"
+              :percentage="
+                totalMaxScore > 0 ? Math.round((totalCurrentScore / totalMaxScore) * 100) : 0
+              "
               :stroke-width="12"
               :color="customColors"
             />
@@ -119,23 +125,29 @@
             <el-button class="action-btn" type="primary" @click="goToRank">
               <el-icon><Trophy /></el-icon>查看实时排名
             </el-button>
-            <el-button class="action-btn" :loading="statusLoading" :disabled="statusLoading" @click="fetchStatus">
+            <el-button
+              class="action-btn"
+              :loading="statusLoading"
+              :disabled="statusLoading"
+              @click="fetchStatus"
+            >
               <el-icon><Refresh /></el-icon>刷新题目状态
             </el-button>
             <el-divider />
-            <el-button class="action-btn" type="danger" plain :loading="exiting" :disabled="exiting || exitConfirming" @click="handleExitExam">
+            <el-button
+              class="action-btn"
+              type="danger"
+              plain
+              :loading="exiting"
+              :disabled="exiting || exitConfirming"
+              @click="handleExitExam"
+            >
               <el-icon><SwitchButton /></el-icon>退出考试模式
             </el-button>
           </div>
         </el-card>
 
-        <el-alert
-            :closable="false"
-            class="mt-4"
-            show-icon
-            title="考试守则"
-            type="warning"
-        >
+        <el-alert :closable="false" class="mt-4" show-icon title="考试守则" type="warning">
           <div class="rules-content">
             <p>1. 严禁任何形式的作弊行为。</p>
             <p>2. 考试期间请保持网络连接稳定。</p>
@@ -148,20 +160,20 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onUnmounted, ref, watch} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { ExamDetailResponse, ExamProblemStatusResponse } from '@/types/exam'
 import { parseRouteId } from '@/utils/route'
-import {exitExam, getExamDetail, getMyExamStatus} from '@/api/exam'
-import {useUserStore} from '@/stores/user'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import { exitExam, getExamDetail, getMyExamStatus } from '@/api/exam'
+import { useUserStore } from '@/stores/user'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   DataAnalysis,
   InfoFilled,
   List,
   Refresh,
   SwitchButton,
-  Trophy
+  Trophy,
 } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import { parseServerDate } from '@/utils/date'
@@ -173,12 +185,15 @@ const router = useRouter()
 const userStore = useUserStore()
 const examId = computed(() => parseRouteId(route.params.id))
 
-const emptyExam = (): Pick<ExamDetailResponse, 'title' | 'description' | 'start_time' | 'end_time' | 'problems'> => ({
+const emptyExam = (): Pick<
+  ExamDetailResponse,
+  'title' | 'description' | 'start_time' | 'end_time' | 'problems'
+> => ({
   title: '加载中...',
   description: '',
   start_time: '',
   end_time: '',
-  problems: []
+  problems: [],
 })
 const exam = ref(emptyExam())
 
@@ -209,8 +224,12 @@ const fetchExamData = async () => {
   const scope = scopeVersion
   const request = ++detailRequestVersion
   const token = localStorage.getItem('token')
-  const isCurrent = () => !disposed && scope === scopeVersion && id === examId.value &&
-    request === detailRequestVersion && token === localStorage.getItem('token')
+  const isCurrent = () =>
+    !disposed &&
+    scope === scopeVersion &&
+    id === examId.value &&
+    request === detailRequestVersion &&
+    token === localStorage.getItem('token')
   try {
     if (id === null) throw new Error('考试 ID 无效')
     const data = await getExamDetail(id)
@@ -229,7 +248,10 @@ const fetchStatus = async () => {
   const scope = scopeVersion
   const request = ++statusRequestVersion
   const token = localStorage.getItem('token')
-  const isCurrent = () => !disposed && scope === scopeVersion && request === statusRequestVersion &&
+  const isCurrent = () =>
+    !disposed &&
+    scope === scopeVersion &&
+    request === statusRequestVersion &&
     token === localStorage.getItem('token')
   statusLoading.value = true
   try {
@@ -245,7 +267,8 @@ const fetchStatus = async () => {
       ElMessage.error('获取题目状态失败，请重试')
     }
   } finally {
-    if (!disposed && scope === scopeVersion && request === statusRequestVersion) statusLoading.value = false
+    if (!disposed && scope === scopeVersion && request === statusRequestVersion)
+      statusLoading.value = false
   }
 }
 
@@ -266,15 +289,15 @@ const getStatusType = (status: string) => {
 
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
-    'Accepted': '已通过',
+    Accepted: '已通过',
     'Not Attempted': '未尝试',
-    'Pending': '评测中',
-    'Judging': '评测中',
+    Pending: '评测中',
+    Judging: '评测中',
     'Wrong Answer': '答案错误',
     'Runtime Error': '运行错误',
     'Time Limit Exceeded': '超时',
     'Memory Limit Exceeded': '超内存',
-    'Compile Error': '编译错误'
+    'Compile Error': '编译错误',
   }
   return map[status] || status
 }
@@ -289,7 +312,9 @@ const handleExamEnd = () => {
   const scope = scopeVersion
   ElMessageBox.alert('考试已结束，系统将自动退出考试模式。', '提示', {
     confirmButtonText: '确定',
-    callback: async () => { await performExit(token, scope) }
+    callback: async () => {
+      await performExit(token, scope)
+    },
   })
 }
 
@@ -302,7 +327,7 @@ const handleExitExam = async () => {
     await ElMessageBox.confirm('确定要退出考试吗？退出后将无法继续在考试模式下提交。', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
     })
     await performExit(token, scope)
   } catch (error) {
@@ -316,7 +341,8 @@ const handleExitExam = async () => {
 }
 
 const performExit = async (expectedToken = localStorage.getItem('token'), scope = scopeVersion) => {
-  const isCurrentSession = () => !disposed && scope === scopeVersion && localStorage.getItem('token') === expectedToken
+  const isCurrentSession = () =>
+    !disposed && scope === scopeVersion && localStorage.getItem('token') === expectedToken
   if (exiting.value || !isCurrentSession()) return
   exiting.value = true
   try {
@@ -339,20 +365,26 @@ const remainingTimeStr = computed(() => {
   const seconds = remainingTime.value
   if (seconds <= 0) return '00:00:00'
 
-  const h = Math.floor(seconds / 3600).toString().padStart(2, '0')
-  const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0')
+  const h = Math.floor(seconds / 3600)
+    .toString()
+    .padStart(2, '0')
+  const m = Math.floor((seconds % 3600) / 60)
+    .toString()
+    .padStart(2, '0')
   const s = (seconds % 60).toString().padStart(2, '0')
 
   return `${h}:${m}:${s}`
 })
 
 const timerStatus = computed(() => {
-  return ({
-    upcoming: {label: '距离开始', type: 'info'},
-    ongoing: {label: '剩余时间', type: 'danger'},
-    ended: {label: '已结束', type: 'info'},
-    unknown: {label: '加载中', type: 'info'},
-  } as const)[timing.value.phase]
+  return (
+    {
+      upcoming: { label: '距离开始', type: 'info' },
+      ongoing: { label: '剩余时间', type: 'danger' },
+      ended: { label: '已结束', type: 'info' },
+      unknown: { label: '加载中', type: 'info' },
+    } as const
+  )[timing.value.phase]
 })
 
 const formatTime = (time: unknown) => {
@@ -363,7 +395,7 @@ const formatTime = (time: unknown) => {
 const goToProblem = (problemId: number) => {
   router.push({
     path: `/problem/${problemId}`,
-    query: {exam_id: examId.value}
+    query: { exam_id: examId.value },
   })
 }
 
@@ -371,17 +403,21 @@ const goToRank = () => {
   router.push(`/exam/${examId.value}/rank`)
 }
 
-watch(examId, () => {
-  scopeVersion += 1
-  exam.value = emptyExam()
-  problemStatus.value = []
-  sessionConfirmed.value = false
-  statusToken = null
-  statusLoading.value = false
-  exiting.value = false
-  exitConfirming.value = false
-  fetchExamData()
-}, {immediate: true, flush: 'sync'})
+watch(
+  examId,
+  () => {
+    scopeVersion += 1
+    exam.value = emptyExam()
+    problemStatus.value = []
+    sessionConfirmed.value = false
+    statusToken = null
+    statusLoading.value = false
+    exiting.value = false
+    exitConfirming.value = false
+    fetchExamData()
+  },
+  { immediate: true, flush: 'sync' },
+)
 
 onUnmounted(() => {
   disposed = true
@@ -455,7 +491,8 @@ onUnmounted(() => {
 }
 
 /* Cards */
-.problem-list-card, .info-sidebar-card {
+.problem-list-card,
+.info-sidebar-card {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
 }

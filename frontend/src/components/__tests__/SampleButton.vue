@@ -1,9 +1,5 @@
 <template>
-  <button
-      :class="['sample-button', variant]"
-      :disabled="disabled"
-      @click="handleClick"
-  >
+  <button :class="['sample-button', variant]" :disabled="disabled" @click="handleClick">
     <slot>{{ label }}</slot>
   </button>
 </template>
@@ -21,14 +17,28 @@ const props = defineProps({
 })
 const emit = defineEmits(['click'])
 
-function handleClick () {
+function handleClick() {
   if (!props.disabled) emit('click')
 }
 </script>
 
 <style scoped>
-.sample-button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; }
-.sample-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.sample-button.primary { background: #409eff; color: white; }
-.sample-button.success { background: #67c23a; color: white; }
+.sample-button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+.sample-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sample-button.primary {
+  background: #409eff;
+  color: white;
+}
+.sample-button.success {
+  background: #67c23a;
+  color: white;
+}
 </style>

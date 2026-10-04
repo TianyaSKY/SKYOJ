@@ -9,7 +9,7 @@
           </div>
           <div class="header-actions">
             <el-button :loading="loading" @click="fetchDrafts">刷新</el-button>
-            <el-button type="primary" @click="$router.push({name: 'problem-admin'})">
+            <el-button type="primary" @click="$router.push({ name: 'problem-admin' })">
               返回题目管理
             </el-button>
           </div>
@@ -50,68 +50,84 @@
       </el-row>
 
       <div class="filters">
-        <el-select v-model="filterStatus" clearable placeholder="状态" style="width: 140px" @change="fetchDrafts">
-          <el-option label="等待中" value="pending"/>
-          <el-option label="执行中" value="running"/>
-          <el-option label="成功" value="success"/>
-          <el-option label="失败" value="failed"/>
+        <el-select
+          v-model="filterStatus"
+          clearable
+          placeholder="状态"
+          style="width: 140px"
+          @change="fetchDrafts"
+        >
+          <el-option label="等待中" value="pending" />
+          <el-option label="执行中" value="running" />
+          <el-option label="成功" value="success" />
+          <el-option label="失败" value="failed" />
         </el-select>
-        <el-select v-model="filterType" clearable placeholder="任务类型" style="width: 180px" @change="fetchDrafts">
-          <el-option label="AI 出题" value="problem_generation"/>
-          <el-option label="测例脚本" value="test_script_generation"/>
-          <el-option label="测例执行" value="test_data_execution"/>
+        <el-select
+          v-model="filterType"
+          clearable
+          placeholder="任务类型"
+          style="width: 180px"
+          @change="fetchDrafts"
+        >
+          <el-option label="AI 出题" value="problem_generation" />
+          <el-option label="测例脚本" value="test_script_generation" />
+          <el-option label="测例执行" value="test_data_execution" />
         </el-select>
       </div>
 
       <el-table v-loading="loading" :data="drafts" stripe>
-        <el-table-column label="ID" prop="id" width="70"/>
-        <el-table-column label="标题" min-width="220" prop="title" show-overflow-tooltip/>
+        <el-table-column label="ID" prop="id" width="70" />
+        <el-table-column label="标题" min-width="220" prop="title" show-overflow-tooltip />
         <el-table-column label="类型" prop="task_type" width="140">
-          <template #default="{row}">
+          <template #default="{ row }">
             <el-tag size="small">{{ taskTypeLabel(row.task_type) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="状态" prop="status" width="110">
-          <template #default="{row}">
+          <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)" size="small">
               {{ statusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="题目" prop="problem_id" width="90">
-          <template #default="{row}">
+          <template #default="{ row }">
             <span v-if="row.problem_id">#{{ row.problem_id }}</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
         <el-table-column label="更新时间" min-width="160">
-          <template #default="{row}">
+          <template #default="{ row }">
             {{ formatTime(row.updated_at || row.created_at) }}
           </template>
         </el-table-column>
         <el-table-column align="center" fixed="right" label="操作" width="260">
-          <template #default="{row}">
+          <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button
-                v-if="row.task_type === 'problem_generation' && row.status === 'success' && !row.consumed_at"
-                link
-                type="success"
-                @click="handleApply(row)"
+              v-if="
+                row.task_type === 'problem_generation' &&
+                row.status === 'success' &&
+                !row.consumed_at
+              "
+              link
+              type="success"
+              @click="handleApply(row)"
             >
               创建题目
             </el-button>
             <el-button
-                v-if="row.task_type === 'test_script_generation' && row.status === 'success'"
-                link
-                type="warning"
-                @click="openDetail(row, true)"
+              v-if="row.task_type === 'test_script_generation' && row.status === 'success'"
+              link
+              type="warning"
+              @click="openDetail(row, true)"
             >
               执行
             </el-button>
             <el-popconfirm
-                v-if="row.status !== 'pending' && row.status !== 'running'"
-                title="确定删除该草稿？"
-                @confirm="handleDelete(row.id)"
+              v-if="row.status !== 'pending' && row.status !== 'running'"
+              title="确定删除该草稿？"
+              @confirm="handleDelete(row.id)"
             >
               <template #reference>
                 <el-button link type="danger">删除</el-button>
@@ -145,69 +161,71 @@
           </el-descriptions>
 
           <el-alert
-              v-if="detail.error_message"
-              :closable="false"
-              :title="detail.error_message"
-              class="mt-16"
-              show-icon
-              type="error"
+            v-if="detail.error_message"
+            :closable="false"
+            :title="detail.error_message"
+            class="mt-16"
+            show-icon
+            type="error"
           />
 
           <template v-if="detail.task_type === 'problem_generation' && detail.status === 'success'">
             <h3 class="section-title">题目预览</h3>
             <el-form label-position="top">
               <el-form-item label="标题">
-                <el-input :model-value="detail.result_payload?.title" readonly/>
+                <el-input :model-value="detail.result_payload?.title" readonly />
               </el-form-item>
               <el-form-item label="内容 (Markdown)">
                 <MarkdownContentEditor
-                    :model-value="detail.result_payload?.content || ''"
-                    default-mode="preview"
-                    min-height="320px"
-                    readonly
-                    :rows="12"
+                  :model-value="detail.result_payload?.content || ''"
+                  default-mode="preview"
+                  min-height="320px"
+                  readonly
+                  :rows="12"
                 />
               </el-form-item>
               <el-row :gutter="12">
                 <el-col :span="8">
                   <el-form-item label="类型">
-                    <el-input :model-value="detail.result_payload?.type" readonly/>
+                    <el-input :model-value="detail.result_payload?.type" readonly />
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="语言">
-                    <el-input :model-value="detail.result_payload?.language" readonly/>
+                    <el-input :model-value="detail.result_payload?.language" readonly />
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="时限 / 内存">
                     <el-input
-                        :model-value="`${detail.result_payload?.time_limit || 1000}ms / ${detail.result_payload?.memory_limit || 128}MB`"
-                        readonly
+                      :model-value="`${detail.result_payload?.time_limit || 1000}ms / ${detail.result_payload?.memory_limit || 128}MB`"
+                      readonly
                     />
                   </el-form-item>
                 </el-col>
               </el-row>
             </el-form>
             <el-button
-                v-if="!detail.consumed_at"
-                :loading="applying"
-                type="primary"
-                @click="handleApply(detail)"
+              v-if="!detail.consumed_at"
+              :loading="applying"
+              type="primary"
+              @click="handleApply(detail)"
             >
               创建为正式题目
             </el-button>
             <el-tag v-else type="success">已创建正式题目</el-tag>
           </template>
 
-          <template v-if="detail.task_type === 'test_script_generation' && detail.status === 'success'">
+          <template
+            v-if="detail.task_type === 'test_script_generation' && detail.status === 'success'"
+          >
             <h3 class="section-title">生成脚本</h3>
             <div class="editor-container script-editor">
               <vue-monaco-editor
-                  v-model:value="editableScript"
-                  :language="editableLanguage"
-                  :options="editorOptions"
-                  theme="vs-dark"
+                v-model:value="editableScript"
+                :language="editableLanguage"
+                :options="editorOptions"
+                theme="vs-dark"
               />
             </div>
             <div class="mt-16">
@@ -218,12 +236,14 @@
             </div>
           </template>
 
-          <template v-if="detail.task_type === 'test_data_execution' && detail.status === 'success'">
+          <template
+            v-if="detail.task_type === 'test_data_execution' && detail.status === 'success'"
+          >
             <h3 class="section-title">执行结果</h3>
             <el-result
-                :sub-title="detail.result_payload?.message || '执行完成'"
-                icon="success"
-                title="成功"
+              :sub-title="detail.result_payload?.message || '执行完成'"
+              icon="success"
+              title="成功"
             />
           </template>
 
@@ -236,15 +256,20 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, onUnmounted, ref} from 'vue'
-import {useRouter} from 'vue-router'
-import type { DraftSummaryResponse, DraftDetailResponse, DraftStatsResponse, DraftQuery } from '@/types/aiDraft'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import type {
+  DraftSummaryResponse,
+  DraftDetailResponse,
+  DraftStatsResponse,
+  DraftQuery,
+} from '@/types/aiDraft'
 import type { editor } from 'monaco-editor'
 import type { TagProps } from 'element-plus'
 import { backendErrorMessage } from '@/utils/error'
 import { draftResultSchema, type DraftResult } from '@/schemas/aiDraft'
-import {ElMessage} from 'element-plus'
-import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import { ElMessage } from 'element-plus'
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 import MarkdownContentEditor from '@/components/MarkdownContentEditor.vue'
 import {
   applyProblemDraft,
@@ -254,7 +279,7 @@ import {
   listAiDrafts,
   submitTestDataExecutionDraft,
 } from '@/api/llm'
-import {executeTestDataDraftSchema} from '@/schemas/aiDraft'
+import { executeTestDataDraftSchema } from '@/schemas/aiDraft'
 
 const router = useRouter()
 const drafts = ref<DraftSummaryResponse[]>([])
@@ -264,8 +289,11 @@ const filterType = ref('')
 const stats = ref<Partial<DraftStatsResponse>>({})
 const detailVisible = ref(false)
 const detailLoading = ref(false)
-type DraftDetail = Omit<DraftDetailResponse, 'result_payload'> & {result_payload: DraftResult}
-const decodeDraftDetail = (data: DraftDetailResponse): DraftDetail => ({...data, result_payload: draftResultSchema.parse(data.result_payload)})
+type DraftDetail = Omit<DraftDetailResponse, 'result_payload'> & { result_payload: DraftResult }
+const decodeDraftDetail = (data: DraftDetailResponse): DraftDetail => ({
+  ...data,
+  result_payload: draftResultSchema.parse(data.result_payload),
+})
 const detail = ref<DraftDetail | null>(null)
 const applying = ref(false)
 const executing = ref(false)
@@ -275,7 +303,7 @@ let pollTimer: ReturnType<typeof setInterval> | undefined
 
 const editorOptions: editor.IStandaloneEditorConstructionOptions = {
   automaticLayout: true,
-  minimap: {enabled: true},
+  minimap: { enabled: true },
   fontSize: 14,
   scrollBeyondLastLine: false,
 }
@@ -442,9 +470,7 @@ onMounted(() => {
   fetchDrafts()
   // 有进行中任务时自动刷新
   pollTimer = setInterval(() => {
-    const hasInProgress = drafts.value.some(
-        (d) => d.status === 'pending' || d.status === 'running'
-    )
+    const hasInProgress = drafts.value.some((d) => d.status === 'pending' || d.status === 'running')
     if (hasInProgress || (stats.value.in_progress || 0) > 0) {
       fetchDrafts()
     }

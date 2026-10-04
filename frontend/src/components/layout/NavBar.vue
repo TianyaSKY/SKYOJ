@@ -1,15 +1,15 @@
 <template>
   <el-menu
-      :default-active="activeIndex"
-      :ellipsis="false"
-      class="el-menu-demo"
-      mode="horizontal"
-      router
+    :default-active="activeIndex"
+    :ellipsis="false"
+    class="el-menu-demo"
+    mode="horizontal"
+    router
   >
     <el-menu-item index="/" class="brand-item">
       <span class="brand-title">{{ sysStore.title }}</span>
     </el-menu-item>
-    <div class="flex-grow"/>
+    <div class="flex-grow" />
     <el-menu-item index="/">首页</el-menu-item>
     <template v-if="isPracticeMode && !isTeacher">
       <el-menu-item index="/problems">题库</el-menu-item>
@@ -27,12 +27,14 @@
             {{ username.charAt(0).toUpperCase() }}
           </el-avatar>
           <span class="username">{{ username }}</span>
-          <el-icon class="el-icon--right"><ArrowDown/></el-icon>
+          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-            <el-dropdown-item v-if="isTeacher" command="teacher-dashboard">教师后台</el-dropdown-item>
+            <el-dropdown-item v-if="isTeacher" command="teacher-dashboard"
+              >教师后台</el-dropdown-item
+            >
             <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -46,11 +48,11 @@
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {useUserStore} from '@/stores/user'
-import {useSysStore} from '@/stores/sys'
-import {ArrowDown, Timer} from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import { useSysStore } from '@/stores/sys'
+import { ArrowDown, Timer } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -65,7 +67,7 @@ const isTeacher = computed(() => userStore.user?.role === 'teacher')
 const isPracticeMode = computed(() => ![false, 'False'].includes(sysStore.practice))
 
 // If backend provides avatar URL, use it; otherwise empty string to trigger slot content
-const userAvatar = computed(() => userStore.user?.avatar ? `/api${userStore.user?.avatar}` : '')
+const userAvatar = computed(() => (userStore.user?.avatar ? `/api${userStore.user?.avatar}` : ''))
 
 const handleCommand = (command: string) => {
   if (command === 'logout') {

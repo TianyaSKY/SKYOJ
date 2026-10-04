@@ -48,9 +48,29 @@ export interface SubmissionDetailResponse {
   case_results: Array<CaseResult>
 }
 
-export interface SubmitCodeBody { problem_id: number; code: string; language: string; exam_id?: number | null }
-export interface SubmissionQuery { problem_id?: number; user_id?: number; username?: string; exam_id?: number; status?: string; page?: number; per_page?: number }
+export interface SubmitCodeBody {
+  problem_id: number
+  code: string
+  language: string
+  exam_id?: number | null
+}
+export interface SubmissionQuery {
+  problem_id?: number
+  user_id?: number
+  username?: string
+  exam_id?: number
+  status?: string
+  page?: number
+  per_page?: number
+}
 
 // 管理页面兼容历史 items/data 包装与直接数组响应。
-export interface LegacySubmissionsResponse { total?: number; items?: SubmissionListResponse[]; data?: SubmissionListResponse[] }
-export type SubmissionsResponse = PaginatedSubmissionsResponse | LegacySubmissionsResponse | SubmissionListResponse[]
+export interface LegacySubmissionsResponse {
+  total?: number
+  items?: SubmissionListResponse[]
+  data?: SubmissionListResponse[]
+}
+export type SubmissionsResponse =
+  | PaginatedSubmissionsResponse
+  | LegacySubmissionsResponse
+  | SubmissionListResponse[]

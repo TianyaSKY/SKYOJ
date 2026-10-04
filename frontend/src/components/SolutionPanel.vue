@@ -14,7 +14,17 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
-import { getSolutions, createSolution, updateSolution, hideSolution as hideSolutionRequest, toggleSolutionLike, toggleSolutionFavorite, getComments, createComment, deleteComment as deleteCommentRequest } from '@/api/community'
+import {
+  getSolutions,
+  createSolution,
+  updateSolution,
+  hideSolution as hideSolutionRequest,
+  toggleSolutionLike,
+  toggleSolutionFavorite,
+  getComments,
+  createComment,
+  deleteComment as deleteCommentRequest,
+} from '@/api/community'
 import type { SolutionListItemResponse, CommentResponse } from '@/types/community'
 import { errorMessage } from '@/utils/error'
 import { formatServerDateTime, formatServerDate } from '@/utils/date'
@@ -23,7 +33,7 @@ import { solutionFormSchema, commentFormSchema } from '@/schemas/community'
 import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
-  problemId: { type: Number, required: true }
+  problemId: { type: Number, required: true },
 })
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
@@ -32,8 +42,13 @@ const loading = ref(false)
 const solutions = ref<SolutionListItemResponse[]>([])
 const pendingLikes = ref(new Set<number>())
 const pendingFavorites = ref(new Set<number>())
-type ReactionValues = Partial<Pick<SolutionListItemResponse, 'vote_count' | 'liked_by_me' | 'favorited_by_me'>>
-const reactionUpdates = new Map<number, Partial<Record<'like' | 'favorite', {version: number; values: ReactionValues}>>>()
+type ReactionValues = Partial<
+  Pick<SolutionListItemResponse, 'vote_count' | 'liked_by_me' | 'favorited_by_me'>
+>
+const reactionUpdates = new Map<
+  number,
+  Partial<Record<'like' | 'favorite', { version: number; values: ReactionValues }>>
+>()
 let reactionVersion = 0
 const total = ref(0)
 const page = ref(1)
@@ -42,7 +57,7 @@ const pageSize = 20
 const writeDialogVisible = ref(false)
 const savingSolution = ref(false)
 let writeVersion = 0
-const editing = ref<SolutionListItemResponse | null>(null)  // null 表示新建；非空表示编辑
+const editing = ref<SolutionListItemResponse | null>(null) // null 表示新建；非空表示编辑
 const form = ref({ title: '', content: '', language: '' })
 
 const commentsDialog = ref(false)
@@ -63,13 +78,16 @@ const isCurrentScope = (version: number) => !disposed && version === scopeVersio
 const isCurrentWrite = (scope: number, version: number) =>
   isCurrentScope(scope) && version === writeVersion && writeDialogVisible.value
 const isCurrentComments = (scope: number, version: number, item: SolutionListItemResponse) =>
-  isCurrentScope(scope) && version === commentsVersion && commentsDialog.value && currentSolution.value === item
+  isCurrentScope(scope) &&
+  version === commentsVersion &&
+  commentsDialog.value &&
+  currentSolution.value === item
 
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.user || {})
 const isTeacher = computed(() => userInfo.value.role === 'teacher')
 
-async function load (pageNo = page.value): Promise<void> {
+async function load(pageNo = page.value): Promise<void> {
   const scope = scopeVersion
   const requestId = ++loadVersion
   const initialReactionVersion = reactionVersion
@@ -81,7 +99,7 @@ async function load (pageNo = page.value): Promise<void> {
     const lastPage = Math.max(1, Math.ceil((resp.total || 0) / pageSize))
     if (pageNo > lastPage) return await load(lastPage)
     page.value = pageNo
-    solutions.value = (resp.items || []).map(item => {
+    solutions.value = (resp.items || []).map((item) => {
       // 列表请求发起后完成的操作优先于该请求可能读取到的旧状态。
       for (const update of Object.values(reactionUpdates.get(item.id) || {})) {
         if (update.version > initialReactionVersion) Object.assign(item, update.values)
@@ -90,36 +108,40 @@ async function load (pageNo = page.value): Promise<void> {
     })
     total.value = resp.total || 0
   } catch (e) {
-    if (isCurrent()) ElMessage.error('加载题解失败：' + (errorMessage(e, '未知错误')))
+    if (isCurrent()) ElMessage.error('加载题解失败：' + errorMessage(e, '未知错误'))
   } finally {
     if (isCurrent()) loading.value = false
   }
 }
 
-watch(() => props.problemId, () => {
-  scopeVersion += 1
-  commentsVersion += 1
-  page.value = 1
-  solutions.value = []
-  pendingLikes.value.clear()
-  pendingFavorites.value.clear()
-  reactionUpdates.clear()
-  reactionVersion = 0
-  total.value = 0
-  writeDialogVisible.value = false
-  editing.value = null
-  form.value = { title: '', content: '', language: '' }
-  commentsDialog.value = false
-  currentSolution.value = null
-  comments.value = []
-  commentsTotal.value = 0
-  commentsPage.value = 1
-  loadingComments.value = false
-  newComment.value = ''
-  submittingComment.value = false
-  load()
-}, { immediate: true })
-watch(commentsDialog, visible => {
+watch(
+  () => props.problemId,
+  () => {
+    scopeVersion += 1
+    commentsVersion += 1
+    page.value = 1
+    solutions.value = []
+    pendingLikes.value.clear()
+    pendingFavorites.value.clear()
+    reactionUpdates.clear()
+    reactionVersion = 0
+    total.value = 0
+    writeDialogVisible.value = false
+    editing.value = null
+    form.value = { title: '', content: '', language: '' }
+    commentsDialog.value = false
+    currentSolution.value = null
+    comments.value = []
+    commentsTotal.value = 0
+    commentsPage.value = 1
+    loadingComments.value = false
+    newComment.value = ''
+    submittingComment.value = false
+    load()
+  },
+  { immediate: true },
+)
+watch(commentsDialog, (visible) => {
   if (!visible) {
     commentsVersion += 1
     currentSolution.value = null
@@ -131,20 +153,27 @@ watch(commentsDialog, visible => {
     submittingComment.value = false
   }
 })
-watch(writeDialogVisible, visible => {
-  if (!visible) {
-    writeVersion += 1
-    savingSolution.value = false
-  }
-}, { flush: 'sync' })
-onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
+watch(
+  writeDialogVisible,
+  (visible) => {
+    if (!visible) {
+      writeVersion += 1
+      savingSolution.value = false
+    }
+  },
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => {
+  disposed = true
+  scopeVersion += 1
+})
 
-function renderMarkdown (text: string) {
+function renderMarkdown(text: string) {
   if (!text) return ''
   return md.render(text)
 }
 
-function openWrite (item: SolutionListItemResponse | null = null) {
+function openWrite(item: SolutionListItemResponse | null = null) {
   writeVersion += 1
   savingSolution.value = false
   editing.value = item
@@ -154,7 +183,7 @@ function openWrite (item: SolutionListItemResponse | null = null) {
   writeDialogVisible.value = true
 }
 
-async function submitSolution () {
+async function submitSolution() {
   if (!writeDialogVisible.value || savingSolution.value) return
   const scope = scopeVersion
   const version = writeVersion
@@ -167,7 +196,9 @@ async function submitSolution () {
   const problemId = props.problemId
   savingSolution.value = true
   try {
-    await (editingId ? updateSolution(editingId, parsed.data) : createSolution(problemId, parsed.data))
+    await (editingId
+      ? updateSolution(editingId, parsed.data)
+      : createSolution(problemId, parsed.data))
     if (!isCurrentScope(scope)) return
     // 保存已生效时刷新当前题目列表，但不能干扰后来打开的编辑窗口。
     load()
@@ -181,17 +212,21 @@ async function submitSolution () {
   }
 }
 
-function applyReactionResult (item: SolutionListItemResponse, kind: 'like' | 'favorite', values: ReactionValues) {
+function applyReactionResult(
+  item: SolutionListItemResponse,
+  kind: 'like' | 'favorite',
+  values: ReactionValues,
+) {
   const updates = reactionUpdates.get(item.id) || {}
   updates[kind] = { version: ++reactionVersion, values }
   reactionUpdates.set(item.id, updates)
   // 刷新会替换卡片对象，同时更新原对象和当前列表中的对象。
   Object.assign(item, values)
-  const current = solutions.value.find(solution => solution.id === item.id)
+  const current = solutions.value.find((solution) => solution.id === item.id)
   if (current) Object.assign(current, values)
 }
 
-async function toggleLike (item: SolutionListItemResponse) {
+async function toggleLike(item: SolutionListItemResponse) {
   if (pendingLikes.value.has(item.id)) return
   const scope = scopeVersion
   pendingLikes.value.add(item.id)
@@ -206,7 +241,7 @@ async function toggleLike (item: SolutionListItemResponse) {
   }
 }
 
-async function toggleFavorite (item: SolutionListItemResponse) {
+async function toggleFavorite(item: SolutionListItemResponse) {
   if (pendingFavorites.value.has(item.id)) return
   const scope = scopeVersion
   pendingFavorites.value.add(item.id)
@@ -221,10 +256,12 @@ async function toggleFavorite (item: SolutionListItemResponse) {
   }
 }
 
-async function hideSolution (item: SolutionListItemResponse) {
+async function hideSolution(item: SolutionListItemResponse) {
   const scope = scopeVersion
   try {
-    await ElMessageBox.confirm('确定要隐藏该题解吗？隐藏后仅你自己与教师可见。', '确认隐藏', { type: 'warning' })
+    await ElMessageBox.confirm('确定要隐藏该题解吗？隐藏后仅你自己与教师可见。', '确认隐藏', {
+      type: 'warning',
+    })
     if (!isCurrentScope(scope)) return
     await hideSolutionRequest(item.id)
     if (!isCurrentScope(scope)) return
@@ -237,7 +274,7 @@ async function hideSolution (item: SolutionListItemResponse) {
   }
 }
 
-async function openComments (item: SolutionListItemResponse) {
+async function openComments(item: SolutionListItemResponse) {
   commentsVersion += 1
   submittingComment.value = false
   currentSolution.value = item
@@ -250,12 +287,14 @@ async function openComments (item: SolutionListItemResponse) {
   await loadComments()
 }
 
-async function loadComments (pageNo = commentsPage.value, latest = false): Promise<void> {
+async function loadComments(pageNo = commentsPage.value, latest = false): Promise<void> {
   const item = currentSolution.value
   if (!item) return
-  const scope = scopeVersion, version = commentsVersion
+  const scope = scopeVersion,
+    version = commentsVersion
   const requestId = ++commentRequestVersion
-  const isCurrent = () => isCurrentComments(scope, version, item) && requestId === commentRequestVersion
+  const isCurrent = () =>
+    isCurrentComments(scope, version, item) && requestId === commentRequestVersion
   loadingComments.value = true
   try {
     const resp = await getComments(item.id, { page: pageNo, page_size: commentsPageSize })
@@ -274,12 +313,13 @@ async function loadComments (pageNo = commentsPage.value, latest = false): Promi
   }
 }
 
-async function submitComment () {
+async function submitComment() {
   const item = currentSolution.value
   if (!item || !commentsDialog.value || submittingComment.value) return
-  const scope = scopeVersion, version = commentsVersion
+  const scope = scopeVersion,
+    version = commentsVersion
   const content = newComment.value
-  const parsed = commentFormSchema.safeParse({content})
+  const parsed = commentFormSchema.safeParse({ content })
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查评论输入')
     return
@@ -301,10 +341,11 @@ async function submitComment () {
   }
 }
 
-async function deleteComment (commentId: number) {
+async function deleteComment(commentId: number) {
   const item = currentSolution.value
   if (!item) return
-  const scope = scopeVersion, version = commentsVersion
+  const scope = scopeVersion,
+    version = commentsVersion
   try {
     await ElMessageBox.confirm('删除这条评论？', '确认', { type: 'warning' })
     if (!isCurrentComments(scope, version, item)) return
@@ -315,12 +356,15 @@ async function deleteComment (commentId: number) {
     ElMessage.success('已删除')
     await loadComments()
   } catch (e) {
-    if (isCurrentComments(scope, version, item) && e !== 'cancel' && errorMessage(e, '') !== 'cancel') {
+    if (
+      isCurrentComments(scope, version, item) &&
+      e !== 'cancel' &&
+      errorMessage(e, '') !== 'cancel'
+    ) {
       ElMessage.error(errorMessage(e, '删除失败'))
     }
   }
 }
-
 </script>
 
 <template>
@@ -339,12 +383,7 @@ async function deleteComment (commentId: number) {
     <el-skeleton v-else-if="loading" :rows="4" animated />
 
     <div v-else class="solution-list">
-      <el-card
-        v-for="item in solutions"
-        :key="item.id"
-        class="solution-item"
-        shadow="hover"
-      >
+      <el-card v-for="item in solutions" :key="item.id" class="solution-item" shadow="hover">
         <div class="solution-head">
           <div class="head-left">
             <el-tag v-if="item.is_official" type="success" size="small">官方</el-tag>
@@ -357,11 +396,23 @@ async function deleteComment (commentId: number) {
         </div>
         <div class="solution-body markdown-body" v-html="renderMarkdown(item.content)" />
         <div class="solution-actions">
-          <el-button :type="item.liked_by_me ? 'primary' : 'default'" size="small" :loading="pendingLikes.has(item.id)" :disabled="pendingLikes.has(item.id)" @click="toggleLike(item)">
+          <el-button
+            :type="item.liked_by_me ? 'primary' : 'default'"
+            size="small"
+            :loading="pendingLikes.has(item.id)"
+            :disabled="pendingLikes.has(item.id)"
+            @click="toggleLike(item)"
+          >
             <el-icon><Star /></el-icon>
             <span style="margin-left: 4px">{{ item.vote_count }}</span>
           </el-button>
-          <el-button :type="item.favorited_by_me ? 'warning' : 'default'" size="small" :loading="pendingFavorites.has(item.id)" :disabled="pendingFavorites.has(item.id)" @click="toggleFavorite(item)">
+          <el-button
+            :type="item.favorited_by_me ? 'warning' : 'default'"
+            size="small"
+            :loading="pendingFavorites.has(item.id)"
+            :disabled="pendingFavorites.has(item.id)"
+            @click="toggleFavorite(item)"
+          >
             <el-icon><StarFilled /></el-icon>
           </el-button>
           <el-button size="small" @click="openComments(item)">
@@ -414,12 +465,24 @@ async function deleteComment (commentId: number) {
           <el-input v-model="form.language" placeholder="如 python / cpp" maxlength="50" />
         </el-form-item>
         <el-form-item label="正文 (Markdown)" required>
-          <el-input v-model="form.content" type="textarea" :rows="12" maxlength="20000" show-word-limit />
+          <el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="12"
+            maxlength="20000"
+            show-word-limit
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="writeDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingSolution" :disabled="savingSolution" @click="submitSolution">{{ editing ? '保存' : '发布' }}</el-button>
+        <el-button
+          type="primary"
+          :loading="savingSolution"
+          :disabled="savingSolution"
+          @click="submitSolution"
+          >{{ editing ? '保存' : '发布' }}</el-button
+        >
       </template>
     </el-dialog>
 
@@ -431,8 +494,21 @@ async function deleteComment (commentId: number) {
       destroy-on-close
     >
       <div class="comment-input">
-        <el-input v-model="newComment" type="textarea" :rows="3" maxlength="1000" placeholder="说点什么…" show-word-limit />
-        <el-button type="primary" :loading="submittingComment" :disabled="!newComment.trim() || submittingComment" @click="submitComment">发送</el-button>
+        <el-input
+          v-model="newComment"
+          type="textarea"
+          :rows="3"
+          maxlength="1000"
+          placeholder="说点什么…"
+          show-word-limit
+        />
+        <el-button
+          type="primary"
+          :loading="submittingComment"
+          :disabled="!newComment.trim() || submittingComment"
+          @click="submitComment"
+          >发送</el-button
+        >
       </div>
       <el-skeleton v-if="loadingComments" :rows="3" animated />
       <el-empty v-else-if="comments.length === 0" description="还没有评论" :image-size="80" />

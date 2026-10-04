@@ -2,36 +2,50 @@
   <div class="teacher-manual-container">
     <div class="markdown-body">
       <h1>教师操作手册 (内部文档)</h1>
-      <p>本文档仅供教师查阅，包含 AI 辅助出题、ACM/OOP/Kaggle 题目的录入指南，以及判题脚本（打分）的示例代码。</p>
+      <p>
+        本文档仅供教师查阅，包含 AI 辅助出题、ACM/OOP/Kaggle
+        题目的录入指南，以及判题脚本（打分）的示例代码。
+      </p>
 
       <h2>1. AI 辅助出题</h2>
       <p>SKYOJ 深度集成了大语言模型，可以帮助教师快速生成高质量的编程题目。</p>
       <ul>
         <li><strong>操作路径</strong>: 题目管理 -> 点击右上角 <strong>"AI 生成题目"</strong>。</li>
-        <li><strong>配置项</strong>:
+        <li>
+          <strong>配置项</strong>:
           <ul>
-            <li><strong>题目背景/方向</strong>: 描述你想要的题目主题（如：字符串处理、动态规划、面向对象设计等）。</li>
+            <li>
+              <strong>题目背景/方向</strong>:
+              描述你想要的题目主题（如：字符串处理、动态规划、面向对象设计等）。
+            </li>
             <li><strong>难度</strong>: 选择简单、中等或困难。</li>
           </ul>
         </li>
-        <li><strong>生成结果</strong>: AI 会自动生成题目名称、Markdown 格式的描述、初始模板代码、建议的判题模式（ACM/OOP/Kaggle）及资源限制。教师可以在预览后进行二次修改。</li>
+        <li>
+          <strong>生成结果</strong>: AI 会自动生成题目名称、Markdown
+          格式的描述、初始模板代码、建议的判题模式（ACM/OOP/Kaggle）及资源限制。教师可以在预览后进行二次修改。
+        </li>
       </ul>
 
-      <hr>
+      <hr />
 
       <h2>2. 题目录入指南</h2>
 
       <h3>2.1 基础配置</h3>
       <ul>
         <li><strong>标题</strong>: 题目名称。</li>
-        <li><strong>类型</strong>:
+        <li>
+          <strong>类型</strong>:
           <ul>
             <li><strong>ACM</strong>: 标准 I/O，严格文本比对。</li>
             <li><strong>OOP</strong>: 实现特定接口/类，运行单元测试。</li>
             <li><strong>Kaggle</strong>: 提交预测结果 CSV 文件，基于 Metric 评分。</li>
           </ul>
         </li>
-        <li><strong>允许语言</strong>: 教师可以指定该题目允许学生使用的编程语言（如仅限 Python，或 Python + C++）。</li>
+        <li>
+          <strong>允许语言</strong>: 教师可以指定该题目允许学生使用的编程语言（如仅限 Python，或
+          Python + C++）。
+        </li>
         <li><strong>时间/内存限制</strong>: 判题时的资源限制。</li>
         <li><strong>默认模板代码</strong>: 提供给学生的初始代码框架。</li>
       </ul>
@@ -40,9 +54,13 @@
       <p>ACM 模式通常为标准输入输出判题，适用于算法竞赛。</p>
       <ul>
         <li><strong>描述信息</strong>: 包含题目描述、输入描述、输出描述、样例等。</li>
-        <li><strong>测试数据</strong>:
+        <li>
+          <strong>测试数据</strong>:
           <ul>
-            <li>手动上传：上传 <code>.zip</code> 压缩包，包内文件应为 <code>1.in</code>, <code>1.out</code> 等成对出现。</li>
+            <li>
+              手动上传：上传 <code>.zip</code> 压缩包，包内文件应为 <code>1.in</code>,
+              <code>1.out</code> 等成对出现。
+            </li>
             <li>AI 生成：使用 <strong>AICase</strong> 工具自动生成。</li>
           </ul>
         </li>
@@ -51,33 +69,54 @@
       <h3>2.3 OOP 模式题目 (面向对象设计)</h3>
       <p>OOP 模式侧重于类的设计、接口实现与代码复用。</p>
       <ul>
-        <li><strong>判题机制</strong>: 教师需上传单元测试文件（如 Java 的 JUnit 测试类，Python 的 <code>unittest</code> 文件）。</li>
-        <li><strong>AICase 工具</strong>: 强烈推荐使用 <strong>AICase</strong>。它可以根据题目描述自动生成测试脚本，并自动完成测试点的部署。
+        <li>
+          <strong>判题机制</strong>: 教师需上传单元测试文件（如 Java 的 JUnit 测试类，Python 的
+          <code>unittest</code> 文件）。
+        </li>
+        <li>
+          <strong>AICase 工具</strong>: 强烈推荐使用
+          <strong>AICase</strong>。它可以根据题目描述自动生成测试脚本，并自动完成测试点的部署。
         </li>
       </ul>
 
       <h3>2.4 Kaggle 模式题目 (数据科学/机器学习)</h3>
       <p>Kaggle 模式用于数据分析与模型预测任务。</p>
       <ul>
-        <li><strong>数据集托管</strong>: 教师可以先在 <strong>"数据集"</strong> 页面上传 <code>train.csv</code> 和 <code>test.csv</code>，然后复制下载链接填入题目描述中。</li>
-        <li><strong>评分标准</strong>: 教师需上传 <code>truth.csv</code> (包含测试集 ID 和正确标签)。</li>
-        <li><strong>判题脚本</strong>: 使用 <strong>AICase</strong> 生成或手动编写 Python 脚本，读取 <code>truth.csv</code> 和学生提交的 <code>submission.csv</code> 计算得分。</li>
+        <li>
+          <strong>数据集托管</strong>: 教师可以先在 <strong>"数据集"</strong> 页面上传
+          <code>train.csv</code> 和 <code>test.csv</code>，然后复制下载链接填入题目描述中。
+        </li>
+        <li>
+          <strong>评分标准</strong>: 教师需上传 <code>truth.csv</code> (包含测试集 ID 和正确标签)。
+        </li>
+        <li>
+          <strong>判题脚本</strong>: 使用 <strong>AICase</strong> 生成或手动编写 Python 脚本，读取
+          <code>truth.csv</code> 和学生提交的 <code>submission.csv</code> 计算得分。
+        </li>
       </ul>
 
-      <hr>
+      <hr />
 
       <h2>3. AICase 自动化工具</h2>
-      <p>在题目管理页面，点击题目右侧的 <strong>"AICase"</strong> 按钮，可以进入 AI 辅助测试数据生成流程：</p>
+      <p>
+        在题目管理页面，点击题目右侧的 <strong>"AICase"</strong> 按钮，可以进入 AI
+        辅助测试数据生成流程：
+      </p>
       <ol>
         <li><strong>配置方向</strong>: 输入对测试数据的具体要求（如：数据规模、边界条件）。</li>
         <li><strong>生成脚本</strong>: AI 会根据题目类型和要求，自动编写 Python/Java 测试脚本。</li>
-        <li><strong>执行生成</strong>: 点击执行，系统会自动运行脚本生成测试点（ACM）或部署评估环境（OOP/Kaggle）。</li>
+        <li>
+          <strong>执行生成</strong>:
+          点击执行，系统会自动运行脚本生成测试点（ACM）或部署评估环境（OOP/Kaggle）。
+        </li>
       </ol>
 
-      <hr>
+      <hr />
 
       <h2>4. 打分示例代码 (Special Judge / Checker)</h2>
-      <p>当标准对比（diff）无法满足需求时，需要编写评估脚本。脚本最后一行必须输出 0-100 的整数分数。</p>
+      <p>
+        当标准对比（diff）无法满足需求时，需要编写评估脚本。脚本最后一行必须输出 0-100 的整数分数。
+      </p>
 
       <h3>Python OOP 示例</h3>
       <pre><code class="language-python">from solution import Student
@@ -128,7 +167,9 @@ finally:
 }
 
 .markdown-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
   font-size: 16px;
   line-height: 1.5;
   word-wrap: break-word;
@@ -159,7 +200,8 @@ finally:
   font-size: 1.25em;
 }
 
-.markdown-body ul, .markdown-body ol {
+.markdown-body ul,
+.markdown-body ol {
   padding-left: 2em;
 }
 
@@ -169,7 +211,7 @@ finally:
   font-size: 85%;
   background-color: rgba(27, 31, 35, 0.05);
   border-radius: 3px;
-  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
 .markdown-body pre {

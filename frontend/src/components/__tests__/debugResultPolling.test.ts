@@ -10,33 +10,53 @@ import { ElMessage } from 'element-plus'
 
 let wrapper: ReturnType<typeof mountPanel> | undefined
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
+  })
   vi.clearAllMocks()
   vi.mocked(getDebugRun).mockReset()
 })
 afterEach(() => {
-  wrapper?.unmount(); wrapper = undefined
-  vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks()
+  wrapper?.unmount()
+  wrapper = undefined
+  vi.clearAllTimers()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 function mountPanel() {
   const mounted = shallowMount(DebugResultPanel, {
-    props: { debugRunId: 1 }, global: {
-      directives: { loading: () => {} }, stubs: { 'el-card': true, 'el-tag': true },
+    props: { debugRunId: 1 },
+    global: {
+      directives: { loading: () => {} },
+      stubs: { 'el-card': true, 'el-tag': true },
     },
   })
   wrapper = mounted
   return mounted
 }
 const debugResponse = (value: Partial<DebugRunResponse>): DebugRunResponse => ({
-  id: 1, status: 'Pending', language: 'python', case_name: null, input: null, expected_output: null,
-  actual_output: null, error_output: null, time_used_ms: null, memory_used_kb: null,
-  created_at: null, finished_at: null, problem_id: 1, exam_id: null, ...value,
+  id: 1,
+  status: 'Pending',
+  language: 'python',
+  case_name: null,
+  input: null,
+  expected_output: null,
+  actual_output: null,
+  error_output: null,
+  time_used_ms: null,
+  memory_used_kb: null,
+  created_at: null,
+  finished_at: null,
+  problem_id: 1,
+  exam_id: null,
+  ...value,
 })
 function deferred() {
   let resolve!: (value: Partial<DebugRunResponse>) => void
   let reject!: (error: unknown) => void
   const promise = new Promise<DebugRunResponse>((yes, no) => {
-    resolve = value => yes(debugResponse(value)); reject = no
+    resolve = (value) => yes(debugResponse(value))
+    reject = no
   })
   return { promise, resolve, reject }
 }
@@ -65,7 +85,9 @@ describe('调试结果轮询', () => {
 
   it('新调试运行开始后，旧结果不能覆盖或停止新轮询', async () => {
     const old = deferred()
-    vi.mocked(getDebugRun).mockReturnValueOnce(old.promise).mockResolvedValue(debugResponse({ id: 2, status: 'Pending' }))
+    vi.mocked(getDebugRun)
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValue(debugResponse({ id: 2, status: 'Pending' }))
     mountPanel()
     await current().setProps({ debugRunId: 2 })
     await flushPromises()
@@ -91,7 +113,8 @@ describe('调试结果轮询', () => {
     const request = deferred()
     vi.mocked(getDebugRun).mockReturnValue(request.promise)
     mountPanel()
-    current().unmount(); wrapper = undefined
+    current().unmount()
+    wrapper = undefined
     request.reject(new Error('迟到错误'))
     await flushPromises()
     expect(ElMessage.error).not.toHaveBeenCalled()
@@ -113,7 +136,8 @@ describe('调试结果轮询', () => {
 
   it('旧请求失败不停止当前运行，当前终态不会再触发超时提示', async () => {
     const old = deferred()
-    vi.mocked(getDebugRun).mockReturnValueOnce(old.promise)
+    vi.mocked(getDebugRun)
+      .mockReturnValueOnce(old.promise)
       .mockResolvedValueOnce(debugResponse({ id: 2, status: 'Pending' }))
       .mockResolvedValueOnce(debugResponse({ id: 2, status: 'Accepted' }))
     mountPanel()

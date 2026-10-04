@@ -7,11 +7,11 @@ import request from '@/utils/request'
  * @param {Object} data - { problem_id, code, language, exam_id? }
  */
 export function debugSolution(data: Debug.DebugCodeBody): Promise<Debug.CreateDebugRunResponse> {
-    return request<Debug.CreateDebugRunResponse>({
-        url: '/debug',
-        method: 'post',
-        data
-    })
+  return request<Debug.CreateDebugRunResponse>({
+    url: '/debug',
+    method: 'post',
+    data,
+  })
 }
 
 /**
@@ -19,8 +19,8 @@ export function debugSolution(data: Debug.DebugCodeBody): Promise<Debug.CreateDe
  * @param {number} id
  */
 export function getDebugRun(id: number): Promise<Debug.DebugRunResponse> {
-    return request<Debug.DebugRunResponse>({
-        url: `/debug/${id}`,
-        method: 'get'
-    })
+  return request<Debug.DebugRunResponse>({
+    url: `/debug/${id}`,
+    method: 'get',
+  })
 }

@@ -7,11 +7,11 @@
       <div :style="{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }" class="heatmap-grid">
         <div v-for="(week, wIndex) in weeks" :key="wIndex" class="heatmap-week">
           <div
-              v-for="(day, dIndex) in week"
-              :key="dIndex"
-              :class="getColorClass(day.count)"
-              :title="formatTitle(day)"
-              class="heatmap-day"
+            v-for="(day, dIndex) in week"
+            :key="dIndex"
+            :class="getColorClass(day.count)"
+            :title="formatTitle(day)"
+            class="heatmap-day"
           ></div>
         </div>
       </div>
@@ -31,10 +31,13 @@
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue'
+import { computed } from 'vue'
 import { parseServerDate } from '@/utils/date'
 
-interface ActivityDay { date: string; count: number }
+interface ActivityDay {
+  date: string
+  count: number
+}
 const props = defineProps<{ submissions: Array<{ created_at: string | null }> }>()
 
 const dateKey = (date: Date) =>
@@ -47,7 +50,8 @@ const activity = computed(() => {
   start.setFullYear(end.getFullYear() - 1)
   // 闰年的 2 月 29 日对应上一年的 2 月最后一天。
   if (start.getMonth() !== end.getMonth()) start.setDate(0)
-  const firstDate = dateKey(start), lastDate = dateKey(end)
+  const firstDate = dateKey(start),
+    lastDate = dateKey(end)
   const counts = new Map<string, number>()
   let total = 0
   for (const submission of props.submissions) {

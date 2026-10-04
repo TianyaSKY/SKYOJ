@@ -1,242 +1,247 @@
-import {createRouter, createWebHistory} from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import {useUserStore} from '@/stores/user'
-import {useSysStore} from '@/stores/sys'
+import { useUserStore } from '@/stores/user'
+import { useSysStore } from '@/stores/sys'
 
 const router = createRouter({
-    history: createWebHistory(import.meta.env.BASE_URL),
-    routes: [
-        {
-            path: '/',
-            name: 'home',
-            component: HomeView,
-        },
-        {
-            path: '/problems',
-            name: 'problems',
-            component: () => import('../views/ProblemListView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/problem/:id',
-            name: 'problem-detail',
-            component: () => import('../views/ProblemDetailView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/submission/:id',
-            name: 'submission-detail',
-            component: () => import('../views/SubmissionDetailView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/datasets',
-            name: 'datasets',
-            component: () => import('../views/DatasetListView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/exam',
-            name: 'exam',
-            component: () => import('../views/ExamView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/exam/:id',
-            name: 'exam-detail',
-            component: () => import('../views/ExamDetailView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/exam/:id/rank',
-            name: 'exam-rank',
-            component: () => import('../views/ExamRankView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/admin/dashboard',
-            name: 'teacher-dashboard',
-            component: () => import('../views/admin/TeacherDashboardView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/analytics',
-            name: 'teacher-analytics',
-            component: () => import('../views/admin/TeacherAnalyticsView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/problems',
-            name: 'problem-admin',
-            component: () => import('../views/admin/ProblemAdminView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/problems/:id/preview',
-            name: 'problem-admin-preview',
-            component: () => import('../views/admin/ProblemPreviewView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/datasets',
-            name: 'dataset-admin',
-            component: () => import('../views/DatasetListView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/drafts',
-            name: 'ai-draft-box',
-            component: () => import('../views/admin/DraftBoxView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/exams',
-            name: 'exam-admin',
-            component: () => import('../views/admin/ExamAdminView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/exams/:id/monitor',
-            name: 'exam-monitor',
-            component: () => import('../views/admin/ExamMonitorView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/submissions',
-            name: 'submission-admin',
-            component: () => import('../views/admin/SubmissionAdminView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/admin/settings',
-            name: 'teacher-settings',
-            component: () => import('../views/admin/TeacherSettingsView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/rank',
-            name: 'rank',
-            redirect: {name: 'exam'}
-        },
-        {
-            path: '/login',
-            name: 'login',
-            component: () => import('../views/LoginView.vue')
-        },
-        {
-            path: '/register',
-            name: 'register',
-            component: () => import('../views/RegisterView.vue')
-        },
-        {
-            path: '/profile',
-            name: 'profile',
-            component: () => import('../views/ProfileView.vue'),
-            meta: {requiresAuth: true}
-        },
-        {
-            path: '/profile/:id',
-            name: 'user-profile',
-            component: () => import('../views/ProfileView.vue'),
-            meta: {requiresAuth: true}
-        },
-        // Documentation Routes
-        {
-            path: '/docs/acm',
-            name: 'doc-acm',
-            component: () => import('../views/docs/ACMDocView.vue')
-        },
-        {
-            path: '/docs/kaggle',
-            name: 'doc-kaggle',
-            component: () => import('../views/docs/KaggleDocView.vue')
-        },
-        {
-            path: '/docs/oop',
-            name: 'doc-oop',
-            component: () => import('../views/docs/OOPDocView.vue')
-        },
-        {
-            path: '/docs/teacher-manual',
-            name: 'doc-teacher-manual',
-            component: () => import('../views/docs/TeacherManualView.vue'),
-            meta: {requiresAuth: true, role: 'teacher'}
-        },
-        {
-            path: '/:pathMatch(.*)*',
-            redirect: {name: 'home'},
-        }
-    ],
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: HomeView,
+    },
+    {
+      path: '/problems',
+      name: 'problems',
+      component: () => import('../views/ProblemListView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/problem/:id',
+      name: 'problem-detail',
+      component: () => import('../views/ProblemDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/submission/:id',
+      name: 'submission-detail',
+      component: () => import('../views/SubmissionDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/datasets',
+      name: 'datasets',
+      component: () => import('../views/DatasetListView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/exam',
+      name: 'exam',
+      component: () => import('../views/ExamView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/exam/:id',
+      name: 'exam-detail',
+      component: () => import('../views/ExamDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/exam/:id/rank',
+      name: 'exam-rank',
+      component: () => import('../views/ExamRankView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/admin/dashboard',
+      name: 'teacher-dashboard',
+      component: () => import('../views/admin/TeacherDashboardView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/analytics',
+      name: 'teacher-analytics',
+      component: () => import('../views/admin/TeacherAnalyticsView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/problems',
+      name: 'problem-admin',
+      component: () => import('../views/admin/ProblemAdminView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/problems/:id/preview',
+      name: 'problem-admin-preview',
+      component: () => import('../views/admin/ProblemPreviewView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/datasets',
+      name: 'dataset-admin',
+      component: () => import('../views/DatasetListView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/drafts',
+      name: 'ai-draft-box',
+      component: () => import('../views/admin/DraftBoxView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/exams',
+      name: 'exam-admin',
+      component: () => import('../views/admin/ExamAdminView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/exams/:id/monitor',
+      name: 'exam-monitor',
+      component: () => import('../views/admin/ExamMonitorView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/submissions',
+      name: 'submission-admin',
+      component: () => import('../views/admin/SubmissionAdminView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/admin/settings',
+      name: 'teacher-settings',
+      component: () => import('../views/admin/TeacherSettingsView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/rank',
+      name: 'rank',
+      redirect: { name: 'exam' },
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterView.vue'),
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('../views/ProfileView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/profile/:id',
+      name: 'user-profile',
+      component: () => import('../views/ProfileView.vue'),
+      meta: { requiresAuth: true },
+    },
+    // Documentation Routes
+    {
+      path: '/docs/acm',
+      name: 'doc-acm',
+      component: () => import('../views/docs/ACMDocView.vue'),
+    },
+    {
+      path: '/docs/kaggle',
+      name: 'doc-kaggle',
+      component: () => import('../views/docs/KaggleDocView.vue'),
+    },
+    {
+      path: '/docs/oop',
+      name: 'doc-oop',
+      component: () => import('../views/docs/OOPDocView.vue'),
+    },
+    {
+      path: '/docs/teacher-manual',
+      name: 'doc-teacher-manual',
+      component: () => import('../views/docs/TeacherManualView.vue'),
+      meta: { requiresAuth: true, role: 'teacher' },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: { name: 'home' },
+    },
+  ],
 })
 
 router.beforeEach(async (to, from, next) => {
-    const userStore = useUserStore()
-    const sysStore = useSysStore()
-    const token = localStorage.getItem('token')
+  const userStore = useUserStore()
+  const sysStore = useSysStore()
+  const token = localStorage.getItem('token')
 
-    // Ensure sys info is loaded to check practice mode
-    if (!sysStore.loaded) {
-        await sysStore.fetchSysInfo()
-    }
+  // Ensure sys info is loaded to check practice mode
+  if (!sysStore.loaded) {
+    await sysStore.fetchSysInfo()
+  }
 
-    const user = userStore.user
-    const isTeacher = user?.role === 'teacher'
-    const isPracticeMode = ![false, 'False'].includes(sysStore.practice)
+  const user = userStore.user
+  const isTeacher = user?.role === 'teacher'
+  const isPracticeMode = ![false, 'False'].includes(sysStore.practice)
 
-    // 先处理身份校验，再应用练习/考试模式，避免未登录请求绕到首页。
-    if (to.meta.requiresAuth && !token) {
-        next({name: 'login', query: {redirect: to.fullPath}})
+  // 先处理身份校验，再应用练习/考试模式，避免未登录请求绕到首页。
+  if (to.meta.requiresAuth && !token) {
+    next({ name: 'login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  if (isTeacher && to.name === 'problem-detail') {
+    next({ name: 'problem-admin-preview', params: { id: to.params.id } })
+    return
+  }
+
+  if (
+    isTeacher &&
+    ['problems', 'datasets', 'exam', 'exam-detail', 'exam-rank'].includes(
+      typeof to.name === 'string' ? to.name : '',
+    )
+  ) {
+    next({ name: to.name === 'datasets' ? 'dataset-admin' : 'teacher-dashboard' })
+    return
+  }
+
+  // Exam Mode Logic
+  if (!isPracticeMode) {
+    // If practice mode is OFF (i.e., Exam Mode is ON)
+    if (!isTeacher) {
+      // Restrict access to specific practice-related routes
+      const restrictedRoutes = ['problems', 'datasets']
+      if (restrictedRoutes.includes(typeof to.name === 'string' ? to.name : '')) {
+        next({ name: 'exam' })
         return
-    }
+      }
 
-    if (isTeacher && to.name === 'problem-detail') {
-        next({name: 'problem-admin-preview', params: {id: to.params.id}})
+      // If trying to access a problem detail, check if it's within an exam context
+      if (to.name === 'problem-detail' && !to.query.exam_id) {
+        next({ name: 'exam' })
         return
+      }
     }
-
-    if (isTeacher && ['problems', 'datasets', 'exam', 'exam-detail', 'exam-rank'].includes(typeof to.name === 'string' ? to.name : '')) {
-        next({name: to.name === 'datasets' ? 'dataset-admin' : 'teacher-dashboard'})
+  } else {
+    // If practice mode is ON
+    if (!isTeacher) {
+      // Restrict access to exam-related routes
+      const examRoutes = ['exam', 'exam-detail', 'exam-rank']
+      if (examRoutes.includes(typeof to.name === 'string' ? to.name : '')) {
+        next({ name: 'home' })
         return
+      }
     }
+  }
 
-    // Exam Mode Logic
-    if (!isPracticeMode) {
-        // If practice mode is OFF (i.e., Exam Mode is ON)
-        if (!isTeacher) {
-            // Restrict access to specific practice-related routes
-            const restrictedRoutes = ['problems', 'datasets']
-            if (restrictedRoutes.includes(typeof to.name === 'string' ? to.name : '')) {
-                next({name: 'exam'})
-                return
-            }
-            
-            // If trying to access a problem detail, check if it's within an exam context
-            if (to.name === 'problem-detail' && !to.query.exam_id) {
-                next({name: 'exam'})
-                return
-            }
-        }
-    } else {
-        // If practice mode is ON
-        if (!isTeacher) {
-            // Restrict access to exam-related routes
-            const examRoutes = ['exam', 'exam-detail', 'exam-rank']
-            if (examRoutes.includes(typeof to.name === 'string' ? to.name : '')) {
-                next({name: 'home'})
-                return
-            }
-        }
+  // Check role permission
+  if (to.meta.role) {
+    if (user?.role !== to.meta.role) {
+      next({ name: 'home' })
+      return
     }
+  }
 
-    // Check role permission
-    if (to.meta.role) {
-        if (user?.role !== to.meta.role) {
-            next({name: 'home'})
-            return
-        }
-    }
-
-    next()
+  next()
 })
 
 export default router

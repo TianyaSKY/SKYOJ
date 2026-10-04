@@ -1,7 +1,16 @@
 <template>
   <div class="submission-detail-container">
-    <el-alert v-if="loadError" class="mb-4" type="error" title="提交详情加载失败" :closable="false" show-icon>
-      <el-button :loading="loading" :disabled="loading" size="small" @click="retrySubmission">重新加载</el-button>
+    <el-alert
+      v-if="loadError"
+      class="mb-4"
+      type="error"
+      title="提交详情加载失败"
+      :closable="false"
+      show-icon
+    >
+      <el-button :loading="loading" :disabled="loading" size="small" @click="retrySubmission"
+        >重新加载</el-button
+      >
     </el-alert>
     <!-- Status Overview -->
     <el-card v-loading="loading" class="status-card mb-4" shadow="hover">
@@ -9,33 +18,35 @@
         <div class="status-main">
           <div class="status-icon">
             <el-icon v-if="submission.status === 'Accepted'" :size="50" color="#67C23A">
-              <CircleCheckFilled/>
+              <CircleCheckFilled />
             </el-icon>
             <el-icon v-else-if="submission.status === 'Wrong Answer'" :size="50" color="#F56C6C">
-              <CircleCloseFilled/>
+              <CircleCloseFilled />
             </el-icon>
             <el-icon v-else-if="isPending" :size="50" class="is-loading" color="#409EFF">
-              <Loading/>
+              <Loading />
             </el-icon>
             <el-icon v-else :size="50" color="#E6A23C">
-              <QuestionFilled/>
+              <QuestionFilled />
             </el-icon>
           </div>
           <div class="status-text">
             <h1 :class="getStatusClass(submission.status)">{{ submission.status }}</h1>
             <div class="meta-info">
               <el-tag class="mr-2" effect="plain" size="small">{{ submission.language }}</el-tag>
-              <span class="time-text"><el-icon><Clock/></el-icon> {{ formatTime(submission.created_at) }}</span>
+              <span class="time-text"
+                ><el-icon><Clock /></el-icon> {{ formatTime(submission.created_at) }}</span
+              >
             </div>
           </div>
         </div>
 
         <div class="score-display">
           <el-progress
-              :color="getScoreColor"
-              :percentage="submission.score"
-              :width="80"
-              type="dashboard"
+            :color="getScoreColor"
+            :percentage="submission.score"
+            :width="80"
+            type="dashboard"
           >
             <template #default="{ percentage }">
               <span class="score-value">{{ percentage }}</span>
@@ -49,7 +60,9 @@
     <el-card v-if="submission.log" class="log-card mb-4" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span class="header-title"><el-icon><List/></el-icon> Judge Feedback</span>
+          <span class="header-title"
+            ><el-icon><List /></el-icon> Judge Feedback</span
+          >
         </div>
       </template>
       <div class="log-content">
@@ -61,35 +74,37 @@
     <el-card class="code-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span class="header-title"><el-icon><Document/></el-icon> Source Code</span>
+          <span class="header-title"
+            ><el-icon><Document /></el-icon> Source Code</span
+          >
           <el-button :icon="CopyDocument" size="small" @click="copyCode">Copy</el-button>
         </div>
       </template>
       <div class="editor-wrapper">
         <vue-monaco-editor
-            v-if="submission.code"
-            v-model:value="submission.code"
-            :language="submission.language || 'python'"
-            :options="editorOptions"
-            class="monaco-editor"
-            theme="vs-light"
+          v-if="submission.code"
+          v-model:value="submission.code"
+          :language="submission.language || 'python'"
+          :options="editorOptions"
+          class="monaco-editor"
+          theme="vs-light"
         />
-        <el-empty v-else description="No code available"/>
+        <el-empty v-else description="No code available" />
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import {computed, onUnmounted, ref, watch} from 'vue'
-import {useRoute} from 'vue-router'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { formatServerDateTime as formatTime } from '@/utils/date'
 import type { SubmissionDetailResponse } from '@/types/submission'
 import type { editor } from 'monaco-editor'
 import { parseRouteId } from '@/utils/route'
-import {getSubmissionDetail} from '@/api/problem'
-import {ElMessage} from 'element-plus'
-import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import { getSubmissionDetail } from '@/api/problem'
+import { ElMessage } from 'element-plus'
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 import {
   CircleCheckFilled,
   CircleCloseFilled,
@@ -98,7 +113,7 @@ import {
   Document,
   List,
   Loading,
-  QuestionFilled
+  QuestionFilled,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -108,7 +123,9 @@ let timer: ReturnType<typeof setTimeout> | null = null
 let requestVersion = 0
 let disposed = false
 
-const initialSubmission = (id: unknown): Omit<SubmissionDetailResponse, 'id'> & {id: number | null} => ({
+const initialSubmission = (
+  id: unknown,
+): Omit<SubmissionDetailResponse, 'id'> & { id: number | null } => ({
   id: parseRouteId(id),
   status: 'Loading...',
   score: 0,
@@ -117,7 +134,7 @@ const initialSubmission = (id: unknown): Omit<SubmissionDetailResponse, 'id'> & 
   language: 'python',
   created_at: '',
   exam_id: null,
-  case_results: []
+  case_results: [],
 })
 const submission = ref(initialSubmission(route.params.id))
 
@@ -129,11 +146,11 @@ const isPending = computed(() => {
 const editorOptions: editor.IStandaloneEditorConstructionOptions = {
   readOnly: true,
   automaticLayout: true,
-  minimap: {enabled: false},
+  minimap: { enabled: false },
   scrollBeyondLastLine: false,
   fontSize: 14,
   fontFamily: "'Fira Code', 'Consolas', monospace",
-  renderWhitespace: 'selection'
+  renderWhitespace: 'selection',
 }
 
 const getStatusClass = (status: string) => {
@@ -150,7 +167,6 @@ const getScoreColor = (percentage: number) => {
   if (percentage >= 60) return '#E6A23C'
   return '#F56C6C'
 }
-
 
 const copyCode = async () => {
   try {
@@ -210,12 +226,16 @@ const stopPolling = () => {
   }
 }
 
-watch(() => route.params.id, (id) => {
-  stopPolling()
-  submission.value = initialSubmission(id)
-  loadError.value = false
-  fetchSubmission()
-}, { immediate: true })
+watch(
+  () => route.params.id,
+  (id) => {
+    stopPolling()
+    submission.value = initialSubmission(id)
+    loadError.value = false
+    fetchSubmission()
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   disposed = true

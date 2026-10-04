@@ -6,12 +6,20 @@ import request from '@/utils/request'
  * 获取公开数据集列表
  * @param {object} params 查询参数
  */
-export function getDatasetList(params?: PaginationQuery): Promise<Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse | Dataset.LegacyDatasetListResponse> {
-    return request<Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse | Dataset.LegacyDatasetListResponse>({
-        url: '/datasets',
-        method: 'get',
-        params
-    })
+export function getDatasetList(
+  params?: PaginationQuery,
+): Promise<
+  Dataset.DatasetResponse[] | Dataset.PaginatedDatasetsResponse | Dataset.LegacyDatasetListResponse
+> {
+  return request<
+    | Dataset.DatasetResponse[]
+    | Dataset.PaginatedDatasetsResponse
+    | Dataset.LegacyDatasetListResponse
+  >({
+    url: '/datasets',
+    method: 'get',
+    params,
+  })
 }
 
 /**
@@ -19,13 +27,13 @@ export function getDatasetList(params?: PaginationQuery): Promise<Dataset.Datase
  * @param {FormData} data 包含文件和元数据的表单数据
  */
 export function uploadDataset(data: FormData): Promise<Dataset.UploadDatasetResponse> {
-    return request<Dataset.UploadDatasetResponse>({
-        url: '/datasets',
-        method: 'post',
-        data,
-        timeout: 300000,
-        headers: {'Content-Type': 'multipart/form-data'}
-    })
+  return request<Dataset.UploadDatasetResponse>({
+    url: '/datasets',
+    method: 'post',
+    data,
+    timeout: 300000,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
 }
 
 /**
@@ -33,10 +41,10 @@ export function uploadDataset(data: FormData): Promise<Dataset.UploadDatasetResp
  * @param {number} id 数据集ID
  */
 export function deleteDataset(id: number): Promise<MessageResponse> {
-    return request<MessageResponse>({
-        url: `/datasets/${id}`,
-        method: 'delete'
-    })
+  return request<MessageResponse>({
+    url: `/datasets/${id}`,
+    method: 'delete',
+  })
 }
 
 /**
@@ -44,10 +52,10 @@ export function deleteDataset(id: number): Promise<MessageResponse> {
  * @param {number} id 数据集ID
  */
 export function downloadDataset(id: number): Promise<Blob> {
-    return request<Blob>({
-        url: `/datasets/${id}/download`,
-        method: 'get',
-        responseType: 'blob',
-        timeout: 300000
-    })
+  return request<Blob>({
+    url: `/datasets/${id}/download`,
+    method: 'get',
+    responseType: 'blob',
+    timeout: 300000,
+  })
 }

@@ -1,31 +1,31 @@
-import {defineStore} from 'pinia'
-import {ref} from 'vue'
-import {getSysInfo} from '@/api/sys'
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { getSysInfo } from '@/api/sys'
 
 export const useSysStore = defineStore('sys', () => {
-    const title = ref('SKYOJ')
-    const practice = ref<boolean | 'True' | 'False'>(true)
-    const info = ref('')
-    const warning = ref<boolean | 'True' | 'False'>(false)
-    const loaded = ref(false)
+  const title = ref('SKYOJ')
+  const practice = ref<boolean | 'True' | 'False'>(true)
+  const info = ref('')
+  const warning = ref<boolean | 'True' | 'False'>(false)
+  const loaded = ref(false)
 
-    const fetchSysInfo = async () => {
-        try {
-            const res = await getSysInfo()
-            if (res) {
-                if (res.title) {
-                    title.value = res.title
-                    document.title = res.title
-                }
-                if (res.practice !== undefined) practice.value = res.practice
-                if (res.info) info.value = res.info
-                if (res.warning !== undefined) warning.value = res.warning
-                loaded.value = true
-            }
-        } catch (error) {
-            console.error('Failed to fetch system info:', error)
+  const fetchSysInfo = async () => {
+    try {
+      const res = await getSysInfo()
+      if (res) {
+        if (res.title) {
+          title.value = res.title
+          document.title = res.title
         }
+        if (res.practice !== undefined) practice.value = res.practice
+        if (res.info) info.value = res.info
+        if (res.warning !== undefined) warning.value = res.warning
+        loaded.value = true
+      }
+    } catch (error) {
+      console.error('Failed to fetch system info:', error)
     }
+  }
 
-    return {title, practice, info, warning, loaded, fetchSysInfo}
+  return { title, practice, info, warning, loaded, fetchSysInfo }
 })

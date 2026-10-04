@@ -30,7 +30,17 @@ describe('useUserStore', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it.each(['{broken', '[]', '"teacher"', '42', 'true', '', '{"id":"1"}', '{"role":123}', '{"username":null}'])('无效用户缓存 %s 不阻断初始化', cached => {
+  it.each([
+    '{broken',
+    '[]',
+    '"teacher"',
+    '42',
+    'true',
+    '',
+    '{"id":"1"}',
+    '{"role":123}',
+    '{"username":null}',
+  ])('无效用户缓存 %s 不阻断初始化', (cached) => {
     localStorage.setItem('token', 'existing-token')
     localStorage.setItem('user', cached)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -86,7 +96,9 @@ describe('useUserStore', () => {
 
     const store = useUserStore()
 
-    await expect(store.login({ username: 'wrong', password: 'wrong' })).rejects.toThrow('Invalid credentials')
+    await expect(store.login({ username: 'wrong', password: 'wrong' })).rejects.toThrow(
+      'Invalid credentials',
+    )
     expect(store.token).toBe('')
   })
 

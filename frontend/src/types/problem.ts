@@ -69,5 +69,15 @@ export interface TestCaseSummaryResponse {
   cases: Array<TestCaseResponse>
 }
 
-export interface ProblemQuery { page?: number; page_size?: number; tag_id?: number; problem_type?: 'acm' | 'oop' | 'kaggle' }
-export interface SearchQuery { query?: string; top_k?: number; tag_id?: number; problem_type?: 'acm' | 'oop' | 'kaggle' }
+export interface ProblemQuery {
+  page?: number
+  page_size?: number
+  tag_id?: number
+  problem_type?: 'acm' | 'oop' | 'kaggle'
+}
+export interface SearchQuery {
+  query?: string
+  top_k?: number
+  tag_id?: number
+  problem_type?: 'acm' | 'oop' | 'kaggle'
+}

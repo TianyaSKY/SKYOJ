@@ -66,4 +66,8 @@ export interface ApplyDraftResponse {
   title: string
 }
 
-export interface DraftQuery { status?: string; task_type?: string; limit?: number }
+export interface DraftQuery {
+  status?: string
+  task_type?: string
+  limit?: number
+}

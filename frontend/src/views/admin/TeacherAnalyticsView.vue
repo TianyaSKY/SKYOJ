@@ -24,18 +24,17 @@
           </template>
           <div v-loading="loading" style="min-height: 280px">
             <div v-if="passRates.length" class="bar-chart">
-              <div
-                v-for="item in passRates"
-                :key="item.problem_id"
-                class="bar-row"
-              >
+              <div v-for="item in passRates" :key="item.problem_id" class="bar-row">
                 <span class="bar-label" :title="item.title">
                   #{{ item.problem_id }} {{ truncate(item.title, 12) }}
                 </span>
                 <div class="bar-track">
                   <div
                     class="bar-fill"
-                    :style="{ width: item.pass_rate + '%', background: passRateColor(item.pass_rate) }"
+                    :style="{
+                      width: item.pass_rate + '%',
+                      background: passRateColor(item.pass_rate),
+                    }"
                   />
                 </div>
                 <span class="bar-value">{{ item.pass_rate.toFixed(1) }}%</span>
@@ -78,15 +77,11 @@
       </template>
       <div v-loading="loading" style="min-height: 200px">
         <div v-if="dailyTrend.length" class="trend-bars">
-          <div
-            v-for="item in dailyTrend"
-            :key="item.date"
-            class="trend-bar-col"
-          >
+          <div v-for="item in dailyTrend" :key="item.date" class="trend-bar-col">
             <div class="trend-bar-wrap">
               <div
                 class="trend-bar"
-                :style="{ height: (item.count / maxDailyCount * 100) + '%' }"
+                :style="{ height: (item.count / maxDailyCount) * 100 + '%' }"
                 :title="`${item.date}: ${item.count} 次提交`"
               />
             </div>
@@ -115,7 +110,11 @@ const overviewStats = computed(() => {
     { label: '总提交数', value: d.total_submissions ?? 0, color: '#409EFF' },
     { label: 'AC 次数', value: d.total_accepted ?? 0, color: '#67C23A' },
     { label: '总题目数', value: d.total_problems ?? 0, color: '#E6A23C' },
-    { label: '全局通过率', value: ((d.global_pass_rate ?? 0) * 100).toFixed(1) + '%', color: '#F56C6C' },
+    {
+      label: '全局通过率',
+      value: ((d.global_pass_rate ?? 0) * 100).toFixed(1) + '%',
+      color: '#F56C6C',
+    },
   ]
 })
 
@@ -126,7 +125,7 @@ const dailyTrend = computed(() => analyticsData.value?.daily_submissions ?? [])
 const maxDailyCount = computed(() => {
   const arr = dailyTrend.value
   if (!arr || !arr.length) return 1
-  return Math.max(...arr.map(i => i.count))
+  return Math.max(...arr.map((i) => i.count))
 })
 
 const passRateColor = (rate: number) => {
@@ -143,8 +142,8 @@ const difficultyColor = (score: number) => {
   return '#ef9a9a'
 }
 
-const truncate = (s: string, n: number) => s.length > n ? s.slice(0, n) + '…' : s
-const shortDate = (s: string) => s ? s.slice(5) : ''
+const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n) + '…' : s)
+const shortDate = (s: string) => (s ? s.slice(5) : '')
 
 const fetchAnalytics = async () => {
   loading.value = true
@@ -158,7 +157,9 @@ const fetchAnalytics = async () => {
   }
 }
 
-onMounted(() => { fetchAnalytics() })
+onMounted(() => {
+  fetchAnalytics()
+})
 </script>
 
 <style scoped>
@@ -195,7 +196,7 @@ onMounted(() => { fetchAnalytics() })
   border-radius: 16px;
   padding: 24px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .stat-value {
@@ -210,7 +211,8 @@ onMounted(() => { fetchAnalytics() })
   margin-top: 8px;
 }
 
-.chart-card, .trend-card {
+.chart-card,
+.trend-card {
   border-radius: 12px;
   margin-bottom: 24px;
 }
@@ -325,7 +327,7 @@ onMounted(() => { fetchAnalytics() })
 
 .trend-bar {
   width: 100%;
-  background: #409EFF;
+  background: #409eff;
   border-radius: 4px 4px 0 0;
   min-height: 2px;
   transition: height 0.4s ease;

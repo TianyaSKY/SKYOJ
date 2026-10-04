@@ -7,22 +7,23 @@
           <div class="header-actions">
             <el-button :icon="Document" @click="goToDraftBox">AI 草稿箱</el-button>
             <el-button :icon="MagicStick" type="success" @click="handleAiCreate"
-            >AI 生成题目
-            </el-button
-            >
+              >AI 生成题目
+            </el-button>
             <el-button :icon="Plus" type="primary" @click="handleCreate">新增题目</el-button>
           </div>
         </div>
       </template>
 
       <el-table v-loading="loading" :data="problems" stripe>
-        <el-table-column label="ID" prop="id" width="80"/>
+        <el-table-column label="ID" prop="id" width="80" />
         <el-table-column label="标题" min-width="200" prop="title">
           <template #default="scope">
-            <el-link type="primary" @click="goToProblem(scope.row.id)">{{ scope.row.title }}</el-link>
+            <el-link type="primary" @click="goToProblem(scope.row.id)">{{
+              scope.row.title
+            }}</el-link>
           </template>
         </el-table-column>
-        <el-table-column label="类型" prop="type" width="100"/>
+        <el-table-column label="类型" prop="type" width="100" />
         <el-table-column label="语言" prop="language" width="150">
           <template #default="scope">
             <el-tag size="small">
@@ -47,9 +48,8 @@
             <el-button size="small" @click="goToProblem(scope.row.id)">预览</el-button>
             <el-button :icon="Edit" size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button :icon="Cpu" size="small" type="warning" @click="handleAiTestData(scope.row)"
-            >AICase
-            </el-button
-            >
+              >AICase
+            </el-button>
             <el-popconfirm title="确定要删除这道题目吗？" @confirm="handleDelete(scope.row.id)">
               <template #reference>
                 <el-button :icon="Delete" size="small" type="danger">删除</el-button>
@@ -61,62 +61,64 @@
     </el-card>
 
     <!-- Edit/Create Dialog -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="82%" top="4vh" @close="resetForm">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="82%"
+      top="4vh"
+      @close="resetForm"
+    >
       <el-form ref="formRef" v-loading="dialogLoading" :model="form" label-position="top">
         <el-form-item label="标题" prop="title">
-          <el-input v-model="form.title"/>
+          <el-input v-model="form.title" />
         </el-form-item>
         <el-form-item label="内容 (Markdown)" prop="content">
           <MarkdownContentEditor
-              v-model="form.content"
-              default-mode="split"
-              min-height="360px"
-              :rows="16"
-              placeholder="题目描述支持 Markdown：标题、代码块、公式等"
+            v-model="form.content"
+            default-mode="split"
+            min-height="360px"
+            :rows="16"
+            placeholder="题目描述支持 Markdown：标题、代码块、公式等"
           />
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="6">
             <el-form-item label="类型" prop="type">
               <el-select v-model="form.type" placeholder="请选择题目类型">
-                <el-option label="ACM" value="acm"/>
-                <el-option label="Kaggle" value="kaggle"/>
-                <el-option label="OOP" value="oop"/>
+                <el-option label="ACM" value="acm" />
+                <el-option label="Kaggle" value="kaggle" />
+                <el-option label="OOP" value="oop" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="允许语言" prop="language">
-              <el-select
-                  v-model="form.language"
-                  placeholder="请选择允许的语言"
-                  style="width: 100%"
-              >
-                <el-option label="Python" value="python"/>
-                <el-option label="C++" value="cpp"/>
-                <el-option label="C" value="c"/>
-                <el-option label="Java" value="java"/>
+              <el-select v-model="form.language" placeholder="请选择允许的语言" style="width: 100%">
+                <el-option label="Python" value="python" />
+                <el-option label="C++" value="cpp" />
+                <el-option label="C" value="c" />
+                <el-option label="Java" value="java" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="时间限制 (ms)" prop="time_limit">
-              <el-input-number v-model="form.time_limit" :min="100" style="width: 100%"/>
+              <el-input-number v-model="form.time_limit" :min="100" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="内存限制 (MB)" prop="memory_limit">
-              <el-input-number v-model="form.memory_limit" :min="32" style="width: 100%"/>
+              <el-input-number v-model="form.memory_limit" :min="32" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-form-item label="默认模板代码 (可选)" prop="template_code">
           <div v-if="dialogVisible" class="editor-container mini-editor">
             <vue-monaco-editor
-                v-model:value="form.template_code"
-                :language="form.language || 'python'"
-                :options="miniEditorOptions"
-                theme="vs-dark"
+              v-model:value="form.template_code"
+              :language="form.language || 'python'"
+              :options="miniEditorOptions"
+              theme="vs-dark"
             />
           </div>
         </el-form-item>
@@ -136,30 +138,32 @@
                 <span>总大小 {{ formatFileSize(testCaseSummary.total_size) }}</span>
               </div>
               <el-alert
-                  v-if="testCaseSummary.status === 'incomplete' || testCaseSummary.status === 'invalid'"
-                  :closable="false"
-                  show-icon
-                  title="测试点文件未完全配对，提交判题前请补齐同名 .in/.out 文件。"
-                  type="warning"
+                v-if="
+                  testCaseSummary.status === 'incomplete' || testCaseSummary.status === 'invalid'
+                "
+                :closable="false"
+                show-icon
+                title="测试点文件未完全配对，提交判题前请补齐同名 .in/.out 文件。"
+                type="warning"
               />
               <el-alert
-                  v-if="testCaseSummary.ignored_files.length"
-                  :closable="false"
-                  class="summary-alert"
-                  show-icon
-                  type="info"
+                v-if="testCaseSummary.ignored_files.length"
+                :closable="false"
+                class="summary-alert"
+                show-icon
+                type="info"
               >
                 已忽略 {{ testCaseSummary.ignored_files.length }} 个不会参与判题的文件：
                 {{ testCaseSummary.ignored_files.join('、') }}
               </el-alert>
               <el-table
-                  v-if="testCaseSummary.cases.length"
-                  :data="testCaseSummary.cases"
-                  border
-                  class="test-case-table"
-                  size="small"
+                v-if="testCaseSummary.cases.length"
+                :data="testCaseSummary.cases"
+                border
+                class="test-case-table"
+                size="small"
               >
-                <el-table-column label="测试点" min-width="100" prop="name"/>
+                <el-table-column label="测试点" min-width="100" prop="name" />
                 <el-table-column label="输入文件" min-width="180">
                   <template #default="scope">
                     {{ scope.row.input_file || '缺失' }}
@@ -184,19 +188,19 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <el-empty v-else description="尚未配置可识别的测试点" :image-size="72"/>
+              <el-empty v-else description="尚未配置可识别的测试点" :image-size="72" />
             </template>
           </div>
           <el-form-item label="上传测试点 (ZIP)">
             <el-upload
-                :auto-upload="false"
-                :file-list="testCaseFileList"
-                :limit="1"
-                :on-change="handleTestCaseChange"
-                :on-remove="handleTestCaseRemove"
-                accept=".zip"
-                action="#"
-                class="upload-demo"
+              :auto-upload="false"
+              :file-list="testCaseFileList"
+              :limit="1"
+              :on-change="handleTestCaseChange"
+              :on-remove="handleTestCaseRemove"
+              accept=".zip"
+              action="#"
+              class="upload-demo"
             >
               <el-button type="primary">选择文件</el-button>
               <template #tip>
@@ -205,31 +209,26 @@
             </el-upload>
             <div class="mt-2">
               <el-button
-                  :disabled="!selectedTestCaseFile"
-                  :loading="uploadingTestCases"
-                  size="small"
-                  type="success"
-                  @click="handleUploadTestCases"
+                :disabled="!selectedTestCaseFile"
+                :loading="uploadingTestCases"
+                size="small"
+                type="success"
+                @click="handleUploadTestCases"
               >
                 上传测试点
               </el-button>
               <el-button
-                  :icon="Download"
-                  :loading="downloadingTestCases"
-                  size="small"
-                  type="info"
-                  @click="handleDownloadTestCases"
+                :icon="Download"
+                :loading="downloadingTestCases"
+                size="small"
+                type="info"
+                @click="handleDownloadTestCases"
               >
                 下载所有测试点
               </el-button>
               <el-popconfirm title="确定要删除所有测试点吗？" @confirm="handleDeleteAllTestCases">
                 <template #reference>
-                  <el-button
-                      :icon="Delete"
-                      :loading="deletingTestCases"
-                      size="small"
-                      type="danger"
-                  >
+                  <el-button :icon="Delete" :loading="deletingTestCases" size="small" type="danger">
                     删除所有测试点
                   </el-button>
                 </template>
@@ -239,10 +238,10 @@
         </div>
         <div v-else>
           <el-alert
-              :closable="false"
-              show-icon
-              title="请先保存题目，然后再编辑以上传测试点。"
-              type="info"
+            :closable="false"
+            show-icon
+            title="请先保存题目，然后再编辑以上传测试点。"
+            type="info"
           />
         </div>
       </el-form>
@@ -255,19 +254,19 @@
     <!-- AI Generation Dialog（异步提交到草稿箱） -->
     <el-dialog v-model="aiDialogVisible" title="AI 生成题目" width="520px">
       <el-alert
-          :closable="false"
-          class="mb-12"
-          show-icon
-          title="提交后将在后台生成，可关闭本窗口，到「AI 草稿箱」查看结果并创建正式题目。"
-          type="info"
+        :closable="false"
+        class="mb-12"
+        show-icon
+        title="提交后将在后台生成，可关闭本窗口，到「AI 草稿箱」查看结果并创建正式题目。"
+        type="info"
       />
       <el-form :model="aiForm" label-position="top">
         <el-form-item label="题目背景/大致方向" required>
           <el-input
-              v-model="aiForm.background"
-              :rows="4"
-              placeholder="例如：关于字符串处理的题目，要求统计元音字母数量，适合初学者。"
-              type="textarea"
+            v-model="aiForm.background"
+            :rows="4"
+            placeholder="例如：关于字符串处理的题目，要求统计元音字母数量，适合初学者。"
+            type="textarea"
           />
         </el-form-item>
         <el-form-item label="题目难度">
@@ -290,20 +289,20 @@
     <!-- AI Test Data Generation Dialog（异步提交到草稿箱） -->
     <el-dialog v-model="aiTestDataVisible" title="AI 生成测试数据" width="560px">
       <el-alert
-          :closable="false"
-          class="mb-12"
-          show-icon
-          title="脚本在后台生成。完成后请到「AI 草稿箱」预览脚本并提交执行，无需在本页等待。"
-          type="info"
+        :closable="false"
+        class="mb-12"
+        show-icon
+        title="脚本在后台生成。完成后请到「AI 草稿箱」预览脚本并提交执行，无需在本页等待。"
+        type="info"
       />
       <div v-loading="fetchingDetail">
         <el-form :model="testDataForm" label-position="top">
           <el-form-item label="生成方向/要求 (可选)">
             <el-input
-                v-model="testDataForm.direction"
-                :rows="4"
-                placeholder="例如：生成若干组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
-                type="textarea"
+              v-model="testDataForm.direction"
+              :rows="4"
+              placeholder="例如：生成若干组数据，包含边界情况（空字符串、超长字符串），数据分布均匀。"
+              type="textarea"
             />
           </el-form-item>
         </el-form>
@@ -312,10 +311,10 @@
         <el-button @click="aiTestDataVisible = false">取消</el-button>
         <el-button @click="goToDraftBox">打开草稿箱</el-button>
         <el-button
-            :disabled="fetchingDetail || !currentProblem"
-            :loading="scriptGenerating"
-            type="primary"
-            @click="handleGenerateScript"
+          :disabled="fetchingDetail || !currentProblem"
+          :loading="scriptGenerating"
+          type="primary"
+          @click="handleGenerateScript"
         >
           提交后台生成脚本
         </el-button>
@@ -326,13 +325,17 @@
 
 <script setup lang="ts">
 import type { CreateProblem } from '@/schemas/problem'
-import type { ProblemListResponse, ProblemDetailResponse, TestCaseSummaryResponse } from '@/types/problem'
+import type {
+  ProblemListResponse,
+  ProblemDetailResponse,
+  TestCaseSummaryResponse,
+} from '@/types/problem'
 import type { editor } from 'monaco-editor'
 import type { UploadFile, UploadFiles, TagProps } from 'element-plus'
 import { backendErrorMessage } from '@/utils/error'
-import {createProblemSchema, updateProblemSchema} from '@/schemas/problem'
-import {computed, onMounted, ref} from 'vue'
-import {useRouter} from 'vue-router'
+import { createProblemSchema, updateProblemSchema } from '@/schemas/problem'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   createProblem,
   deleteAllTestCases,
@@ -345,17 +348,11 @@ import {
   uploadTestCases,
 } from '@/api/problem'
 
-import {
-  submitProblemGenerationDraft,
-  submitTestScriptGenerationDraft,
-} from '@/api/llm'
-import {
-  generateProblemDraftSchema,
-  generateTestScriptDraftSchema,
-} from '@/schemas/aiDraft'
-import {ElMessage} from 'element-plus'
-import {Cpu, Delete, Document, Download, Edit, MagicStick, Plus} from '@element-plus/icons-vue'
-import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
+import { submitProblemGenerationDraft, submitTestScriptGenerationDraft } from '@/api/llm'
+import { generateProblemDraftSchema, generateTestScriptDraftSchema } from '@/schemas/aiDraft'
+import { ElMessage } from 'element-plus'
+import { Cpu, Delete, Document, Download, Edit, MagicStick, Plus } from '@element-plus/icons-vue'
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 import MarkdownContentEditor from '@/components/MarkdownContentEditor.vue'
 
 const router = useRouter()
@@ -386,7 +383,7 @@ const testDataForm = ref({
 
 const miniEditorOptions: editor.IStandaloneEditorConstructionOptions = {
   automaticLayout: true,
-  minimap: {enabled: false},
+  minimap: { enabled: false },
   fontSize: 13,
   scrollBeyondLastLine: false,
   lineNumbers: 'on',
@@ -403,7 +400,7 @@ const deletingTestCases = ref(false)
 const testCaseSummary = ref<TestCaseSummaryResponse | null>(null)
 const testCaseSummaryLoading = ref(false)
 
-type ProblemForm = Omit<CreateProblem, 'language' | 'type'> & {language: string; type: string}
+type ProblemForm = Omit<CreateProblem, 'language' | 'type'> & { language: string; type: string }
 const form = ref<ProblemForm>({
   title: '',
   content: '',
@@ -414,14 +411,14 @@ const form = ref<ProblemForm>({
   template_code: '',
 })
 
-const TEST_CASE_STATUS_META: Record<string, {label: string; type: TagProps['type']}> = {
-  unknown: {label: '未检查', type: 'info'},
-  empty: {label: '未配置', type: 'info'},
-  ready: {label: '已就绪', type: 'success'},
-  incomplete: {label: '配对不完整', type: 'warning'},
-  invalid: {label: '文件无效', type: 'danger'},
-  missing_input: {label: '缺少输入', type: 'danger'},
-  missing_output: {label: '缺少输出', type: 'danger'},
+const TEST_CASE_STATUS_META: Record<string, { label: string; type: TagProps['type'] }> = {
+  unknown: { label: '未检查', type: 'info' },
+  empty: { label: '未配置', type: 'info' },
+  ready: { label: '已就绪', type: 'success' },
+  incomplete: { label: '配对不完整', type: 'warning' },
+  invalid: { label: '文件无效', type: 'danger' },
+  missing_input: { label: '缺少输入', type: 'danger' },
+  missing_output: { label: '缺少输出', type: 'danger' },
 }
 
 const testCaseStatusMeta = (status: string) => {
@@ -486,12 +483,12 @@ const handleCreate = () => {
 }
 
 const handleAiCreate = () => {
-  aiForm.value = {background: '', difficulty: '简单'}
+  aiForm.value = { background: '', difficulty: '简单' }
   aiDialogVisible.value = true
 }
 
 const goToDraftBox = () => {
-  router.push({name: 'ai-draft-box'})
+  router.push({ name: 'ai-draft-box' })
 }
 
 const generateProblem = async () => {
@@ -534,7 +531,7 @@ const handleEdit = async (row: ProblemListResponse) => {
     form.value = {
       ...detail,
       template_code: detail.template_code || '',
-      language: detail.language || 'python'
+      language: detail.language || 'python',
     }
   } catch (error) {
     ElMessage.error('获取题目详情失败')
@@ -560,8 +557,8 @@ const handleDelete = async (id: number) => {
 
 const handleSubmit = async () => {
   const validation = isEdit.value
-    ? {editing: true as const, parsed: updateProblemSchema.safeParse(form.value)}
-    : {editing: false as const, parsed: createProblemSchema.safeParse(form.value)}
+    ? { editing: true as const, parsed: updateProblemSchema.safeParse(form.value) }
+    : { editing: false as const, parsed: createProblemSchema.safeParse(form.value) }
   if (!validation.parsed.success) {
     ElMessage.warning(validation.parsed.error.issues[0]?.message || '请检查输入')
     return
@@ -669,7 +666,6 @@ const handleUploadTestCases = async () => {
   }
 }
 
-
 const handleDownloadTestCases = async () => {
   const problemId = currentProblemId.value
   if (problemId === null) return
@@ -709,7 +705,7 @@ const handleDeleteAllTestCases = async () => {
 }
 
 const goToProblem = (id: number) => {
-  router.push({name: 'problem-admin-preview', params: {id}})
+  router.push({ name: 'problem-admin-preview', params: { id } })
 }
 
 onMounted(() => {

@@ -5,7 +5,7 @@
       <el-button :icon="ArrowLeft" round size="small" @click="backToExam">返回考试题单</el-button>
       <div class="exam-badge">
         <el-icon>
-          <Timer/>
+          <Timer />
         </el-icon>
         <span>正在进行考试模式</span>
       </div>
@@ -19,14 +19,19 @@
             <div class="title-row">
               <h2 class="problem-title">#{{ problem.id }} {{ problem.title }}</h2>
               <div class="problem-meta">
-                <el-tooltip content="数据科学竞赛模式，提交 CSV 预测结果，基于 Metric 评分。" placement="top">
+                <el-tooltip
+                  content="数据科学竞赛模式，提交 CSV 预测结果，基于 Metric 评分。"
+                  placement="top"
+                >
                   <el-tag effect="light" size="small" type="success">Kaggle</el-tag>
                 </el-tooltip>
-                <el-tooltip content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)"
-                            placement="top">
+                <el-tooltip
+                  content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)"
+                  placement="top"
+                >
                   <el-tag effect="plain" size="small" type="info">
                     <el-icon>
-                      <Timer/>
+                      <Timer />
                     </el-icon>
                     {{ problem.time_limit }}ms
                   </el-tag>
@@ -48,31 +53,33 @@
         </template>
         <div class="upload-area">
           <el-upload
-              :auto-upload="false"
-              :file-list="fileList"
-              :limit="1"
-              :on-change="handleFileChange"
-              :on-remove="handleFileRemove"
-              accept=".csv"
-              action="#"
-              class="upload-demo"
-              drag
+            :auto-upload="false"
+            :file-list="fileList"
+            :limit="1"
+            :on-change="handleFileChange"
+            :on-remove="handleFileRemove"
+            accept=".csv"
+            action="#"
+            class="upload-demo"
+            drag
           >
             <el-icon class="el-icon--upload">
-              <upload-filled/>
+              <upload-filled />
             </el-icon>
-            <div class="el-upload__text">
-              将 CSV 文件拖到此处，或 <em>点击上传</em>
-            </div>
+            <div class="el-upload__text">将 CSV 文件拖到此处，或 <em>点击上传</em></div>
             <template #tip>
-              <div class="el-upload__tip">
-                仅支持 CSV 文件。请确保您的文件格式符合题目要求。
-              </div>
+              <div class="el-upload__tip">仅支持 CSV 文件。请确保您的文件格式符合题目要求。</div>
             </template>
           </el-upload>
           <div class="upload-actions">
-            <el-button :disabled="!selectedFile" :loading="submitting" round size="large" type="primary"
-                       @click="handleSubmitKaggle">
+            <el-button
+              :disabled="!selectedFile"
+              :loading="submitting"
+              round
+              size="large"
+              type="primary"
+              @click="handleSubmitKaggle"
+            >
               提交 CSV 结果
             </el-button>
           </div>
@@ -88,28 +95,31 @@
           <div class="problem-header">
             <h2 class="problem-title">#{{ problem.id }} {{ problem.title }}</h2>
             <div class="problem-meta">
-              <el-tooltip content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)"
-                          placement="top">
+              <el-tooltip
+                content="程序运行的最长时间限制，超过此时间将被判定为 TLE (Time Limit Exceeded)"
+                placement="top"
+              >
                 <el-tag effect="plain" size="small" type="info">
                   <el-icon>
-                    <Timer/>
+                    <Timer />
                   </el-icon>
                   {{ problem.time_limit }}ms
                 </el-tag>
               </el-tooltip>
-              <el-tooltip content="程序运行可使用的最大内存限制，超过此限制将被判定为 MLE (Memory Limit Exceeded)"
-                          placement="top">
+              <el-tooltip
+                content="程序运行可使用的最大内存限制，超过此限制将被判定为 MLE (Memory Limit Exceeded)"
+                placement="top"
+              >
                 <el-tag effect="plain" size="small" type="info">
                   <el-icon>
-                    <Monitor/>
+                    <Monitor />
                   </el-icon>
                   {{ problem.memory_limit }}MB
                 </el-tag>
               </el-tooltip>
               <el-tooltip :content="getTypeDescription(problem.type)" placement="top">
-                <el-tag :type="getTypeTag(problem.type)" effect="light" size="small">{{
-                    problem.type?.toUpperCase()
-                  }}
+                <el-tag :type="getTypeTag(problem.type)" effect="light" size="small"
+                  >{{ problem.type?.toUpperCase() }}
                 </el-tag>
               </el-tooltip>
             </div>
@@ -117,7 +127,7 @@
           <div class="problem-tag-row">
             <TagPanel :problem-id="Number(problem.id)" />
           </div>
-          <el-divider/>
+          <el-divider />
         </div>
         <div class="problem-content problem-content-scroll">
           <div class="markdown-body" v-html="renderedContent"></div>
@@ -132,39 +142,53 @@
         <div class="editor-container">
           <div class="editor-toolbar">
             <div class="toolbar-left">
-              <el-select v-model="language" class="lang-select" placeholder="Language" size="default">
+              <el-select
+                v-model="language"
+                class="lang-select"
+                placeholder="Language"
+                size="default"
+              >
                 <el-option
-                    v-for="opt in availableLanguageOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
+                  v-for="opt in availableLanguageOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
                 />
               </el-select>
 
               <!-- Settings Popover -->
-              <el-popover :width="300" placement="bottom" popper-class="editor-settings-popover" trigger="click">
+              <el-popover
+                :width="300"
+                placement="bottom"
+                popper-class="editor-settings-popover"
+                trigger="click"
+              >
                 <template #reference>
-                  <el-button :icon="Setting" circle class="settings-btn" size="default"/>
+                  <el-button :icon="Setting" circle class="settings-btn" size="default" />
                 </template>
                 <div class="settings-panel">
                   <h4 class="settings-title">编辑器设置</h4>
                   <el-form label-position="left" label-width="80px" size="small">
                     <el-form-item label="字体大小">
                       <el-select v-model="fontSize" @change="saveSettings">
-                        <el-option v-for="size in [12, 14, 16, 18, 20, 24]" :key="size" :label="size + 'px'"
-                                   :value="size"/>
+                        <el-option
+                          v-for="size in [12, 14, 16, 18, 20, 24]"
+                          :key="size"
+                          :label="size + 'px'"
+                          :value="size"
+                        />
                       </el-select>
                     </el-form-item>
                     <el-form-item label="字体家族">
                       <el-select v-model="fontFamily" @change="saveSettings">
-                        <el-option label="Fira Code" value="'Fira Code', monospace"/>
-                        <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace"/>
-                        <el-option label="Source Code Pro" value="'Source Code Pro', monospace"/>
-                        <el-option label="Courier New" value="'Courier New', monospace"/>
+                        <el-option label="Fira Code" value="'Fira Code', monospace" />
+                        <el-option label="JetBrains Mono" value="'JetBrains Mono', monospace" />
+                        <el-option label="Source Code Pro" value="'Source Code Pro', monospace" />
+                        <el-option label="Courier New" value="'Courier New', monospace" />
                       </el-select>
                     </el-form-item>
                     <el-form-item label="启用连字">
-                      <el-switch v-model="fontLigatures" @change="saveSettings"/>
+                      <el-switch v-model="fontLigatures" @change="saveSettings" />
                     </el-form-item>
                   </el-form>
                 </div>
@@ -172,30 +196,36 @@
             </div>
             <div class="toolbar-right">
               <el-button
-                  v-if="isAcm"
-                  :icon="MagicStick"
-                  :loading="debugging"
-                  class="debug-btn"
-                  round
-                  size="default"
-                  type="warning"
-                  @click="handleDebug"
+                v-if="isAcm"
+                :icon="MagicStick"
+                :loading="debugging"
+                class="debug-btn"
+                round
+                size="default"
+                type="warning"
+                @click="handleDebug"
               >
                 调试
               </el-button>
-              <el-button :loading="submitting" class="submit-btn" round size="default" type="primary"
-                         @click="handleSubmit">
+              <el-button
+                :loading="submitting"
+                class="submit-btn"
+                round
+                size="default"
+                type="primary"
+                @click="handleSubmit"
+              >
                 提交代码
               </el-button>
             </div>
           </div>
           <div class="editor-wrapper">
             <vue-monaco-editor
-                v-model:value="code"
-                :language="language"
-                :options="editorOptions"
-                class="monaco-editor"
-                theme="vs-dark"
+              v-model:value="code"
+              :language="language"
+              :options="editorOptions"
+              class="monaco-editor"
+              theme="vs-dark"
             />
           </div>
         </div>
@@ -204,16 +234,16 @@
 
     <!-- Debug Result Drawer -->
     <el-drawer
-        v-model="debugDrawerVisible"
-        :close-on-press-escape="true"
-        direction="rtl"
-        size="60%"
-        title="ACM 调试运行结果（仅第一个测试点，不计入成绩）"
+      v-model="debugDrawerVisible"
+      :close-on-press-escape="true"
+      direction="rtl"
+      size="60%"
+      title="ACM 调试运行结果（仅第一个测试点，不计入成绩）"
     >
       <DebugResultPanel
-          v-if="debugDrawerVisible && debugRunId !== null"
-          :debug-run-id="debugRunId"
-          @close="debugDrawerVisible = false"
+        v-if="debugDrawerVisible && debugRunId !== null"
+        :debug-run-id="debugRunId"
+        @close="debugDrawerVisible = false"
       />
     </el-drawer>
 
@@ -221,7 +251,7 @@
     <transition name="el-fade-in">
       <div v-if="realtimeStatus === 'received' && realtimeResult" class="realtime-toast">
         <div class="toast-content">
-          <el-icon class="toast-icon"><CircleCheckFilled/></el-icon>
+          <el-icon class="toast-icon"><CircleCheckFilled /></el-icon>
           <div class="toast-text">
             <strong>判题完成：{{ realtimeResult.status }}</strong>
             <span>得分 {{ Number(realtimeResult.score ?? 0).toFixed(1) }}</span>
@@ -232,7 +262,7 @@
       </div>
       <div v-else-if="realtimeStatus === 'pending'" class="realtime-toast pending">
         <div class="toast-content">
-          <el-icon class="toast-icon is-loading"><Loading/></el-icon>
+          <el-icon class="toast-icon is-loading"><Loading /></el-icon>
           <div class="toast-text">
             <strong>判题中...</strong>
             <span>实时等待结果</span>
@@ -250,25 +280,37 @@ import type { SubmissionWS } from '@/utils/websocket'
 import type { SubmissionMessage } from '@/schemas/submission'
 import type { UploadFile, UploadFiles, TagProps } from 'element-plus'
 import { parseRouteId } from '@/utils/route'
-import {computed, inject, onBeforeUnmount, ref, watch} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {getProblemDetail, submitSolution} from '@/api/problem'
-import {debugSolution} from '@/api/debug'
-import {ElMessage} from 'element-plus'
-import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
-import {ArrowLeft, CircleCheckFilled, Loading, MagicStick, Monitor, Setting, Timer, UploadFilled} from '@element-plus/icons-vue'
-import {createSubmissionWS} from '@/utils/websocket'
-import {submissionMessageSchema} from '@/schemas/submission'
+import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getProblemDetail, submitSolution } from '@/api/problem'
+import { debugSolution } from '@/api/debug'
+import { ElMessage } from 'element-plus'
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
+import {
+  ArrowLeft,
+  CircleCheckFilled,
+  Loading,
+  MagicStick,
+  Monitor,
+  Setting,
+  Timer,
+  UploadFilled,
+} from '@element-plus/icons-vue'
+import { createSubmissionWS } from '@/utils/websocket'
+import { submissionMessageSchema } from '@/schemas/submission'
 import DebugResultPanel from '@/components/DebugResultPanel.vue'
 import SolutionPanel from '@/components/SolutionPanel.vue'
 import TagPanel from '@/components/TagPanel.vue'
 
 // 题面 Markdown 渲染（含 LaTeX / 代码高亮），统一从 utils/markdown 入口复用，避免各处独立初始化导致配置漂移
-import {renderMarkdown} from '@/utils/markdown'
+import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
-const setAnswerWorkspaceActive = inject<((active: boolean) => void) | null>('setAnswerWorkspaceActive', null)
+const setAnswerWorkspaceActive = inject<((active: boolean) => void) | null>(
+  'setAnswerWorkspaceActive',
+  null,
+)
 const problemId = computed(() => parseRouteId(route.params.id))
 let pageVersion = 0
 let disposed = false
@@ -276,7 +318,7 @@ const problemLoaded = ref(false)
 const isCurrentPage = (version: number) => !disposed && version === pageVersion
 const examId = computed(() => parseRouteId(route.query.exam_id))
 
-const emptyProblem = (): Omit<ProblemDetailResponse, 'id'> & {id: number | null} => ({
+const emptyProblem = (): Omit<ProblemDetailResponse, 'id'> & { id: number | null } => ({
   id: null,
   title: 'Loading...',
   content: '',
@@ -284,7 +326,7 @@ const emptyProblem = (): Omit<ProblemDetailResponse, 'id'> & {id: number | null}
   memory_limit: 0,
   type: '',
   language: '',
-  template_code: null
+  template_code: null,
 })
 const problem = ref(emptyProblem())
 
@@ -323,7 +365,9 @@ function startRealtimeWait(submissionId: number) {
       }
       realtimeResult.value = parsed.data
       realtimeStatus.value = 'received'
-      ElMessage.success(`判题完成：${parsed.data.status} (${(parsed.data.score ?? 0).toFixed(1)} 分)`)
+      ElMessage.success(
+        `判题完成：${parsed.data.status} (${(parsed.data.score ?? 0).toFixed(1)} 分)`,
+      )
     },
     onError: () => {
       if (!isCurrentPage(version)) return
@@ -344,7 +388,9 @@ function startRealtimeWait(submissionId: number) {
 
 // Editor Settings
 const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
-const fontFamily = ref(localStorage.getItem('editorFontFamily') || "'Fira Code', 'Courier New', monospace")
+const fontFamily = ref(
+  localStorage.getItem('editorFontFamily') || "'Fira Code', 'Courier New', monospace",
+)
 const fontLigatures = ref(localStorage.getItem('editorFontLigatures') !== 'false')
 
 const saveSettings = () => {
@@ -365,31 +411,35 @@ const isAcm = computed(() => {
   return problem.value.type && problem.value.type.toLowerCase() === 'acm'
 })
 
-watch(isKaggle, (isKaggleProblem) => {
-  setAnswerWorkspaceActive?.(!isKaggleProblem)
-}, {immediate: true})
+watch(
+  isKaggle,
+  (isKaggleProblem) => {
+    setAnswerWorkspaceActive?.(!isKaggleProblem)
+  },
+  { immediate: true },
+)
 
 const getTypeTag = (type: string) => {
   const map: Record<string, TagProps['type']> = {
-    'acm': 'primary',
-    'kaggle': 'success',
-    'oop': 'warning'
+    acm: 'primary',
+    kaggle: 'success',
+    oop: 'warning',
   }
   return map[type?.toLowerCase()] || 'info'
 }
 
 const getTypeDescription = (type: string) => {
   const map: Record<string, string> = {
-    'acm': '经典的算法竞赛模式，标准 I/O，严格文本比对。',
-    'kaggle': '数据科学竞赛模式，提交 CSV 预测结果，基于 Metric 评分。',
-    'oop': '面向对象编程模式，实现特定接口/类，运行单元测试。'
+    acm: '经典的算法竞赛模式，标准 I/O，严格文本比对。',
+    kaggle: '数据科学竞赛模式，提交 CSV 预测结果，基于 Metric 评分。',
+    oop: '面向对象编程模式，实现特定接口/类，运行单元测试。',
   }
   return map[type?.toLowerCase()] || '未知题目类型'
 }
 
 const editorOptions = computed<editor.IStandaloneEditorConstructionOptions>(() => ({
   automaticLayout: true,
-  minimap: {enabled: false},
+  minimap: { enabled: false },
   fontSize: fontSize.value,
   fontFamily: fontFamily.value,
   fontLigatures: fontLigatures.value,
@@ -404,23 +454,23 @@ const editorOptions = computed<editor.IStandaloneEditorConstructionOptions>(() =
 }))
 
 const allLanguageOptions = [
-  {label: 'Python', value: 'python'},
-  {label: 'C++', value: 'cpp'},
-  {label: 'C', value: 'c'},
-  {label: 'Java', value: 'java'}
+  { label: 'Python', value: 'python' },
+  { label: 'C++', value: 'cpp' },
+  { label: 'C', value: 'c' },
+  { label: 'Java', value: 'java' },
 ]
 
 const availableLanguageOptions = computed(() => {
   if (!problem.value.language) return allLanguageOptions
-  const allowed = problem.value.language.split(',').map(s => s.trim().toLowerCase())
-  return allLanguageOptions.filter(opt => allowed.includes(opt.value))
+  const allowed = problem.value.language.split(',').map((s) => s.trim().toLowerCase())
+  return allLanguageOptions.filter((opt) => allowed.includes(opt.value))
 })
 
 const templates: Record<string, string> = {
   python: 'import sys\nimport os\n',
   cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your code here\n    return 0;\n}',
   c: '#include <stdio.h>\n\nint main() {\n    // Write your code here\n    return 0;\n}',
-  java: 'import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}'
+  java: 'import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}',
 }
 
 // Set initial code
@@ -437,7 +487,8 @@ const renderedContent = computed(() => renderMarkdown(problem.value.content))
 
 const fetchProblem = async (version: number) => {
   try {
-    if (problemId.value === null || (route.query.exam_id != null && examId.value === null)) throw new Error('题目或考试 ID 无效')
+    if (problemId.value === null || (route.query.exam_id != null && examId.value === null))
+      throw new Error('题目或考试 ID 无效')
     const data = await getProblemDetail(problemId.value)
     if (!isCurrentPage(version)) return
     if (data) {
@@ -473,7 +524,7 @@ const handleSubmit = async () => {
       problem_id: problemId.value,
       code: code.value,
       language: language.value,
-      exam_id: examId.value || -1
+      exam_id: examId.value || -1,
     })
     if (!isCurrentPage(version)) return
     ElMessage.success('Submission received!')
@@ -511,7 +562,7 @@ const handleDebug = async () => {
       problem_id: problemId.value,
       code: code.value,
       language: language.value,
-      exam_id: examId.value || -1
+      exam_id: examId.value || -1,
     })
     if (!isCurrentPage(version)) return
     debugRunId.value = res.debug_run_id
@@ -572,22 +623,26 @@ const handleSubmitKaggle = async () => {
 }
 
 // 路由复用时清除旧题目状态，并使未完成的请求和订阅回调失效。
-watch(() => [problemId.value, examId.value], () => {
-  const version = ++pageVersion
-  clearRealtimeWS()
-  problemLoaded.value = false
-  problem.value = emptyProblem()
-  code.value = ''
-  selectedFile.value = null
-  fileList.value = []
-  submitting.value = false
-  debugging.value = false
-  debugRunId.value = null
-  debugDrawerVisible.value = false
-  realtimeResult.value = null
-  realtimeStatus.value = 'idle'
-  fetchProblem(version)
-}, {immediate: true})
+watch(
+  () => [problemId.value, examId.value],
+  () => {
+    const version = ++pageVersion
+    clearRealtimeWS()
+    problemLoaded.value = false
+    problem.value = emptyProblem()
+    code.value = ''
+    selectedFile.value = null
+    fileList.value = []
+    submitting.value = false
+    debugging.value = false
+    debugRunId.value = null
+    debugDrawerVisible.value = false
+    realtimeResult.value = null
+    realtimeStatus.value = 'idle'
+    fetchProblem(version)
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   disposed = true

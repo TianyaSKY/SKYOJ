@@ -8,19 +8,19 @@
     <div v-loading="loading" class="exam-list">
       <el-row :gutter="20">
         <el-col
-            v-for="exam in filteredExams"
-            :key="exam.id"
-            :lg="8"
-            :md="12"
-            :sm="12"
-            :xs="24"
-            class="exam-col"
+          v-for="exam in filteredExams"
+          :key="exam.id"
+          :lg="8"
+          :md="12"
+          :sm="12"
+          :xs="24"
+          class="exam-col"
         >
           <el-card
-              :body-style="{ padding: '0px' }"
-              class="exam-card"
-              shadow="hover"
-              @click="handleEnterExam(exam)"
+            :body-style="{ padding: '0px' }"
+            class="exam-card"
+            shadow="hover"
+            @click="handleEnterExam(exam)"
           >
             <div :class="['status-banner', getExamStatus(exam).type]">
               {{ getExamStatus(exam).text }}
@@ -32,51 +32,71 @@
               <div class="exam-meta">
                 <div class="meta-item">
                   <el-icon>
-                    <Calendar/>
+                    <Calendar />
                   </el-icon>
                   <span>开始: {{ formatTime(exam.start_time) }}</span>
                 </div>
                 <div class="meta-item">
                   <el-icon>
-                    <Timer/>
+                    <Timer />
                   </el-icon>
                   <span>结束: {{ formatTime(exam.end_time) }}</span>
                 </div>
                 <div class="meta-item duration">
                   <el-icon>
-                    <Clock/>
+                    <Clock />
                   </el-icon>
                   <span>时长: {{ getDuration(exam.start_time, exam.end_time) }}</span>
                 </div>
               </div>
 
               <div class="card-footer">
-                <el-button class="enter-btn" type="primary"
-                           :loading="entering && currentExamId === exam.id && !submittingPassword"
-                           :disabled="entering || passwordDialogVisible">进入考试</el-button>
+                <el-button
+                  class="enter-btn"
+                  type="primary"
+                  :loading="entering && currentExamId === exam.id && !submittingPassword"
+                  :disabled="entering || passwordDialogVisible"
+                  >进入考试</el-button
+                >
               </div>
             </div>
           </el-card>
         </el-col>
       </el-row>
 
-      <el-empty v-if="!loading && filteredExams.length === 0" description="暂无进行中或未开始的考试"/>
+      <el-empty
+        v-if="!loading && filteredExams.length === 0"
+        description="暂无进行中或未开始的考试"
+      />
     </div>
 
     <!-- Password Dialog -->
-    <el-dialog v-model="passwordDialogVisible" title="请输入考试密码" width="350px"
-               :before-close="handlePasswordClose" :show-close="!submittingPassword"
-               :close-on-click-modal="!submittingPassword" :close-on-press-escape="!submittingPassword">
+    <el-dialog
+      v-model="passwordDialogVisible"
+      title="请输入考试密码"
+      width="350px"
+      :before-close="handlePasswordClose"
+      :show-close="!submittingPassword"
+      :close-on-click-modal="!submittingPassword"
+      :close-on-press-escape="!submittingPassword"
+    >
       <el-input
-          v-model="passwordInput"
-          placeholder="请输入密码"
-          show-password
-          type="password"
-          @keyup.enter="handlePasswordSubmit"
+        v-model="passwordInput"
+        placeholder="请输入密码"
+        show-password
+        type="password"
+        @keyup.enter="handlePasswordSubmit"
       />
       <template #footer>
-        <el-button :disabled="submittingPassword" @click="passwordDialogVisible = false">取消</el-button>
-        <el-button :loading="submittingPassword" :disabled="submittingPassword" type="primary" @click="handlePasswordSubmit">
+        <el-button :disabled="submittingPassword" @click="passwordDialogVisible = false"
+          >取消</el-button
+        >
+        <el-button
+          :loading="submittingPassword"
+          :disabled="submittingPassword"
+          type="primary"
+          @click="handlePasswordSubmit"
+        >
           确认
         </el-button>
       </template>
@@ -85,15 +105,15 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ExamListResponse } from '@/types/exam'
 import { isRecord } from '@/types/http'
 import { errorMessage } from '@/utils/error'
-import {enterExam, getExamList} from '@/api/exam'
-import {useUserStore} from '@/stores/user'
-import {ElMessage} from 'element-plus'
-import {useRouter} from 'vue-router'
-import {Calendar, Clock, Timer} from '@element-plus/icons-vue'
+import { enterExam, getExamList } from '@/api/exam'
+import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { Calendar, Clock, Timer } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import { parseServerDate } from '@/utils/date'
 import { getExamTiming } from '@/utils/examTime'
@@ -130,17 +150,19 @@ const fetchExams = async () => {
 
 const getExamStatus = (exam: ExamListResponse) => {
   const phase = getExamTiming(exam, now.value).phase
-  return ({
-    upcoming: {text: '未开始', type: 'info'},
-    ongoing: {text: '进行中', type: 'success'},
-    ended: {text: '已结束', type: 'danger'},
-    unknown: {text: '时间无效', type: 'info'},
-  } as const)[phase]
+  return (
+    {
+      upcoming: { text: '未开始', type: 'info' },
+      ongoing: { text: '进行中', type: 'success' },
+      ended: { text: '已结束', type: 'danger' },
+      unknown: { text: '时间无效', type: 'info' },
+    } as const
+  )[phase]
 }
 
 const filteredExams = computed(() => {
   if (!allExams.value) return []
-  return allExams.value.filter(exam => {
+  return allExams.value.filter((exam) => {
     const status = getExamStatus(exam).text
     return status === '进行中' || status === '未开始'
   })
@@ -208,7 +230,8 @@ const handleEnterExam = async (exam: ExamListResponse) => {
 }
 
 const handlePasswordSubmit = async () => {
-  if (disposed || entering.value || !passwordDialogVisible.value || currentExamId.value == null) return
+  if (disposed || entering.value || !passwordDialogVisible.value || currentExamId.value == null)
+    return
   if (!passwordInput.value) {
     ElMessage.warning('请输入密码')
     return
@@ -216,7 +239,9 @@ const handlePasswordSubmit = async () => {
   await requestEntry(currentExamId.value, passwordInput.value, true)
 }
 
-onUnmounted(() => { disposed = true })
+onUnmounted(() => {
+  disposed = true
+})
 
 onMounted(() => {
   fetchExams()

@@ -4,23 +4,22 @@
       <div class="header-left">
         <h1 class="page-title">教师后台</h1>
         <p class="page-desc">集中管理题目、考试、提交记录与平台设置。</p>
-      <div class="header-actions">
-        <el-button type="primary" @click="router.push({name: 'problem-admin'})">管理题目</el-button>
-        <el-button @click="router.push({name: 'exam-admin'})">管理考试</el-button>
-      </div>
+        <div class="header-actions">
+          <el-button type="primary" @click="router.push({ name: 'problem-admin' })"
+            >管理题目</el-button
+          >
+          <el-button @click="router.push({ name: 'exam-admin' })">管理考试</el-button>
+        </div>
       </div>
     </div>
 
     <!-- Stats Overview -->
     <el-row :gutter="20" class="stats-row">
       <el-col v-for="(stat, index) in stats" :key="stat.label" :span="6">
-        <div
-            class="stat-card clickable-stat"
-            @click="handleStatClick(index)"
-        >
+        <div class="stat-card clickable-stat" @click="handleStatClick(index)">
           <div :style="{ color: stat.color, backgroundColor: stat.color + '15' }" class="stat-icon">
             <el-icon :size="24">
-              <component :is="stat.icon"/>
+              <component :is="stat.icon" />
             </el-icon>
           </div>
           <div class="stat-info">
@@ -36,15 +35,17 @@
       <!-- AI 草稿箱卡片 -->
       <el-col :lg="8" :md="8" :sm="12" :xs="24" class="mb-4">
         <div class="nav-card" @click="$router.push({ name: 'ai-draft-box' })">
-          <div class="nav-icon" style="color: #409EFF; background-color: #ecf5ff">
+          <div class="nav-icon" style="color: #409eff; background-color: #ecf5ff">
             <el-icon :size="32">
-              <Document/>
+              <Document />
             </el-icon>
           </div>
           <h3>AI 草稿箱</h3>
           <p>查看异步出题与测例生成任务进度，完成后可预览并应用结果。</p>
           <div class="nav-footer">
-            <span>进入草稿箱 <el-icon><ArrowRight/></el-icon></span>
+            <span
+              >进入草稿箱 <el-icon><ArrowRight /></el-icon
+            ></span>
           </div>
         </div>
       </el-col>
@@ -54,13 +55,15 @@
         <div class="nav-card" @click="router.push({ name: 'teacher-settings' })">
           <div class="nav-icon" style="color: #909399; background-color: #f4f4f5">
             <el-icon :size="32">
-              <Setting/>
+              <Setting />
             </el-icon>
           </div>
           <h3>系统设置</h3>
           <p>配置网站标题、公告、运行模式及 AI 智能体状态。</p>
           <div class="nav-footer">
-            <span>进入设置 <el-icon><ArrowRight/></el-icon></span>
+            <span
+              >进入设置 <el-icon><ArrowRight /></el-icon
+            ></span>
           </div>
         </div>
       </el-col>
@@ -70,13 +73,15 @@
         <div class="nav-card" @click="$router.push({ name: 'doc-teacher-manual' })">
           <div class="nav-icon" style="color: #7232dd; background-color: #f2edfe">
             <el-icon :size="32">
-              <Reading/>
+              <Reading />
             </el-icon>
           </div>
           <h3>教师手册</h3>
           <p>查看平台使用指南，了解如何高效管理题目、考试与提交记录。</p>
           <div class="nav-footer">
-            <span>立即查看 <el-icon><ArrowRight/></el-icon></span>
+            <span
+              >立即查看 <el-icon><ArrowRight /></el-icon
+            ></span>
           </div>
         </div>
       </el-col>
@@ -86,13 +91,15 @@
         <div class="nav-card" @click="$router.push({ name: 'teacher-analytics' })">
           <div class="nav-icon" style="color: #e6a23c; background-color: #fdf6ec">
             <el-icon :size="32">
-              <DataAnalysis/>
+              <DataAnalysis />
             </el-icon>
           </div>
           <h3>学情分析</h3>
           <p>全局通过率分布、题目难度热力图、提交趋势等教师决策数据。</p>
           <div class="nav-footer">
-            <span>进入分析 <el-icon><ArrowRight/></el-icon></span>
+            <span
+              >进入分析 <el-icon><ArrowRight /></el-icon
+            ></span>
           </div>
         </div>
       </el-col>
@@ -101,11 +108,13 @@
     <!-- User List Dialog -->
     <el-dialog v-model="userListVisible" title="所有用户" width="800px">
       <el-table v-loading="usersLoading" :data="users" stripe>
-        <el-table-column align="center" label="ID" prop="id" width="80"/>
+        <el-table-column align="center" label="ID" prop="id" width="80" />
         <el-table-column label="用户名" min-width="150" prop="username">
           <template #default="scope">
             <div class="user-cell">
-              <el-avatar :size="24" class="mr-2">{{ scope.row.username.charAt(0).toUpperCase() }}</el-avatar>
+              <el-avatar :size="24" class="mr-2">{{
+                scope.row.username.charAt(0).toUpperCase()
+              }}</el-avatar>
               <span>{{ scope.row.username }}</span>
             </div>
           </template>
@@ -119,30 +128,37 @@
         </el-table-column>
         <el-table-column align="center" label="操作" width="150">
           <template #default="scope">
-            <el-button link type="primary" @click="viewUserProfile(scope.row.id)">查看主页</el-button>
+            <el-button link type="primary" @click="viewUserProfile(scope.row.id)"
+              >查看主页</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
     </el-dialog>
 
     <!-- System Settings Dialog -->
-    <el-dialog v-model="sysDialogVisible" class="settings-dialog" title="系统全局配置" width="700px">
+    <el-dialog
+      v-model="sysDialogVisible"
+      class="settings-dialog"
+      title="系统全局配置"
+      width="700px"
+    >
       <el-tabs class="settings-tabs" type="border-card">
         <el-tab-pane label="基础设置">
           <el-form :model="sysForm" class="mt-4" label-position="top">
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="网站标题">
-                  <el-input v-model="sysForm.title" placeholder="例如: SKYOJ"/>
+                  <el-input v-model="sysForm.title" placeholder="例如: SKYOJ" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="运行模式">
                   <div class="mode-switches">
-                    <el-switch v-model="sysForm.practice" active-text="练习模式"/>
+                    <el-switch v-model="sysForm.practice" active-text="练习模式" />
                     <el-tooltip content="关闭后学生只能访问考试，无法自由练习" placement="top">
                       <el-icon class="info-icon">
-                        <InfoFilled/>
+                        <InfoFilled />
                       </el-icon>
                     </el-tooltip>
                   </div>
@@ -150,7 +166,12 @@
               </el-col>
             </el-row>
             <el-form-item label="公告内容">
-              <el-input v-model="sysForm.info" :rows="3" placeholder="顶部滚动显示的公告内容" type="textarea"/>
+              <el-input
+                v-model="sysForm.info"
+                :rows="3"
+                placeholder="顶部滚动显示的公告内容"
+                type="textarea"
+              />
             </el-form-item>
             <el-form-item label="公告样式">
               <el-radio-group v-model="sysForm.warning">
@@ -163,11 +184,15 @@
 
         <el-tab-pane label="AI 智能体 (LLM)">
           <el-alert
-              :title="llmEnv.ready ? 'LLM 环境变量已配置，可正常使用 AI 功能。' : 'LLM 环境变量未完整配置，AI 功能不可用。'"
-              :type="llmEnv.ready ? 'success' : 'warning'"
-              :closable="false"
-              class="mb-4"
-              show-icon
+            :title="
+              llmEnv.ready
+                ? 'LLM 环境变量已配置，可正常使用 AI 功能。'
+                : 'LLM 环境变量未完整配置，AI 功能不可用。'
+            "
+            :type="llmEnv.ready ? 'success' : 'warning'"
+            :closable="false"
+            class="mb-4"
+            show-icon
           />
           <el-descriptions :column="1" border>
             <el-descriptions-item label="配置来源">根目录 .env 环境变量</el-descriptions-item>
@@ -182,13 +207,14 @@
             </el-descriptions-item>
           </el-descriptions>
         </el-tab-pane>
-
       </el-tabs>
 
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="sysDialogVisible = false">取消</el-button>
-          <el-button :loading="sysSubmitting" type="primary" @click="handleSaveSysSettings">保存全局配置</el-button>
+          <el-button :loading="sysSubmitting" type="primary" @click="handleSaveSysSettings"
+            >保存全局配置</el-button
+          >
         </div>
       </template>
     </el-dialog>
@@ -196,14 +222,21 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue'
-import {useRouter} from 'vue-router'
-import {ArrowRight, DataAnalysis, Document, InfoFilled, Setting, Reading} from '@element-plus/icons-vue'
-import {getSysInfo, getSysStatistics, updateSysInfo} from '@/api/sys'
+import { onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  ArrowRight,
+  DataAnalysis,
+  Document,
+  InfoFilled,
+  Setting,
+  Reading,
+} from '@element-plus/icons-vue'
+import { getSysInfo, getSysStatistics, updateSysInfo } from '@/api/sys'
 import type { UserProfileResponse } from '@/types/user'
-import {getAllUsers} from '@/api/user'
-import {useSysStore} from '@/stores/sys'
-import {ElMessage} from 'element-plus'
+import { getAllUsers } from '@/api/user'
+import { useSysStore } from '@/stores/sys'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const sysStore = useSysStore()
@@ -213,23 +246,23 @@ const sysForm = ref({
   title: '',
   info: '',
   warning: false,
-  practice: true
+  practice: true,
 })
 const llmEnv = ref({
   ready: false,
   apiUrl: '',
-  modelName: ''
+  modelName: '',
 })
 
 const userListVisible = ref(false)
 const users = ref<UserProfileResponse[]>([])
 const usersLoading = ref(false)
 
-const stats = ref<Array<{label: string; value: string | number; icon: string; color: string}>>([
-  {label: '总题目数', value: '0', icon: 'Collection', color: '#409EFF'},
-  {label: '活跃考试', value: '0', icon: 'Timer', color: '#F56C6C'},
-  {label: '今日提交', value: '0', icon: 'Monitor', color: '#67C23A'},
-  {label: '总用户数', value: '0', icon: 'User', color: '#E6A23C'}
+const stats = ref<Array<{ label: string; value: string | number; icon: string; color: string }>>([
+  { label: '总题目数', value: '0', icon: 'Collection', color: '#409EFF' },
+  { label: '活跃考试', value: '0', icon: 'Timer', color: '#F56C6C' },
+  { label: '今日提交', value: '0', icon: 'Monitor', color: '#67C23A' },
+  { label: '总用户数', value: '0', icon: 'User', color: '#E6A23C' },
 ])
 
 const fetchStats = async () => {
@@ -292,12 +325,12 @@ const openSysSettings = async () => {
         title: res.title || 'SKYOJ',
         info: res.info || '',
         warning: res.warning === 'True' || res.warning === true,
-        practice: res.practice === 'True' || res.practice === true
+        practice: res.practice === 'True' || res.practice === true,
       }
       llmEnv.value = {
         ready: !!res.llm_env_ready,
         apiUrl: res.llm_api_url || '',
-        modelName: res.llm_model_name || ''
+        modelName: res.llm_model_name || '',
       }
     }
   } catch (error) {
@@ -338,7 +371,10 @@ onMounted(() => {
   margin-bottom: 40px;
 }
 
-.header-actions { display: flex; gap: 12px; }
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
 
 .page-title {
   font-size: 2.2rem;
@@ -510,5 +546,4 @@ onMounted(() => {
 .dialog-footer {
   padding-top: 10px;
 }
-
 </style>

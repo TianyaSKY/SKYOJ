@@ -19,10 +19,18 @@
             </div>
             <div class="exam-alert-text">
               <h3>考试模式进行中</h3>
-              <p>当前系统已进入考试状态，练习功能暂时关闭。请各位同学点击下方按钮进入考试中心参加考试。</p>
+              <p>
+                当前系统已进入考试状态，练习功能暂时关闭。请各位同学点击下方按钮进入考试中心参加考试。
+              </p>
             </div>
             <div class="exam-alert-action">
-              <el-button type="danger" size="large" @click="$router.push('/exam')" round class="exam-btn-glow">
+              <el-button
+                type="danger"
+                size="large"
+                @click="$router.push('/exam')"
+                round
+                class="exam-btn-glow"
+              >
                 进入考试中心 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
               </el-button>
             </div>
@@ -30,11 +38,16 @@
         </div>
 
         <div class="hero-actions" v-if="isPracticeMode || isTeacher">
-          <el-button class="action-btn primary-btn" round size="large" type="primary"
-                     @click="$router.push('/problems')">
+          <el-button
+            class="action-btn primary-btn"
+            round
+            size="large"
+            type="primary"
+            @click="$router.push('/problems')"
+          >
             开始编程
             <el-icon class="el-icon--right">
-              <ArrowRight/>
+              <ArrowRight />
             </el-icon>
           </el-button>
           <el-button class="action-btn" round size="large" @click="scrollToAbout">
@@ -74,35 +87,37 @@
         <el-col :md="12" :xs="24">
           <div class="about-content">
             <p class="about-text">
-              {{ sysStore.title }} 是一个专为学生、教育工作者和编程爱好者设计的现代化开源在线评测系统（Online Judge）。
+              {{ sysStore.title }}
+              是一个专为学生、教育工作者和编程爱好者设计的现代化开源在线评测系统（Online Judge）。
               它提供了一个强大的平台，用于练习算法、举办比赛以及分享编程知识。
             </p>
             <p class="about-text">
-              我们的使命是通过提供易于访问的工具和资源来普及计算机科学教育。
-              无论您是学习 Python 的初学者，还是解决复杂图论问题的专家，{{ sysStore.title }} 都能为您的学习之旅提供支持。
+              我们的使命是通过提供易于访问的工具和资源来普及计算机科学教育。 无论您是学习 Python
+              的初学者，还是解决复杂图论问题的专家，{{ sysStore.title }}
+              都能为您的学习之旅提供支持。
             </p>
             <div class="features-grid">
               <div class="feature-card">
                 <el-icon class="feature-icon">
-                  <Timer/>
+                  <Timer />
                 </el-icon>
                 <span>实时代码评测</span>
               </div>
               <div class="feature-card">
                 <el-icon class="feature-icon">
-                  <Monitor/>
+                  <Monitor />
                 </el-icon>
                 <span>多语言支持</span>
               </div>
               <div class="feature-card">
                 <el-icon class="feature-icon">
-                  <DataAnalysis/>
+                  <DataAnalysis />
                 </el-icon>
                 <span>Kaggle 模式</span>
               </div>
               <div class="feature-card">
                 <el-icon class="feature-icon">
-                  <MagicStick/>
+                  <MagicStick />
                 </el-icon>
                 <span>AI 辅助教学</span>
               </div>
@@ -140,15 +155,20 @@
       <el-row :gutter="30">
         <el-col v-for="mode in modes" :key="mode.title" :md="8" :xs="24" class="mb-4">
           <div class="mode-card-new" @click="$router.push(mode.route)">
-            <div :style="{ backgroundColor: mode.color + '15', color: mode.color }" class="mode-icon-wrapper">
+            <div
+              :style="{ backgroundColor: mode.color + '15', color: mode.color }"
+              class="mode-icon-wrapper"
+            >
               <el-icon :size="32">
-                <component :is="mode.icon"/>
+                <component :is="mode.icon" />
               </el-icon>
             </div>
             <h3>{{ mode.title }}</h3>
             <p class="mode-desc">{{ mode.description }}</p>
             <div class="mode-footer">
-              <span class="learn-more">了解详情 <el-icon><ArrowRight/></el-icon></span>
+              <span class="learn-more"
+                >了解详情 <el-icon><ArrowRight /></el-icon
+              ></span>
             </div>
           </div>
         </el-col>
@@ -162,10 +182,15 @@
         <p class="section-subtitle">连接全球最优秀的开发者社区与文档</p>
       </div>
       <div class="resources-grid">
-        <div v-for="resource in resources" :key="resource.name" class="resource-item" @click="openLink(resource.url)">
+        <div
+          v-for="resource in resources"
+          :key="resource.name"
+          class="resource-item"
+          @click="openLink(resource.url)"
+        >
           <div :style="{ color: resource.color }" class="resource-icon-box">
             <el-icon :size="28">
-              <component :is="resource.icon"/>
+              <component :is="resource.icon" />
             </el-icon>
           </div>
           <div class="resource-info">
@@ -179,10 +204,10 @@
 </template>
 
 <script setup lang="ts">
-import {computed} from 'vue'
-import {ArrowRight, DataAnalysis, MagicStick, Monitor, Timer} from '@element-plus/icons-vue'
-import {useSysStore} from '@/stores/sys'
-import {useUserStore} from '@/stores/user'
+import { computed } from 'vue'
+import { ArrowRight, DataAnalysis, MagicStick, Monitor, Timer } from '@element-plus/icons-vue'
+import { useSysStore } from '@/stores/sys'
+import { useUserStore } from '@/stores/user'
 
 const sysStore = useSysStore()
 const userStore = useUserStore()
@@ -196,57 +221,57 @@ const resources = [
     description: '全球最大的代码托管平台。',
     url: 'https://github.com',
     icon: 'Share',
-    color: '#333'
+    color: '#333',
   },
   {
     name: 'Stack Overflow',
     description: '开发者问答社区。',
     url: 'https://stackoverflow.com',
     icon: 'ChatLineSquare',
-    color: '#f48024'
+    color: '#f48024',
   },
   {
     name: 'MDN Web Docs',
     description: 'Web 开发权威文档。',
     url: 'https://developer.mozilla.org',
     icon: 'Reading',
-    color: '#000'
+    color: '#000',
   },
   {
     name: 'OI Wiki',
     description: '免费的编程竞赛知识库。',
     url: 'https://oi-wiki.org/',
     icon: 'DataLine',
-    color: '#0052cc'
+    color: '#0052cc',
   },
   {
     name: 'Python 文档',
     description: 'Python 官方文档。',
     url: 'https://docs.python.org/zh-cn/3/',
     icon: 'Link',
-    color: '#3776ab'
+    color: '#3776ab',
   },
   {
     name: 'CppReference',
     description: 'C++ 标准库参考手册。',
     url: 'https://zh.cppreference.com/',
     icon: 'Link',
-    color: '#004482'
+    color: '#004482',
   },
   {
     name: 'Hugging Face',
     description: '构建未来的 AI 社区。',
     url: 'https://huggingface.co/',
     icon: 'MagicStick',
-    color: '#FFD21E'
+    color: '#FFD21E',
   },
   {
     name: 'Kaggle',
     description: '数据科学与机器学习之家。',
     url: 'https://www.kaggle.com/',
     icon: 'DataAnalysis',
-    color: '#20BEFF'
-  }
+    color: '#20BEFF',
+  },
 ]
 
 const modes = [
@@ -260,8 +285,8 @@ const modes = [
       '标准输入输出 (stdin/stdout)',
       '严格的时间与内存限制',
       '即时评测反馈 (AC/WA/TLE)',
-      '支持多种编程语言'
-    ]
+      '支持多种编程语言',
+    ],
   },
   {
     title: 'Kaggle 模式',
@@ -273,8 +298,8 @@ const modes = [
       '基于 CSV 文件的预测提交',
       '大数据集处理与分析',
       '模型准确率评分',
-      '适合 AI 与数据挖掘任务'
-    ]
+      '适合 AI 与数据挖掘任务',
+    ],
   },
   {
     title: 'OOP 模式',
@@ -286,13 +311,13 @@ const modes = [
       '实现特定的类与接口',
       '单元测试覆盖',
       '代码结构与设计模式',
-      '适合 Java/C++ 工程实践'
-    ]
-  }
+      '适合 Java/C++ 工程实践',
+    ],
+  },
 ]
 
 const scrollToAbout = () => {
-  document.getElementById('about-section')?.scrollIntoView({behavior: 'smooth'})
+  document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' })
 }
 
 const openLink = (url: string) => {
@@ -474,15 +499,27 @@ const openLink = (url: string) => {
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 @keyframes glow {
-  0% { box-shadow: 0 0 5px rgba(245, 108, 108, 0.4); }
-  50% { box-shadow: 0 0 20px rgba(245, 108, 108, 0.6); }
-  100% { box-shadow: 0 0 5px rgba(245, 108, 108, 0.4); }
+  0% {
+    box-shadow: 0 0 5px rgba(245, 108, 108, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 108, 108, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(245, 108, 108, 0.4);
+  }
 }
 
 /* Stats Section */

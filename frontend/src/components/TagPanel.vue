@@ -16,12 +16,12 @@ import { errorMessage } from '@/utils/error'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
-  problemId: { type: Number, required: true }
+  problemId: { type: Number, required: true },
 })
 
 const loading = ref(false)
-const attached = ref<TagResponse[]>([])        // 当前题目已贴标签
-const all = ref<TagResponse[]>([])              // 全站标签
+const attached = ref<TagResponse[]>([]) // 当前题目已贴标签
+const all = ref<TagResponse[]>([]) // 全站标签
 const attachDialogVisible = ref(false)
 const selectedTagId = ref<number | null>(null)
 const submittingAttach = ref(false)
@@ -36,16 +36,13 @@ const isCurrentAttach = (scope: number, version: number) =>
 const userStore = useUserStore()
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
 
-async function load () {
+async function load() {
   const scope = scopeVersion
   const requestId = ++loadVersion
   const isCurrent = () => isCurrentScope(scope) && requestId === loadVersion
   loading.value = true
   try {
-    const [a, b] = await Promise.all([
-      getProblemTags(props.problemId),
-      getTags()
-    ])
+    const [a, b] = await Promise.all([getProblemTags(props.problemId), getTags()])
     if (!isCurrent()) return
     attached.value = a || []
     all.value = b || []
@@ -56,30 +53,41 @@ async function load () {
   }
 }
 
-watch(() => props.problemId, () => {
+watch(
+  () => props.problemId,
+  () => {
+    scopeVersion += 1
+    attached.value = []
+    all.value = []
+    selectedTagId.value = null
+    attachDialogVisible.value = false
+    load()
+  },
+  { immediate: true },
+)
+watch(
+  attachDialogVisible,
+  (visible) => {
+    if (!visible) {
+      attachVersion += 1
+      submittingAttach.value = false
+    }
+  },
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => {
+  disposed = true
   scopeVersion += 1
-  attached.value = []
-  all.value = []
-  selectedTagId.value = null
-  attachDialogVisible.value = false
-  load()
-}, { immediate: true })
-watch(attachDialogVisible, visible => {
-  if (!visible) {
-    attachVersion += 1
-    submittingAttach.value = false
-  }
-}, { flush: 'sync' })
-onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
+})
 
-function openAttach () {
+function openAttach() {
   attachVersion += 1
   submittingAttach.value = false
   selectedTagId.value = null
   attachDialogVisible.value = true
 }
 
-async function confirmAttach () {
+async function confirmAttach() {
   if (!attachDialogVisible.value || submittingAttach.value) return
   const scope = scopeVersion
   const version = attachVersion
@@ -105,7 +113,7 @@ async function confirmAttach () {
   }
 }
 
-async function detach (tag: TagResponse) {
+async function detach(tag: TagResponse) {
   const scope = scopeVersion
   const problemId = props.problemId
   try {
@@ -147,7 +155,7 @@ async function detach (tag: TagResponse) {
         <el-form-item label="选择标签">
           <el-select v-model="selectedTagId" placeholder="搜索标签" filterable style="width: 100%">
             <el-option
-              v-for="t in all.filter(x => !attached.find(a => a.id === x.id))"
+              v-for="t in all.filter((x) => !attached.find((a) => a.id === x.id))"
               :key="t.id"
               :label="t.name + (t.category ? ` (${t.category})` : '')"
               :value="t.id"
@@ -157,7 +165,13 @@ async function detach (tag: TagResponse) {
       </el-form>
       <template #footer>
         <el-button @click="attachDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submittingAttach" :disabled="submittingAttach" @click="confirmAttach">提交</el-button>
+        <el-button
+          type="primary"
+          :loading="submittingAttach"
+          :disabled="submittingAttach"
+          @click="confirmAttach"
+          >提交</el-button
+        >
       </template>
     </el-dialog>
   </div>

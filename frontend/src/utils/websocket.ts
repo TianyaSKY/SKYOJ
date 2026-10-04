@@ -38,12 +38,11 @@ const RECONNECT_INITIAL_DELAY_MS = 1000
 const RECONNECT_MAX_DELAY_MS = 30000
 const TERMINAL_CLOSE_CODES = new Set([1000, 1001, 1008, 4001, 4003, 4004])
 
-export function createSubmissionWS(submissionId: number, token: string, {
-  onMessage,
-  onError,
-  onClose,
-  onReconnect,
-}: SubmissionWSOptions = {}): SubmissionWS {
+export function createSubmissionWS(
+  submissionId: number,
+  token: string,
+  { onMessage, onError, onClose, onReconnect }: SubmissionWSOptions = {},
+): SubmissionWS {
   let ws: WebSocket | null = null
   let closed = false
   let reconnectAttempt = 0
@@ -67,7 +66,7 @@ export function createSubmissionWS(submissionId: number, token: string, {
     if (closed || reconnectTimer !== null) return
     const delay = Math.min(
       RECONNECT_MAX_DELAY_MS,
-      RECONNECT_INITIAL_DELAY_MS * 2 ** reconnectAttempt
+      RECONNECT_INITIAL_DELAY_MS * 2 ** reconnectAttempt,
     )
     reconnectAttempt += 1
     reconnectTimer = setTimeout(() => {
