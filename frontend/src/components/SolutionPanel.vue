@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * 题解面板：嵌入 ProblemDetailView 的题解 Tab。
  *
@@ -15,6 +15,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled, ChatDotRound, Edit, Hide, EditPen, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import type { SolutionListItemResponse, SolutionListResponse, CommentResponse, CommentListResponse, ToggleLikeResponse, ToggleFavoriteResponse } from '@/types/community'
+import { errorMessage } from '@/utils/error'
 import { formatServerDateTime, formatServerDate } from '@/utils/date'
 import { useUserStore } from '@/stores/user'
 import { solutionFormSchema, commentFormSchema } from '@/schemas/community'
@@ -27,10 +29,11 @@ const props = defineProps({
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
 const loading = ref(false)
-const solutions = ref([])
-const pendingLikes = ref(new Set())
-const pendingFavorites = ref(new Set())
-const reactionUpdates = new Map()
+const solutions = ref<SolutionListItemResponse[]>([])
+const pendingLikes = ref(new Set<number>())
+const pendingFavorites = ref(new Set<number>())
+type ReactionValues = Partial<Pick<SolutionListItemResponse, 'vote_count' | 'liked_by_me' | 'favorited_by_me'>>
+const reactionUpdates = new Map<number, Partial<Record<'like' | 'favorite', {version: number; values: ReactionValues}>>>()
 let reactionVersion = 0
 const total = ref(0)
 const page = ref(1)
@@ -39,12 +42,12 @@ const pageSize = 20
 const writeDialogVisible = ref(false)
 const savingSolution = ref(false)
 let writeVersion = 0
-const editing = ref(null)  // null 表示新建；非空表示编辑
+const editing = ref<SolutionListItemResponse | null>(null)  // null 表示新建；非空表示编辑
 const form = ref({ title: '', content: '', language: '' })
 
 const commentsDialog = ref(false)
-const currentSolution = ref(null)
-const comments = ref([])
+const currentSolution = ref<SolutionListItemResponse | null>(null)
+const comments = ref<CommentResponse[]>([])
 const commentsTotal = ref(0)
 const commentsPage = ref(1)
 const commentsPageSize = 50
@@ -56,24 +59,24 @@ let loadVersion = 0
 let commentsVersion = 0
 let commentRequestVersion = 0
 let disposed = false
-const isCurrentScope = version => !disposed && version === scopeVersion
-const isCurrentWrite = (scope, version) =>
+const isCurrentScope = (version: number) => !disposed && version === scopeVersion
+const isCurrentWrite = (scope: number, version: number) =>
   isCurrentScope(scope) && version === writeVersion && writeDialogVisible.value
-const isCurrentComments = (scope, version, item) =>
+const isCurrentComments = (scope: number, version: number, item: SolutionListItemResponse) =>
   isCurrentScope(scope) && version === commentsVersion && commentsDialog.value && currentSolution.value === item
 
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.user || {})
 const isTeacher = computed(() => userInfo.value.role === 'teacher')
 
-async function load (pageNo = page.value) {
+async function load (pageNo = page.value): Promise<void> {
   const scope = scopeVersion
   const requestId = ++loadVersion
   const initialReactionVersion = reactionVersion
   const isCurrent = () => isCurrentScope(scope) && requestId === loadVersion
   loading.value = true
   try {
-    const resp = await request({
+    const resp = await request<SolutionListResponse>({
       url: `/problems/${props.problemId}/solutions`,
       method: 'get',
       params: { page: pageNo, page_size: pageSize }
@@ -91,7 +94,7 @@ async function load (pageNo = page.value) {
     })
     total.value = resp.total || 0
   } catch (e) {
-    if (isCurrent()) ElMessage.error('加载题解失败：' + (e.message || '未知错误'))
+    if (isCurrent()) ElMessage.error('加载题解失败：' + (errorMessage(e, '未知错误')))
   } finally {
     if (isCurrent()) loading.value = false
   }
@@ -140,12 +143,12 @@ watch(writeDialogVisible, visible => {
 }, { flush: 'sync' })
 onBeforeUnmount(() => { disposed = true; scopeVersion += 1 })
 
-function renderMarkdown (text) {
+function renderMarkdown (text: string) {
   if (!text) return ''
   return md.render(text)
 }
 
-function openWrite (item = null) {
+function openWrite (item: SolutionListItemResponse | null = null) {
   writeVersion += 1
   savingSolution.value = false
   editing.value = item
@@ -180,13 +183,13 @@ async function submitSolution () {
     ElMessage.success(editingId ? '题解已更新' : '题解已发布')
     writeDialogVisible.value = false
   } catch (e) {
-    if (isCurrentWrite(scope, version)) ElMessage.error(e.message || '操作失败')
+    if (isCurrentWrite(scope, version)) ElMessage.error(errorMessage(e, '操作失败'))
   } finally {
     if (isCurrentWrite(scope, version)) savingSolution.value = false
   }
 }
 
-function applyReactionResult (item, kind, values) {
+function applyReactionResult (item: SolutionListItemResponse, kind: 'like' | 'favorite', values: ReactionValues) {
   const updates = reactionUpdates.get(item.id) || {}
   updates[kind] = { version: ++reactionVersion, values }
   reactionUpdates.set(item.id, updates)
@@ -196,43 +199,43 @@ function applyReactionResult (item, kind, values) {
   if (current) Object.assign(current, values)
 }
 
-async function toggleLike (item) {
+async function toggleLike (item: SolutionListItemResponse) {
   if (pendingLikes.value.has(item.id)) return
   const scope = scopeVersion
   pendingLikes.value.add(item.id)
   try {
-    const resp = await request({
+    const resp = await request<ToggleLikeResponse>({
       url: `/problems/solutions/${item.id}/like`,
       method: 'post'
     })
     if (!isCurrentScope(scope)) return
     applyReactionResult(item, 'like', { vote_count: resp.vote_count, liked_by_me: resp.liked })
   } catch (e) {
-    if (isCurrentScope(scope)) ElMessage.error(e.message || '点赞失败')
+    if (isCurrentScope(scope)) ElMessage.error(errorMessage(e, '点赞失败'))
   } finally {
     if (isCurrentScope(scope)) pendingLikes.value.delete(item.id)
   }
 }
 
-async function toggleFavorite (item) {
+async function toggleFavorite (item: SolutionListItemResponse) {
   if (pendingFavorites.value.has(item.id)) return
   const scope = scopeVersion
   pendingFavorites.value.add(item.id)
   try {
-    const resp = await request({
+    const resp = await request<ToggleFavoriteResponse>({
       url: `/problems/solutions/${item.id}/favorite`,
       method: 'post'
     })
     if (!isCurrentScope(scope)) return
     applyReactionResult(item, 'favorite', { favorited_by_me: resp.favorited })
   } catch (e) {
-    if (isCurrentScope(scope)) ElMessage.error(e.message || '收藏失败')
+    if (isCurrentScope(scope)) ElMessage.error(errorMessage(e, '收藏失败'))
   } finally {
     if (isCurrentScope(scope)) pendingFavorites.value.delete(item.id)
   }
 }
 
-async function hideSolution (item) {
+async function hideSolution (item: SolutionListItemResponse) {
   const scope = scopeVersion
   try {
     await ElMessageBox.confirm('确定要隐藏该题解吗？隐藏后仅你自己与教师可见。', '确认隐藏', { type: 'warning' })
@@ -242,13 +245,13 @@ async function hideSolution (item) {
     ElMessage.success('已隐藏')
     load()
   } catch (e) {
-    if (isCurrentScope(scope) && e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(e.message || '隐藏失败')
+    if (isCurrentScope(scope) && e !== 'cancel' && errorMessage(e, '') !== 'cancel') {
+      ElMessage.error(errorMessage(e, '隐藏失败'))
     }
   }
 }
 
-async function openComments (item) {
+async function openComments (item: SolutionListItemResponse) {
   commentsVersion += 1
   submittingComment.value = false
   currentSolution.value = item
@@ -261,7 +264,7 @@ async function openComments (item) {
   await loadComments()
 }
 
-async function loadComments (pageNo = commentsPage.value, latest = false) {
+async function loadComments (pageNo = commentsPage.value, latest = false): Promise<void> {
   const item = currentSolution.value
   if (!item) return
   const scope = scopeVersion, version = commentsVersion
@@ -269,7 +272,7 @@ async function loadComments (pageNo = commentsPage.value, latest = false) {
   const isCurrent = () => isCurrentComments(scope, version, item) && requestId === commentRequestVersion
   loadingComments.value = true
   try {
-    const resp = await request({
+    const resp = await request<CommentListResponse>({
       url: `/problems/solutions/${item.id}/comments`,
       method: 'get',
       params: { page: pageNo, page_size: commentsPageSize }
@@ -283,7 +286,7 @@ async function loadComments (pageNo = commentsPage.value, latest = false) {
     comments.value = resp.items || []
     commentsTotal.value = resp.total || 0
   } catch (e) {
-    if (isCurrent()) ElMessage.error(e.message || '加载评论失败')
+    if (isCurrent()) ElMessage.error(errorMessage(e, '加载评论失败'))
   } finally {
     if (isCurrent()) loadingComments.value = false
   }
@@ -314,13 +317,13 @@ async function submitComment () {
     const estimatedLastPage = Math.max(1, Math.ceil((commentsTotal.value + 1) / commentsPageSize))
     await loadComments(estimatedLastPage, true)
   } catch (e) {
-    if (isCurrentComments(scope, version, item)) ElMessage.error(e.message || '评论失败')
+    if (isCurrentComments(scope, version, item)) ElMessage.error(errorMessage(e, '评论失败'))
   } finally {
     if (isCurrentComments(scope, version, item)) submittingComment.value = false
   }
 }
 
-async function deleteComment (commentId) {
+async function deleteComment (commentId: number) {
   const item = currentSolution.value
   if (!item) return
   const scope = scopeVersion, version = commentsVersion
@@ -334,8 +337,8 @@ async function deleteComment (commentId) {
     ElMessage.success('已删除')
     await loadComments()
   } catch (e) {
-    if (isCurrentComments(scope, version, item) && e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(e.message || '删除失败')
+    if (isCurrentComments(scope, version, item) && e !== 'cancel' && errorMessage(e, '') !== 'cancel') {
+      ElMessage.error(errorMessage(e, '删除失败'))
     }
   }
 }

@@ -51,8 +51,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onBeforeUnmount, ref, watch} from 'vue'
+import type { DebugRunResponse } from '@/types/debug'
 import {getDebugRun} from '@/api/debug'
 import {ElMessage} from 'element-plus'
 
@@ -63,10 +64,10 @@ const props = defineProps({
   }
 })
 
-const detail = ref(null)
+const detail = ref<DebugRunResponse | null>(null)
 const loading = ref(false)
-let timer = null
-let timeoutTimer = null
+let timer: ReturnType<typeof setTimeout> | null = null
+let timeoutTimer: ReturnType<typeof setTimeout> | null = null
 let generation = 0
 let disposed = false
 const MAX_POLL_DURATION_MS = 180000  // 每次运行最多等待三分钟

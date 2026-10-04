@@ -45,7 +45,7 @@
   </el-menu>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {useUserStore} from '@/stores/user'
@@ -62,12 +62,12 @@ const activeIndex = computed(() => route.path)
 const isLoggedIn = computed(() => !!userStore.token)
 const username = computed(() => userStore.user?.username || 'User')
 const isTeacher = computed(() => userStore.user?.role === 'teacher')
-const isPracticeMode = computed(() => sysStore.practice !== false && sysStore.practice !== 'False')
+const isPracticeMode = computed(() => ![false, 'False'].includes(sysStore.practice))
 
 // If backend provides avatar URL, use it; otherwise empty string to trigger slot content
 const userAvatar = computed(() => userStore.user?.avatar ? `/api${userStore.user?.avatar}` : '')
 
-const handleCommand = (command) => {
+const handleCommand = (command: string) => {
   if (command === 'logout') {
     userStore.logout()
     router.push('/login')

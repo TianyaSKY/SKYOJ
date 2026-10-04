@@ -30,18 +30,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed} from 'vue'
 import { parseServerDate } from '@/utils/date'
 
-const props = defineProps({
-  submissions: {
-    type: Array,
-    required: true
-  }
-})
+interface ActivityDay { date: string; count: number }
+const props = defineProps<{ submissions: Array<{ created_at: string | null }> }>()
 
-const dateKey = date =>
+const dateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
 const activity = computed(() => {
@@ -52,7 +48,7 @@ const activity = computed(() => {
   // 闰年的 2 月 29 日对应上一年的 2 月最后一天。
   if (start.getMonth() !== end.getMonth()) start.setDate(0)
   const firstDate = dateKey(start), lastDate = dateKey(end)
-  const counts = new Map()
+  const counts = new Map<string, number>()
   let total = 0
   for (const submission of props.submissions) {
     const date = parseServerDate(submission.created_at)
@@ -65,7 +61,7 @@ const activity = computed(() => {
 
   const current = new Date(start)
   current.setDate(current.getDate() - current.getDay())
-  const weeks = []
+  const weeks: ActivityDay[][] = []
   let dayIndex = 0
   // 每次递增日历日期，用序号分周，不依赖夏令时下每天的毫秒数。
   while (current <= end || current.getDay() !== 0) {
@@ -82,7 +78,7 @@ const activity = computed(() => {
 const totalSubmissions = computed(() => activity.value.total)
 const weeks = computed(() => activity.value.weeks)
 
-const getColorClass = (count) => {
+const getColorClass = (count: number) => {
   if (count === 0) return 'level-0'
   if (count <= 2) return 'level-1'
   if (count <= 5) return 'level-2'
@@ -90,7 +86,7 @@ const getColorClass = (count) => {
   return 'level-4'
 }
 
-const formatTitle = (day) => {
+const formatTitle = (day: ActivityDay) => {
   return `${day.count} submissions on ${day.date}`
 }
 </script>

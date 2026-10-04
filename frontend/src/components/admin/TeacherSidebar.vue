@@ -18,7 +18,7 @@
   </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {useRoute} from 'vue-router'
 import {Collection, FolderOpened, Monitor, Odometer, Reading, School, Search, Setting, Timer} from '@element-plus/icons-vue'
 import {ENABLE_PLAGIARISM} from '@/utils/featureFlags'

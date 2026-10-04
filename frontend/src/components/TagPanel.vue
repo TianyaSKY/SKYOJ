@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * 题目标签面板：在题目标题下展示当前题目的标签，
  * 教师可挂 / 摘标签；普通用户可建议。
@@ -11,6 +11,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import type { TagResponse } from '@/types/community'
+import { errorMessage } from '@/utils/error'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
@@ -18,17 +20,17 @@ const props = defineProps({
 })
 
 const loading = ref(false)
-const attached = ref([])        // 当前题目已贴标签
-const all = ref([])              // 全站标签
+const attached = ref<TagResponse[]>([])        // 当前题目已贴标签
+const all = ref<TagResponse[]>([])              // 全站标签
 const attachDialogVisible = ref(false)
-const selectedTagId = ref(null)
+const selectedTagId = ref<number | null>(null)
 const submittingAttach = ref(false)
 let attachVersion = 0
 let scopeVersion = 0
 let loadVersion = 0
 let disposed = false
-const isCurrentScope = version => !disposed && version === scopeVersion
-const isCurrentAttach = (scope, version) =>
+const isCurrentScope = (version: number) => !disposed && version === scopeVersion
+const isCurrentAttach = (scope: number, version: number) =>
   isCurrentScope(scope) && version === attachVersion && attachDialogVisible.value
 
 const userStore = useUserStore()
@@ -41,14 +43,14 @@ async function load () {
   loading.value = true
   try {
     const [a, b] = await Promise.all([
-      request({ url: `/tags/problems/${props.problemId}`, method: 'get' }),
-      request({ url: `/tags`, method: 'get' })
+      request<TagResponse[]>({ url: `/tags/problems/${props.problemId}`, method: 'get' }),
+      request<TagResponse[]>({ url: `/tags`, method: 'get' })
     ])
     if (!isCurrent()) return
     attached.value = a || []
     all.value = b || []
   } catch (e) {
-    if (isCurrent()) ElMessage.error(e.message || '加载标签失败')
+    if (isCurrent()) ElMessage.error(errorMessage(e, '加载标签失败'))
   } finally {
     if (isCurrent()) loading.value = false
   }
@@ -101,13 +103,13 @@ async function confirmAttach () {
     ElMessage.success(approved ? '标签已挂上' : '已提交建议，等待教师审核')
     attachDialogVisible.value = false
   } catch (e) {
-    if (isCurrentAttach(scope, version)) ElMessage.error(e.message || '操作失败')
+    if (isCurrentAttach(scope, version)) ElMessage.error(errorMessage(e, '操作失败'))
   } finally {
     if (isCurrentAttach(scope, version)) submittingAttach.value = false
   }
 }
 
-async function detach (tag) {
+async function detach (tag: TagResponse) {
   const scope = scopeVersion
   const problemId = props.problemId
   try {
@@ -121,8 +123,8 @@ async function detach (tag) {
     ElMessage.success('已移除')
     load()
   } catch (e) {
-    if (isCurrentScope(scope) && e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(e.message || '移除失败')
+    if (isCurrentScope(scope) && e !== 'cancel' && errorMessage(e, '') !== 'cancel') {
+      ElMessage.error(errorMessage(e, '移除失败'))
     }
   }
 }

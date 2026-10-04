@@ -12,7 +12,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onMounted, provide, ref} from 'vue'
 import {useRoute} from 'vue-router'
 import NavBar from './NavBar.vue'
@@ -26,7 +26,7 @@ const userStore = useUserStore()
 const isTeacherAdmin = computed(() => userStore.user?.role === 'teacher' && (route.path.startsWith('/admin') || route.path === '/docs/teacher-manual'))
 const answerWorkspaceActive = ref(false)
 
-provide('setAnswerWorkspaceActive', (active) => {
+provide('setAnswerWorkspaceActive', (active: boolean) => {
   answerWorkspaceActive.value = active
 })
 

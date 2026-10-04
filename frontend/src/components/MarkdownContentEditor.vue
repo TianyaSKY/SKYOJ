@@ -32,7 +32,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, ref} from 'vue'
 import md from '@/utils/markdown'
 
@@ -61,11 +61,11 @@ const props = defineProps({
   defaultMode: {
     type: String,
     default: 'edit',
-    validator: (v) => ['edit', 'preview', 'split'].includes(v),
+    validator: (v: string) => ['edit', 'preview', 'split'].includes(v),
   },
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const mode = ref(
     ['edit', 'preview', 'split'].includes(props.defaultMode)
@@ -91,7 +91,7 @@ const renderedHtml = computed(() => {
   }
 })
 
-const onInput = (value) => {
+const onInput = (value: string) => {
   if (props.readonly) return
   emit('update:modelValue', value)
 }
