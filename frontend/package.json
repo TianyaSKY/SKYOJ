@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "format": "prettier --write --experimental-cli src/",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "type-check": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.vitest.json && tsc --noEmit -p tsconfig.node.json",
+    "test:unit:coverage": "vitest run --coverage",
+    "check": "npm run type-check && npm run test:unit && npm run build"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -32,13 +35,18 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@types/katex": "^0.16.8",
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^24.19.1",
     "@vitejs/plugin-vue": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.11",
     "@vue/test-utils": "^2.4.11",
     "happy-dom": "^20.11.6",
     "prettier": "3.6.2",
+    "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vite-plugin-vue-devtools": "^8.0.5",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "vue-tsc": "^3.3.12"
   }
 }

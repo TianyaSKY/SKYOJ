@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": [
+      "vite/client",
+      "vitest/globals",
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*",
+    "e2e/fixtures/**/*"
+  ],
+  "exclude": []
+}
