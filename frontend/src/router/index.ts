@@ -179,9 +179,9 @@ router.beforeEach(async (to, from, next) => {
         await sysStore.fetchSysInfo()
     }
 
-    const user = userStore.user || {}
-    const isTeacher = user.role === 'teacher'
-    const isPracticeMode = sysStore.practice !== false && sysStore.practice !== 'False'
+    const user = userStore.user
+    const isTeacher = user?.role === 'teacher'
+    const isPracticeMode = ![false, 'False'].includes(sysStore.practice)
 
     // 先处理身份校验，再应用练习/考试模式，避免未登录请求绕到首页。
     if (to.meta.requiresAuth && !token) {
@@ -194,7 +194,7 @@ router.beforeEach(async (to, from, next) => {
         return
     }
 
-    if (isTeacher && ['problems', 'datasets', 'exam', 'exam-detail', 'exam-rank'].includes(to.name)) {
+    if (isTeacher && ['problems', 'datasets', 'exam', 'exam-detail', 'exam-rank'].includes(typeof to.name === 'string' ? to.name : '')) {
         next({name: to.name === 'datasets' ? 'dataset-admin' : 'teacher-dashboard'})
         return
     }
@@ -205,7 +205,7 @@ router.beforeEach(async (to, from, next) => {
         if (!isTeacher) {
             // Restrict access to specific practice-related routes
             const restrictedRoutes = ['problems', 'datasets']
-            if (restrictedRoutes.includes(to.name)) {
+            if (restrictedRoutes.includes(typeof to.name === 'string' ? to.name : '')) {
                 next({name: 'exam'})
                 return
             }
@@ -221,7 +221,7 @@ router.beforeEach(async (to, from, next) => {
         if (!isTeacher) {
             // Restrict access to exam-related routes
             const examRoutes = ['exam', 'exam-detail', 'exam-rank']
-            if (examRoutes.includes(to.name)) {
+            if (examRoutes.includes(typeof to.name === 'string' ? to.name : '')) {
                 next({name: 'home'})
                 return
             }
@@ -230,7 +230,7 @@ router.beforeEach(async (to, from, next) => {
 
     // Check role permission
     if (to.meta.role) {
-        if (user.role !== to.meta.role) {
+        if (user?.role !== to.meta.role) {
             next({name: 'home'})
             return
         }

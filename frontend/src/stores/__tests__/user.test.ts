@@ -30,7 +30,7 @@ describe('useUserStore', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it.each(['{broken', '[]', '"teacher"', '42', 'true', ''])('无效用户缓存 %s 不阻断初始化', cached => {
+  it.each(['{broken', '[]', '"teacher"', '42', 'true', '', '{"id":"1"}', '{"role":123}', '{"username":null}'])('无效用户缓存 %s 不阻断初始化', cached => {
     localStorage.setItem('token', 'existing-token')
     localStorage.setItem('user', cached)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -66,7 +66,7 @@ describe('useUserStore', () => {
 
   it('login 成功后设置 token 和 user', async () => {
     const request = vi.mocked(await import('@/utils/request')).default
-    request.post.mockResolvedValue({
+    vi.mocked(request.post).mockResolvedValue({
       token: 'new_token_456',
       user: { id: 2, username: 'newuser', role: 'student' },
     })
@@ -82,7 +82,7 @@ describe('useUserStore', () => {
 
   it('login 失败时返回 false 并抛出错误', async () => {
     const request = vi.mocked(await import('@/utils/request')).default
-    request.post.mockRejectedValue(new Error('Invalid credentials'))
+    vi.mocked(request.post).mockRejectedValue(new Error('Invalid credentials'))
 
     const store = useUserStore()
 

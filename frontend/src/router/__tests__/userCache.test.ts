@@ -10,10 +10,12 @@ vi.mock('@/views/HomeView.vue', () => ({ default: {} }))
 vi.mock('@/stores/sys', () => ({ useSysStore: () => ({ loaded: true, practice: true }) }))
 vi.mock('@/utils/request', () => ({ default: {} }))
 
+import type { RouteLocationNormalized } from 'vue-router'
 import router from '../index'
 import { useUserStore } from '@/stores/user'
 
-const guard = router.beforeEach.mock.calls[0][0]
+const guard = vi.mocked(router.beforeEach).mock.calls[0]![0]
+const emptyRoute = {} as RouteLocationNormalized
 
 beforeEach(() => {
   localStorage.clear()
@@ -24,7 +26,7 @@ describe('路由守卫读取用户状态', () => {
   it('用户缓存为 null 时可进入公开页面', async () => {
     localStorage.setItem('user', 'null')
     const next = vi.fn()
-    await guard({ name: 'home', meta: {} }, {}, next)
+    await guard.call(undefined, { name: 'home', meta: {} } as RouteLocationNormalized, emptyRoute, next)
     expect(next).toHaveBeenCalledWith()
   })
 
@@ -32,7 +34,7 @@ describe('路由守卫读取用户状态', () => {
     useUserStore()
     localStorage.setItem('user', '{broken')
     const next = vi.fn()
-    await guard({ name: 'profile', fullPath: '/profile', meta: { requiresAuth: true } }, {}, next)
+    await guard.call(undefined, { name: 'profile', fullPath: '/profile', meta: { requiresAuth: true } } as RouteLocationNormalized, emptyRoute, next)
     expect(next).toHaveBeenCalledWith({ name: 'login', query: { redirect: '/profile' } })
   })
 })

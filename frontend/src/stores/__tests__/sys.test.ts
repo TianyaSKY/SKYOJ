@@ -21,7 +21,7 @@ describe('useSysStore', () => {
   })
 
   it('获取系统配置并更新文档标题', async () => {
-    getSysInfo.mockResolvedValue({title: '课堂 OJ', practice: false, warning: true, info: '通知'})
+    vi.mocked(getSysInfo).mockResolvedValue({title: '课堂 OJ', practice: false, warning: true, info: '通知'})
     const store = useSysStore()
     await store.fetchSysInfo()
     expect(getSysInfo).toHaveBeenCalledOnce()
@@ -35,7 +35,7 @@ describe('useSysStore', () => {
 
   it('网络失败时保留当前配置并记录错误', async () => {
     const error = new Error('Network error')
-    getSysInfo.mockRejectedValue(error)
+    vi.mocked(getSysInfo).mockRejectedValue(error)
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       const store = useSysStore()
