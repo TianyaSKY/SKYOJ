@@ -287,3 +287,53 @@ def test_update_password_omission_replacement_and_explicit_removal(client, teach
     assert client.put(url, headers=headers, json={'password': ''}).status_code == 200
     assert db_session.get(Exam, exam_id).password is None
     assert client.get(url, headers=headers).json()['has_password'] is False
+
+
+@pytest.mark.parametrize('username,escaped', [
+    ('=1+1', True), ('+1+1', True), ('-1+1', True), ('@SUM(1)', True),
+    ('  =1+1', True), ('\t=1+1', True), ('\r=1+1', True), ('\n=1+1', True),
+    ('Alice', False), ('张三', False), ('a,b"c', False), (' Alice', False),
+])
+def test_score_csv_treats_usernames_as_text_and_preserves_numbers(
+    client, teacher_token, db_session, student_user, sample_problem, username, escaped
+):
+    import csv
+    import io
+    from app.persistence.submission import Submission
+
+    student_user.username = username
+    db_session.flush()
+    headers = {'Authorization': f'Bearer {teacher_token}'}
+    created = client.post('/api/exams/', headers=headers, json={
+        'title': '安全导出', 'start_time': '2090-01-01T10:00:00Z',
+        'end_time': '2090-01-01T11:00:00Z', 'problem_ids': [sample_problem.id]})
+    exam_id = created.json()['id']
+    db_session.add(Submission(user_id=student_user.id, problem_id=sample_problem.id,
+        exam_id=exam_id, status='Accepted', score=70, created_at=datetime.datetime(2090, 1, 1, 10, 5)))
+    db_session.flush()
+    response = client.get(f'/api/exams/{exam_id}/export_scores', headers=headers)
+    assert response.status_code == 200
+    rows = list(csv.reader(io.StringIO(response.content.decode('utf-8-sig'))))
+    assert rows[1][1] == ("'" + username if escaped else username)
+    assert rows[1][0] == str(student_user.id)
+    assert float(rows[1][2]) == 70
+    assert float(rows[1][3]) == 70
+    assert student_user.username == username
+
+
+def test_score_csv_escapes_formula_like_problem_display_labels(client, teacher_token, db_session, sample_problem):
+    import csv
+    import io
+    from app.persistence.exam import ExamProblem
+
+    headers = {'Authorization': f'Bearer {teacher_token}'}
+    created = client.post('/api/exams/', headers=headers, json={
+        'title': '安全表头', 'start_time': '2090-01-01T10:00:00Z',
+        'end_time': '2090-01-01T11:00:00Z', 'problem_ids': [sample_problem.id]})
+    exam_id = created.json()['id']
+    item = db_session.query(ExamProblem).filter_by(exam_id=exam_id).one()
+    item.display_id = '=1+1'
+    db_session.flush()
+    response = client.get(f'/api/exams/{exam_id}/export_scores', headers=headers)
+    rows = list(csv.reader(io.StringIO(response.content.decode('utf-8-sig'))))
+    assert rows[0][2] == "'=1+1 (Max: 100)"

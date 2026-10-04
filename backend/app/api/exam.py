@@ -37,6 +37,13 @@ from app.services.exam import (
 router = APIRouter()
 
 
+def _csv_text(value: str) -> str:
+    """将公式前缀和控制字符开头的文本标记为普通文本，数值列不经过此转换。"""
+    if value and (value[0] in "\t\r\n" or value.lstrip().startswith(("=", "+", "-", "@"))):
+        return "'" + value
+    return value
+
+
 def _exam_response(exam) -> dict:
     return {
         "id": exam.id,
@@ -313,12 +320,12 @@ def export_exam_scores(
         [
             "User ID",
             "Username",
-            *[f"{item.display_id} (Max: {item.score})" for item in exam.problems],
+            *[_csv_text(f"{item.display_id} (Max: {item.score})") for item in exam.problems],
             "Total Score",
         ]
     )
     for row in rows:
-        writer.writerow([row.user_id, row.username, *row.scores, row.total_score])
+        writer.writerow([row.user_id, _csv_text(row.username), *row.scores, row.total_score])
     filename = f"exam_{exam_id}_scores_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode("utf-8-sig")),
