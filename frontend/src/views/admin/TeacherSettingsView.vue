@@ -2,7 +2,7 @@
   <div class="settings-container">
     <div class="page-header">
       <h1>系统设置</h1>
-      <p>管理平台公告、运行模式及系统维护操作。</p>
+      <p>管理平台公告及运行模式。</p>
     </div>
     <el-tabs type="border-card">
       <el-tab-pane label="基础设置">
@@ -16,25 +16,18 @@
           <el-button :loading="saving" type="primary" @click="save">保存配置</el-button>
         </el-form>
       </el-tab-pane>
-      <el-tab-pane label="高级维护">
-        <el-alert title="危险操作区：重建索引期间，搜索服务可能暂时受到影响。" type="warning" :closable="false" show-icon />
-        <el-button v-if="ENABLE_SEMANTIC_SEARCH" class="maintenance-button" :loading="rebuilding" type="warning" @click="rebuild">立即重建搜索索引</el-button>
-        <el-empty v-else description="语义搜索功能当前未启用" />
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
 import {onMounted, ref} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
-import {getSysInfo, rebuildIndex, updateSysInfo} from '@/api/sys'
+import {ElMessage} from 'element-plus'
+import {getSysInfo, updateSysInfo} from '@/api/sys'
 import {useSysStore} from '@/stores/sys'
-import {ENABLE_SEMANTIC_SEARCH} from '@/utils/featureFlags'
 
 const sysStore = useSysStore()
 const saving = ref(false)
-const rebuilding = ref(false)
 const form = ref({title: '', info: '', warning: false, practice: true})
 
 onMounted(async () => {
@@ -63,18 +56,6 @@ const save = async () => {
   }
 }
 
-const rebuild = async () => {
-  try {
-    await ElMessageBox.confirm('重建索引可能暂时影响搜索服务，是否继续？', '确认重建搜索索引', {type: 'warning'})
-    rebuilding.value = true
-    await rebuildIndex()
-    ElMessage.success('索引重建任务已提交')
-  } catch (error) {
-    if (error !== 'cancel') ElMessage.error('索引重建失败')
-  } finally {
-    rebuilding.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -82,5 +63,4 @@ const rebuild = async () => {
 .page-header { margin-bottom: 24px; }
 .page-header h1 { margin: 0 0 8px; }
 .page-header p { margin: 0; color: #909399; }
-.maintenance-button { margin-top: 24px; }
 </style>
