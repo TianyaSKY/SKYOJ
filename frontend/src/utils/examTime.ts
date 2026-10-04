@@ -1,6 +1,8 @@
+export interface ExamTimes { start_time?: string | null; end_time?: string | null }
+export interface ExamTiming { phase: 'unknown' | 'upcoming' | 'ongoing' | 'ended'; remainingSeconds: number }
 import { parseServerDate } from './date'
 
-export function getExamTiming(exam, now) {
+export function getExamTiming(exam: ExamTimes, now: number): ExamTiming {
   const start = parseServerDate(exam.start_time)?.getTime()
   const end = parseServerDate(exam.end_time)?.getTime()
   if (start == null || end == null || end <= start) {

@@ -16,7 +16,7 @@ const fields = z.object({
   password: z.string().nullable().optional(),
   is_visible: z.boolean(),
 })
-const timesValid = value => !value.start_time || !value.end_time ||
+const timesValid = (value: { start_time?: string; end_time?: string }) => !value.start_time || !value.end_time ||
   Date.parse(value.start_time) < Date.parse(value.end_time)
 export const createExamSchema = fields.extend({
   problem_ids: problemIds.default([]),
@@ -29,3 +29,9 @@ export const createExamSchema = fields.extend({
 export const updateExamSchema = fields.partial().extend({problem_ids: problemIds.nullable().optional()}).refine(timesValid, {
   message: '考试开始时间必须早于结束时间', path: ['end_time'],
 })
+
+export type CreateExamInput = z.input<typeof createExamSchema>
+export type CreateExam = z.output<typeof createExamSchema>
+
+export type UpdateExamInput = z.input<typeof updateExamSchema>
+export type UpdateExam = z.output<typeof updateExamSchema>

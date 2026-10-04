@@ -23,3 +23,9 @@ export const updateProblemSchema = fields.partial().extend({
   memory_limit: fields.shape.memory_limit.nullable().optional(),
   template_code: z.string().nullable().optional(),
 })
+
+export type CreateProblemInput = z.input<typeof createProblemSchema>
+export type CreateProblem = z.output<typeof createProblemSchema>
+
+export type UpdateProblemInput = z.input<typeof updateProblemSchema>
+export type UpdateProblem = z.output<typeof updateProblemSchema>

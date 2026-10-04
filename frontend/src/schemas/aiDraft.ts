@@ -17,7 +17,7 @@ export const generateProblemDraftSchema = z.object({
 /** 测例脚本生成表单 */
 export const generateTestScriptDraftSchema = z.object({
   problem_id: z
-    .number({invalid_type_error: '题目 ID 无效'})
+    .number({error: '题目 ID 无效'})
     .int('题目 ID 必须是整数')
     .min(1, '题目 ID 无效'),
   direction: z.string().max(5000, '生成方向过长').default(''),
@@ -26,7 +26,7 @@ export const generateTestScriptDraftSchema = z.object({
 /** 测例执行表单 */
 export const executeTestDataDraftSchema = z.object({
   problem_id: z
-    .number({invalid_type_error: '题目 ID 无效'})
+    .number({error: '题目 ID 无效'})
     .int()
     .min(1, '题目 ID 无效'),
   code: z.string().trim().min(1, '脚本代码不能为空'),
@@ -34,3 +34,12 @@ export const executeTestDataDraftSchema = z.object({
   language: z.string().trim().min(1).max(32).default('python'),
   source_draft_id: z.number().int().min(1).optional().nullable(),
 })
+
+export type GenerateProblemDraftInput = z.input<typeof generateProblemDraftSchema>
+export type GenerateProblemDraft = z.output<typeof generateProblemDraftSchema>
+
+export type GenerateTestScriptDraftInput = z.input<typeof generateTestScriptDraftSchema>
+export type GenerateTestScriptDraft = z.output<typeof generateTestScriptDraftSchema>
+
+export type ExecuteTestDataDraftInput = z.input<typeof executeTestDataDraftSchema>
+export type ExecuteTestDataDraft = z.output<typeof executeTestDataDraftSchema>

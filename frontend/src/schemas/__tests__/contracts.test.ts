@@ -17,7 +17,7 @@ describe('HTTP 请求校验契约', () => {
     expect(registerSchema.safeParse({username: 'a', password: 'x'.repeat(129)}).success).toBe(false)
   })
   it('题目限制及枚举校验，移除详情中的只读字段', () => {
-    expect(createProblemSchema.parse({...problem, id: 99}).id).toBeUndefined()
+    expect(createProblemSchema.parse({...problem, id: 99})).not.toHaveProperty('id')
     for (const patch of [{time_limit: 99}, {memory_limit: 4097}, {language: 'ruby'}, {content: ''}]) {
       expect(createProblemSchema.safeParse({...problem, ...patch}).success).toBe(false)
     }

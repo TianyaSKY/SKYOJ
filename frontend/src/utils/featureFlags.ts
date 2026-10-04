@@ -1,6 +1,6 @@
 // 占位：保留与删除前语义一致（两个能力开关均关闭）。
 // 详见 commit dd4572858b4aa5278a95f9f8c9c823d07baca4fc 重构。
-const parseEnvBool = (value, defaultValue = false) => {
+const parseEnvBool = (value: unknown, defaultValue = false) => {
     if (value === undefined || value === null || value === '') {
         return defaultValue
     }
