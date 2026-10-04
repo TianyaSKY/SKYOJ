@@ -15,7 +15,7 @@ function deferred() {
   return { promise, resolve, reject }
 }
 function mountPage() {
-  wrapper = shallowMount(ExamAdminView, { global: { directives: { loading: () => {} }, stubs: Object.fromEntries(['el-icon','el-row','el-col','el-card','el-tag','el-link','el-table','el-table-column','el-button','el-divider','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm'].map(name => [name,true])) } })
+  wrapper = shallowMount(ExamAdminView, { global: { directives: { loading: () => {} }, stubs: { ...Object.fromEntries(['el-icon','el-row','el-col','el-card','el-tag','el-link','el-table','el-table-column','el-button','el-divider','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm'].map(name => [name,true])), ...Object.fromEntries(['el-dialog','el-form','el-row','el-col'].map(name => [name, { template: '<div><slot /></div>' }])), 'el-transfer': { name: 'TransferOptions', props: ['data'], template: '<div />' } } } })
   return wrapper.vm
 }
 beforeEach(() => {
@@ -93,4 +93,27 @@ it('创建失败保留所选题目与表单供重试', async () => {
   await vm.handleSubmit()
   expect(vm.dialogVisible).toBe(true); expect(vm.selectedProblemIds).toEqual([2, 1]); expect(vm.submitting).toBe(false)
   await vm.handleSubmit(); expect(createExam.mock.calls[1][0].problem_ids).toEqual([2, 1])
+})
+it('顶部搜索按题目标题或 ID 筛选实际选题器，同时保留已选题目', async () => {
+  getProblemList.mockResolvedValueOnce([{ id: 1, title: 'A+B' }, { id: 2, title: 'Graph PATH' }, { id: 3, title: '字符串' }])
+  const vm = mountPage(); await flushPromises(); vm.handleCreate()
+  vm.selectedProblemIds = [1]; vm.problemSearchQuery = ' path '; await flushPromises()
+  const transfer = wrapper.findComponent({ name: 'TransferOptions' })
+  expect(transfer.props('data').map(item => item.id)).toEqual([1, 2])
+  expect(vm.selectedProblemIds).toEqual([1])
+  vm.problemSearchQuery = '3'; await flushPromises()
+  expect(transfer.props('data').map(item => item.id)).toEqual([1, 3])
+  vm.problemSearchQuery = '无匹配'; await flushPromises()
+  expect(transfer.props('data').map(item => item.id)).toEqual([1])
+  vm.problemSearchQuery = ''; await flushPromises()
+  expect(transfer.props('data')).toHaveLength(3)
+})
+it('新建或编辑另一场考试时清空旧搜索，恢复完整候选题库', async () => {
+  getProblemList.mockResolvedValueOnce([{ id: 1, title: 'A+B' }, { id: 2, title: 'Graph' }])
+  const vm = mountPage(); await flushPromises(); vm.handleCreate(); vm.problemSearchQuery = 'Graph'
+  await vm.handleEdit({ id: 1 })
+  expect(vm.problemSearchQuery).toBe('')
+  expect(wrapper.findComponent({ name: 'TransferOptions' }).props('data')).toHaveLength(2)
+  vm.problemSearchQuery = '无匹配'; vm.dialogVisible = false; vm.handleCreate()
+  expect(vm.problemSearchQuery).toBe('')
 })

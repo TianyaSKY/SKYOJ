@@ -149,7 +149,7 @@
               </div>
               <el-transfer
                   v-model="selectedProblemIds"
-                  :data="allProblems"
+                  :data="filteredProblems"
                   :filter-method="filterMethod"
                   :props="{ key: 'id', label: 'label' }"
                   :titles="['题库', '已选题目']"
@@ -228,6 +228,14 @@ const allProblems = ref([])
 const selectedProblemIds = ref([])
 const problemSearchQuery = ref('')
 const timeRange = ref([])
+const filteredProblems = computed(() => {
+  const query = problemSearchQuery.value.trim().toLowerCase()
+  if (!query) return allProblems.value
+  const selected = new Set(selectedProblemIds.value)
+  // 保留右侧已选题目，搜索只筛选左侧候选项。
+  return allProblems.value.filter(problem => selected.has(problem.id) ||
+    problem.label.toLowerCase().includes(query))
+})
 
 const form = ref({
   title: '',
@@ -306,6 +314,7 @@ const resetForm = () => {
   }
   timeRange.value = []
   selectedProblemIds.value = []
+  problemSearchQuery.value = ''
   currentExamId.value = null
 }
 
