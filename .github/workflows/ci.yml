@@ -132,9 +132,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage baseline
         working-directory: frontend
-        run: npm run test:unit
+        run: npm run test:unit:coverage
 
   frontend-e2e-tests:
     name: Frontend E2E tests

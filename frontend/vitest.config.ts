@@ -13,6 +13,11 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    include: ['src/**/*.{test,spec}.{js,ts}'],
+    include: ['src/**/*.{test,spec}.ts'],
+    coverage: {
+      provider: 'v8',
+      // 迁移前实测基线；CI 阻止现有行为覆盖率下降。
+      thresholds: { statements: 74.04, branches: 59.11, functions: 43.58, lines: 75.39 },
+    },
   },
 })
