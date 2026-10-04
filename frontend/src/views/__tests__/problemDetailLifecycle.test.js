@@ -26,7 +26,7 @@ function deferred() {
 function mountPage() {
   wrapper = shallowMount(ProblemDetailView, { global: {
     directives: { loading: () => {} },
-    stubs: Object.fromEntries(['el-icon','el-tag','el-button','el-select','el-option','el-tooltip','el-drawer','el-popover','el-input-number','el-switch','el-divider'].map(name => [name,true])),
+    stubs: Object.fromEntries(['el-icon','el-tag','el-button','el-select','el-option','el-tooltip','el-drawer','el-popover','el-input-number','el-switch','el-divider','el-card','el-upload','el-col','el-row','el-form','el-form-item','el-tabs','el-tab-pane','el-input'].map(name => [name,true])),
   } })
 }
 beforeEach(() => {
@@ -43,7 +43,7 @@ it('复用题目页时加载新 ID，旧题面响应不能覆盖新题目', asyn
   state.route.params.id = '2'
   await nextTick(); await flushPromises()
   old.resolve(problem('1')); await flushPromises()
-  expect(wrapper.vm.problem.id).toBe('2')
+  expect(wrapper.vm.problem.id).toBe(2)
   submitSolution.mockResolvedValue({ submission_id: 20 })
   await wrapper.vm.handleSubmit()
   expect(submitSolution.mock.calls[0][0].problem_id).toBe(2)

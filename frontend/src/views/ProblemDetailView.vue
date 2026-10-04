@@ -211,7 +211,7 @@
         title="ACM 调试运行结果（仅第一个测试点，不计入成绩）"
     >
       <DebugResultPanel
-          v-if="debugDrawerVisible"
+          v-if="debugDrawerVisible && debugRunId !== null"
           :debug-run-id="debugRunId"
           @close="debugDrawerVisible = false"
       />
@@ -243,7 +243,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { editor } from 'monaco-editor'
+import type { ProblemDetailResponse } from '@/types/problem'
+import type { SubmissionWS } from '@/utils/websocket'
+import type { SubmissionMessage } from '@/schemas/submission'
+import type { UploadFile, UploadFiles, TagProps } from 'element-plus'
+import { parseRouteId } from '@/utils/route'
 import {computed, inject, onBeforeUnmount, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {getProblemDetail, submitSolution} from '@/api/problem'
@@ -262,22 +268,23 @@ import {renderMarkdown} from '@/utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
-const setAnswerWorkspaceActive = inject('setAnswerWorkspaceActive', null)
-const problemId = computed(() => route.params.id)
+const setAnswerWorkspaceActive = inject<((active: boolean) => void) | null>('setAnswerWorkspaceActive', null)
+const problemId = computed(() => parseRouteId(route.params.id))
 let pageVersion = 0
 let disposed = false
 const problemLoaded = ref(false)
-const isCurrentPage = version => !disposed && version === pageVersion
-const examId = computed(() => route.query.exam_id)
+const isCurrentPage = (version: number) => !disposed && version === pageVersion
+const examId = computed(() => parseRouteId(route.query.exam_id))
 
-const emptyProblem = () => ({
-  id: '',
+const emptyProblem = (): Omit<ProblemDetailResponse, 'id'> & {id: number | null} => ({
+  id: null,
   title: 'Loading...',
   content: '',
   time_limit: 0,
   memory_limit: 0,
   type: '',
-  language: ''
+  language: '',
+  template_code: null
 })
 const problem = ref(emptyProblem())
 
@@ -286,12 +293,12 @@ const code = ref('')
 const submitting = ref(false)
 const debugging = ref(false)
 const debugDrawerVisible = ref(false)
-const debugRunId = ref(null)
+const debugRunId = ref<number | null>(null)
 
 // WebSocket: 提交后等待实时判题结果
-const realtimeResult = ref(null)
+const realtimeResult = ref<SubmissionMessage | null>(null)
 const realtimeStatus = ref('idle') // 'idle' | 'pending' | 'received' | 'closed'
-let activeWS = null
+let activeWS: SubmissionWS | null = null
 
 function clearRealtimeWS() {
   if (activeWS) {
@@ -300,7 +307,7 @@ function clearRealtimeWS() {
   }
 }
 
-function startRealtimeWait(submissionId) {
+function startRealtimeWait(submissionId: number) {
   const version = pageVersion
   clearRealtimeWS()
   realtimeResult.value = null
@@ -341,14 +348,14 @@ const fontFamily = ref(localStorage.getItem('editorFontFamily') || "'Fira Code',
 const fontLigatures = ref(localStorage.getItem('editorFontLigatures') !== 'false')
 
 const saveSettings = () => {
-  localStorage.setItem('editorFontSize', fontSize.value)
+  localStorage.setItem('editorFontSize', String(fontSize.value))
   localStorage.setItem('editorFontFamily', fontFamily.value)
-  localStorage.setItem('editorFontLigatures', fontLigatures.value)
+  localStorage.setItem('editorFontLigatures', String(fontLigatures.value))
 }
 
 // Kaggle specific refs
-const fileList = ref([])
-const selectedFile = ref(null)
+const fileList = ref<UploadFiles>([])
+const selectedFile = ref<File | null>(null)
 
 const isKaggle = computed(() => {
   return problem.value.type && problem.value.type.toLowerCase() === 'kaggle'
@@ -362,8 +369,8 @@ watch(isKaggle, (isKaggleProblem) => {
   setAnswerWorkspaceActive?.(!isKaggleProblem)
 }, {immediate: true})
 
-const getTypeTag = (type) => {
-  const map = {
+const getTypeTag = (type: string) => {
+  const map: Record<string, TagProps['type']> = {
     'acm': 'primary',
     'kaggle': 'success',
     'oop': 'warning'
@@ -371,8 +378,8 @@ const getTypeTag = (type) => {
   return map[type?.toLowerCase()] || 'info'
 }
 
-const getTypeDescription = (type) => {
-  const map = {
+const getTypeDescription = (type: string) => {
+  const map: Record<string, string> = {
     'acm': '经典的算法竞赛模式，标准 I/O，严格文本比对。',
     'kaggle': '数据科学竞赛模式，提交 CSV 预测结果，基于 Metric 评分。',
     'oop': '面向对象编程模式，实现特定接口/类，运行单元测试。'
@@ -380,7 +387,7 @@ const getTypeDescription = (type) => {
   return map[type?.toLowerCase()] || '未知题目类型'
 }
 
-const editorOptions = computed(() => ({
+const editorOptions = computed<editor.IStandaloneEditorConstructionOptions>(() => ({
   automaticLayout: true,
   minimap: {enabled: false},
   fontSize: fontSize.value,
@@ -409,7 +416,7 @@ const availableLanguageOptions = computed(() => {
   return allLanguageOptions.filter(opt => allowed.includes(opt.value))
 })
 
-const templates = {
+const templates: Record<string, string> = {
   python: 'import sys\nimport os\n',
   cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your code here\n    return 0;\n}',
   c: '#include <stdio.h>\n\nint main() {\n    // Write your code here\n    return 0;\n}',
@@ -428,8 +435,9 @@ watch(language, (newLang) => {
 
 const renderedContent = computed(() => renderMarkdown(problem.value.content))
 
-const fetchProblem = async (version) => {
+const fetchProblem = async (version: number) => {
   try {
+    if (problemId.value === null || (route.query.exam_id != null && examId.value === null)) throw new Error('题目或考试 ID 无效')
     const data = await getProblemDetail(problemId.value)
     if (!isCurrentPage(version)) return
     if (data) {
@@ -452,7 +460,7 @@ const backToExam = () => {
 
 // Standard Submission
 const handleSubmit = async () => {
-  if (!problemLoaded.value || submitting.value) return
+  if (!problemLoaded.value || submitting.value || problemId.value === null) return
   const version = pageVersion
   if (!code.value.trim()) {
     ElMessage.warning('Code cannot be empty')
@@ -462,7 +470,7 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     const res = await submitSolution({
-      problem_id: parseInt(problemId.value),
+      problem_id: problemId.value,
       code: code.value,
       language: language.value,
       exam_id: examId.value || -1
@@ -486,7 +494,7 @@ const goToSubmissionDetail = () => {
 
 // Debug Run（仅 ACM 题目，不计入成绩，仅跑第一个测试点）
 const handleDebug = async () => {
-  if (!problemLoaded.value || debugging.value) return
+  if (!problemLoaded.value || debugging.value || problemId.value === null) return
   const version = pageVersion
   if (!isAcm.value) {
     ElMessage.warning('仅 ACM 类型题目支持调试运行')
@@ -500,7 +508,7 @@ const handleDebug = async () => {
   debugging.value = true
   try {
     const res = await debugSolution({
-      problem_id: parseInt(problemId.value),
+      problem_id: problemId.value,
       code: code.value,
       language: language.value,
       exam_id: examId.value || -1
@@ -516,11 +524,11 @@ const handleDebug = async () => {
 }
 
 // Kaggle File Handling
-const handleFileChange = (uploadFile, uploadFiles) => {
+const handleFileChange = (uploadFile: UploadFile, uploadFiles: UploadFiles) => {
   if (uploadFiles.length > 1) {
     uploadFiles.splice(0, 1) // Keep only the latest
   }
-  selectedFile.value = uploadFile.raw
+  selectedFile.value = uploadFile.raw || null
   fileList.value = uploadFiles
 }
 
@@ -531,7 +539,7 @@ const handleFileRemove = () => {
 
 // Kaggle Submission
 const handleSubmitKaggle = async () => {
-  if (!problemLoaded.value || submitting.value) return
+  if (!problemLoaded.value || submitting.value || problemId.value === null) return
   const version = pageVersion
   if (!selectedFile.value) {
     ElMessage.warning('Please select a CSV file')
@@ -546,11 +554,11 @@ const handleSubmitKaggle = async () => {
   submitting.value = true
   try {
     const formData = new FormData()
-    formData.append('problem_id', problemId.value)
+    formData.append('problem_id', String(problemId.value))
     formData.append('file', selectedFile.value)
     formData.append('code', 'Kaggle Submission')
     formData.append('language', 'csv')
-    formData.append('exam_id', examId.value || -1)
+    formData.append('exam_id', String(examId.value || -1))
 
     const res = await submitSolution(formData)
     if (!isCurrentPage(version)) return

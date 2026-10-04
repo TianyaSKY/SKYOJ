@@ -324,7 +324,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { CreateProblem } from '@/schemas/problem'
+import type { ProblemListResponse, ProblemDetailResponse, TestCaseSummaryResponse } from '@/types/problem'
+import type { editor } from 'monaco-editor'
+import type { UploadFile, UploadFiles, TagProps } from 'element-plus'
+import { backendErrorMessage } from '@/utils/error'
 import {createProblemSchema, updateProblemSchema} from '@/schemas/problem'
 import {computed, onMounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
@@ -354,14 +359,14 @@ import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 import MarkdownContentEditor from '@/components/MarkdownContentEditor.vue'
 
 const router = useRouter()
-const problems = ref([])
+const problems = ref<ProblemListResponse[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
 const dialogLoading = ref(false)
 const isEdit = ref(false)
-const currentProblemId = ref(null)
-const currentProblem = ref(null)
+const currentProblemId = ref<number | null>(null)
+const currentProblem = ref<ProblemDetailResponse | null>(null)
 
 // AI Generation State
 const aiDialogVisible = ref(false)
@@ -379,7 +384,7 @@ const testDataForm = ref({
   direction: '',
 })
 
-const miniEditorOptions = {
+const miniEditorOptions: editor.IStandaloneEditorConstructionOptions = {
   automaticLayout: true,
   minimap: {enabled: false},
   fontSize: 13,
@@ -389,16 +394,17 @@ const miniEditorOptions = {
 }
 
 // Test Case Upload Refs
-const testCaseFileList = ref([])
-const selectedTestCaseFile = ref(null)
+const testCaseFileList = ref<UploadFiles>([])
+const selectedTestCaseFile = ref<File | null>(null)
 const uploadingTestCases = ref(false)
 const downloadingTestCases = ref(false)
 const deletingTestCases = ref(false)
 
-const testCaseSummary = ref(null)
+const testCaseSummary = ref<TestCaseSummaryResponse | null>(null)
 const testCaseSummaryLoading = ref(false)
 
-const form = ref({
+type ProblemForm = Omit<CreateProblem, 'language' | 'type'> & {language: string; type: string}
+const form = ref<ProblemForm>({
   title: '',
   content: '',
   language: 'python',
@@ -408,7 +414,7 @@ const form = ref({
   template_code: '',
 })
 
-const TEST_CASE_STATUS_META = {
+const TEST_CASE_STATUS_META: Record<string, {label: string; type: TagProps['type']}> = {
   unknown: {label: '未检查', type: 'info'},
   empty: {label: '未配置', type: 'info'},
   ready: {label: '已就绪', type: 'success'},
@@ -418,11 +424,11 @@ const TEST_CASE_STATUS_META = {
   missing_output: {label: '缺少输出', type: 'danger'},
 }
 
-const testCaseStatusMeta = (status) => {
+const testCaseStatusMeta = (status: string) => {
   return TEST_CASE_STATUS_META[status] || TEST_CASE_STATUS_META.unknown
 }
 
-const formatFileSize = (size) => {
+const formatFileSize = (size: number | null | undefined) => {
   if (size === null || size === undefined) return '缺失'
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
@@ -434,7 +440,8 @@ const dialogTitle = computed(() => (isEdit.value ? '编辑题目' : '新增题�
 const fetchProblems = async () => {
   loading.value = true
   try {
-    problems.value = await getProblemList()
+    const data = await getProblemList()
+    problems.value = Array.isArray(data) ? data : data.problems
   } catch (error) {
     ElMessage.error('获取题目列表失败')
   } finally {
@@ -442,7 +449,7 @@ const fetchProblems = async () => {
   }
 }
 
-const fetchTestCaseSummary = async (problemId) => {
+const fetchTestCaseSummary = async (problemId: number) => {
   testCaseSummaryLoading.value = true
   try {
     testCaseSummary.value = await getTestCaseSummary(problemId)
@@ -503,14 +510,14 @@ const generateProblem = async () => {
     aiDialogVisible.value = false
     ElMessage.success(res.message || '已提交后台生成，请到草稿箱查看')
   } catch (error) {
-    const msg = error?.response?.data?.error || '提交 AI 出题任务失败'
+    const msg = backendErrorMessage(error, '提交 AI 出题任务失败')
     ElMessage.error(msg)
   } finally {
     aiGenerating.value = false
   }
 }
 
-const handleEdit = async (row) => {
+const handleEdit = async (row: ProblemListResponse) => {
   isEdit.value = true
   currentProblemId.value = row.id
   dialogVisible.value = true
@@ -541,7 +548,7 @@ const handleEdit = async (row) => {
   }
 }
 
-const handleDelete = async (id) => {
+const handleDelete = async (id: number) => {
   try {
     await deleteProblem(id)
     ElMessage.success('删除成功')
@@ -552,19 +559,22 @@ const handleDelete = async (id) => {
 }
 
 const handleSubmit = async () => {
-  const parsed = (isEdit.value ? updateProblemSchema : createProblemSchema).safeParse(form.value)
-  if (!parsed.success) {
-    ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
+  const validation = isEdit.value
+    ? {editing: true as const, parsed: updateProblemSchema.safeParse(form.value)}
+    : {editing: false as const, parsed: createProblemSchema.safeParse(form.value)}
+  if (!validation.parsed.success) {
+    ElMessage.warning(validation.parsed.error.issues[0]?.message || '请检查输入')
     return
   }
 
   submitting.value = true
   try {
-    if (isEdit.value) {
-      await updateProblem(currentProblemId.value, parsed.data)
+    if (validation.editing) {
+      if (currentProblemId.value === null) throw new Error('编辑题目缺少 ID')
+      await updateProblem(currentProblemId.value, validation.parsed.data)
       ElMessage.success('更新成功')
     } else {
-      await createProblem(parsed.data)
+      await createProblem(validation.parsed.data)
       ElMessage.success('新增成功')
     }
     dialogVisible.value = false
@@ -577,7 +587,7 @@ const handleSubmit = async () => {
 }
 
 // AI Test Data Handlers（异步：只提交生成脚本任务）
-const handleAiTestData = async (row) => {
+const handleAiTestData = async (row: ProblemListResponse) => {
   aiTestDataVisible.value = true
   fetchingDetail.value = true
   testDataForm.value = {
@@ -615,7 +625,7 @@ const handleGenerateScript = async () => {
     aiTestDataVisible.value = false
     ElMessage.success(res.message || '已提交后台生成，请到草稿箱查看')
   } catch (error) {
-    const msg = error?.response?.data?.error || '提交测例脚本任务失败'
+    const msg = backendErrorMessage(error, '提交测例脚本任务失败')
     ElMessage.error(msg)
   } finally {
     scriptGenerating.value = false
@@ -623,11 +633,11 @@ const handleGenerateScript = async () => {
 }
 
 // Test Case Upload Handlers
-const handleTestCaseChange = (uploadFile, uploadFiles) => {
+const handleTestCaseChange = (uploadFile: UploadFile, uploadFiles: UploadFiles) => {
   if (uploadFiles.length > 1) {
     uploadFiles.splice(0, 1)
   }
-  selectedTestCaseFile.value = uploadFile.raw
+  selectedTestCaseFile.value = uploadFile.raw || null
   testCaseFileList.value = uploadFiles
 }
 
@@ -637,6 +647,8 @@ const handleTestCaseRemove = () => {
 }
 
 const handleUploadTestCases = async () => {
+  const problemId = currentProblemId.value
+  if (problemId === null) return
   if (!selectedTestCaseFile.value) return
 
   uploadingTestCases.value = true
@@ -644,11 +656,11 @@ const handleUploadTestCases = async () => {
     const formData = new FormData()
     formData.append('file', selectedTestCaseFile.value)
 
-    await uploadTestCases(currentProblemId.value, formData)
+    await uploadTestCases(problemId, formData)
     ElMessage.success('测试点上传成功')
     testCaseFileList.value = []
     selectedTestCaseFile.value = null
-    await fetchTestCaseSummary(currentProblemId.value)
+    await fetchTestCaseSummary(problemId)
     await fetchProblems()
   } catch (error) {
     ElMessage.error('测试点上传失败')
@@ -659,9 +671,11 @@ const handleUploadTestCases = async () => {
 
 
 const handleDownloadTestCases = async () => {
+  const problemId = currentProblemId.value
+  if (problemId === null) return
   downloadingTestCases.value = true
   try {
-    const blob = await downloadTestCases(currentProblemId.value)
+    const blob = await downloadTestCases(problemId)
     const url = window.URL.createObjectURL(new Blob([blob]))
     const link = document.createElement('a')
     link.href = url
@@ -679,11 +693,13 @@ const handleDownloadTestCases = async () => {
 }
 
 const handleDeleteAllTestCases = async () => {
+  const problemId = currentProblemId.value
+  if (problemId === null) return
   deletingTestCases.value = true
   try {
-    await deleteAllTestCases(currentProblemId.value)
+    await deleteAllTestCases(problemId)
     ElMessage.success('所有测试点已删除')
-    await fetchTestCaseSummary(currentProblemId.value)
+    await fetchTestCaseSummary(problemId)
     await fetchProblems()
   } catch (error) {
     ElMessage.error('删除失败')
@@ -692,7 +708,7 @@ const handleDeleteAllTestCases = async () => {
   }
 }
 
-const goToProblem = (id) => {
+const goToProblem = (id: number) => {
   router.push({name: 'problem-admin-preview', params: {id}})
 }
 
