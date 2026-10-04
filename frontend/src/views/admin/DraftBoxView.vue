@@ -235,9 +235,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {onMounted, onUnmounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
+import type { DraftSummaryResponse, DraftDetailResponse, DraftStatsResponse, DraftQuery } from '@/types/aiDraft'
+import type { editor } from 'monaco-editor'
+import type { TagProps } from 'element-plus'
+import { backendErrorMessage } from '@/utils/error'
+import { draftResultSchema, type DraftResult } from '@/schemas/aiDraft'
 import {ElMessage} from 'element-plus'
 import {VueMonacoEditor} from '@guolao/vue-monaco-editor'
 import MarkdownContentEditor from '@/components/MarkdownContentEditor.vue'
@@ -252,29 +257,31 @@ import {
 import {executeTestDataDraftSchema} from '@/schemas/aiDraft'
 
 const router = useRouter()
-const drafts = ref([])
+const drafts = ref<DraftSummaryResponse[]>([])
 const loading = ref(false)
 const filterStatus = ref('')
 const filterType = ref('')
-const stats = ref({})
+const stats = ref<Partial<DraftStatsResponse>>({})
 const detailVisible = ref(false)
 const detailLoading = ref(false)
-const detail = ref(null)
+type DraftDetail = Omit<DraftDetailResponse, 'result_payload'> & {result_payload: DraftResult}
+const decodeDraftDetail = (data: DraftDetailResponse): DraftDetail => ({...data, result_payload: draftResultSchema.parse(data.result_payload)})
+const detail = ref<DraftDetail | null>(null)
 const applying = ref(false)
 const executing = ref(false)
 const editableScript = ref('')
 const editableLanguage = ref('python')
-let pollTimer = null
+let pollTimer: ReturnType<typeof setInterval> | undefined
 
-const editorOptions = {
+const editorOptions: editor.IStandaloneEditorConstructionOptions = {
   automaticLayout: true,
   minimap: {enabled: true},
   fontSize: 14,
   scrollBeyondLastLine: false,
 }
 
-const taskTypeLabel = (type) => {
-  const map = {
+const taskTypeLabel = (type: string) => {
+  const map: Record<string, string> = {
     problem_generation: 'AI 出题',
     test_script_generation: '测例脚本',
     test_data_execution: '测例执行',
@@ -282,8 +289,8 @@ const taskTypeLabel = (type) => {
   return map[type] || type
 }
 
-const statusLabel = (status) => {
-  const map = {
+const statusLabel = (status: string) => {
+  const map: Record<string, string> = {
     pending: '等待中',
     running: '执行中',
     success: '成功',
@@ -292,8 +299,8 @@ const statusLabel = (status) => {
   return map[status] || status
 }
 
-const statusTagType = (status) => {
-  const map = {
+const statusTagType = (status: string) => {
+  const map: Record<string, TagProps['type']> = {
     pending: 'info',
     running: 'warning',
     success: 'success',
@@ -302,7 +309,7 @@ const statusTagType = (status) => {
   return map[status] || 'info'
 }
 
-const formatTime = (value) => {
+const formatTime = (value: string | null) => {
   if (!value) return '—'
   try {
     return new Date(value).toLocaleString()
@@ -311,7 +318,7 @@ const formatTime = (value) => {
   }
 }
 
-const prettyJson = (obj) => {
+const prettyJson = (obj: unknown) => {
   try {
     return JSON.stringify(obj || {}, null, 2)
   } catch {
@@ -330,7 +337,7 @@ const fetchStats = async () => {
 const fetchDrafts = async () => {
   loading.value = true
   try {
-    const params = {}
+    const params: DraftQuery = {}
     if (filterStatus.value) params.status = filterStatus.value
     if (filterType.value) params.task_type = filterType.value
     const res = await listAiDrafts(params)
@@ -343,17 +350,17 @@ const fetchDrafts = async () => {
   }
 }
 
-const openDetail = async (row, preferExecute = false) => {
+const openDetail = async (row: DraftSummaryResponse, preferExecute = false) => {
   detailVisible.value = true
   detailLoading.value = true
   detail.value = null
   editableScript.value = ''
   try {
     const data = await getAiDraftDetail(row.id)
-    detail.value = data
+    detail.value = decodeDraftDetail(data)
     if (data.task_type === 'test_script_generation' && data.status === 'success') {
-      editableScript.value = data.result_payload?.code || ''
-      editableLanguage.value = data.result_payload?.language || 'python'
+      editableScript.value = detail.value.result_payload?.code || ''
+      editableLanguage.value = detail.value.result_payload?.language || 'python'
     }
     if (preferExecute) {
       // 已打开编辑区，用户可直接点执行
@@ -371,17 +378,17 @@ const resetDetail = () => {
   editableScript.value = ''
 }
 
-const handleApply = async (row) => {
+const handleApply = async (row: DraftSummaryResponse) => {
   applying.value = true
   try {
     const res = await applyProblemDraft(row.id)
     ElMessage.success(`题目已创建：#${res.problem_id} ${res.title || ''}`)
     await fetchDrafts()
     if (detail.value?.id === row.id) {
-      detail.value = await getAiDraftDetail(row.id)
+      detail.value = decodeDraftDetail(await getAiDraftDetail(row.id))
     }
   } catch (error) {
-    const msg = error?.response?.data?.error || '创建题目失败'
+    const msg = backendErrorMessage(error, '创建题目失败')
     ElMessage.error(msg)
   } finally {
     applying.value = false
@@ -410,14 +417,14 @@ const handleExecuteFromDraft = async () => {
     detailVisible.value = false
     await fetchDrafts()
   } catch (error) {
-    const msg = error?.response?.data?.error || '提交执行失败'
+    const msg = backendErrorMessage(error, '提交执行失败')
     ElMessage.error(msg)
   } finally {
     executing.value = false
   }
 }
 
-const handleDelete = async (id) => {
+const handleDelete = async (id: number) => {
   try {
     await deleteAiDraft(id)
     ElMessage.success('已删除')
@@ -426,7 +433,7 @@ const handleDelete = async (id) => {
     }
     await fetchDrafts()
   } catch (error) {
-    const msg = error?.response?.data?.error || '删除失败'
+    const msg = backendErrorMessage(error, '删除失败')
     ElMessage.error(msg)
   }
 }

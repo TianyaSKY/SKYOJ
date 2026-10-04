@@ -76,3 +76,11 @@ it('判题消息只接受有效的状态、分数和日志，兼容旧版可选�
     expect(submissionMessageSchema.safeParse(value).success).toBe(false)
   }
 })
+
+it('AI 代码分析仅展示结构完整的文本字段', async () => {
+  const { codeAnalysisSchema } = await import('../aiDraft')
+  expect(codeAnalysisSchema.parse({rating: '良好', logic: '求和', suggestion: '检查空输入'})).toEqual({rating: '良好', logic: '求和', suggestion: '检查空输入'})
+  for (const value of [null, 'raw text', {}, {rating: '良好', logic: 1, suggestion: '建议'}]) {
+    expect(codeAnalysisSchema.safeParse(value).success).toBe(false)
+  }
+})

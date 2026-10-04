@@ -43,3 +43,22 @@ export type GenerateTestScriptDraft = z.output<typeof generateTestScriptDraftSch
 
 export type ExecuteTestDataDraftInput = z.input<typeof executeTestDataDraftSchema>
 export type ExecuteTestDataDraft = z.output<typeof executeTestDataDraftSchema>
+
+// LLM 分析结果来自外部模型，展示前校验结构。
+export const codeAnalysisSchema = z.object({ rating: z.string(), logic: z.string(), suggestion: z.string() })
+export type CodeAnalysis = z.output<typeof codeAnalysisSchema>
+
+// 不同任务共享草稿容器，已知展示与执行字段校验类型，保留任务专属 JSON 字段。
+export const draftResultSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  type: z.string().optional(),
+  language: z.string().optional(),
+  code: z.string().optional(),
+  problem_id: z.number().int().positive().optional(),
+  problem_type: z.string().optional(),
+  time_limit: z.number().optional(),
+  memory_limit: z.number().optional(),
+  message: z.string().optional(),
+}).catchall(z.json())
+export type DraftResult = z.output<typeof draftResultSchema>

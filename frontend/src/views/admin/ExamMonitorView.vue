@@ -146,10 +146,10 @@
           <template #default="scope">
             <div v-if="getSubmission(scope.row.user_id, problem.problem_id)" class="score-cell">
               <div
-                :class="['score-box', getScoreStatusClass(getSubmission(scope.row.user_id, problem.problem_id).score)]"
+                :class="['score-box', getScoreStatusClass(getSubmission(scope.row.user_id, problem.problem_id)?.score ?? 0)]"
                 @click="openLevel2(scope.row.user_id, problem.problem_id)"
               >
-                {{ getSubmission(scope.row.user_id, problem.problem_id).score }}
+                {{ getSubmission(scope.row.user_id, problem.problem_id)?.score }}
               </div>
             </div>
             <span v-else class="empty-score">-</span>
@@ -240,7 +240,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { CSSProperties } from 'vue'
+import type { MonitorEntry, MonitorProblemInfo, RankEntry } from '@/types/exam'
+import type { SubmissionDetailResponse } from '@/types/submission'
+import type { ProblemDetailResponse } from '@/types/problem'
+import { codeAnalysisSchema, type CodeAnalysis } from '@/schemas/aiDraft'
+import { parseRouteId } from '@/utils/route'
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {
@@ -266,30 +272,31 @@ import 'highlight.js/styles/vs2015.css'
 import dayjs from 'dayjs'
 
 const route = useRoute()
-const examId = route.params.id
+const examId = parseRouteId(route.params.id)
 const examTitle = ref('加载中...')
 const loading = ref(false)
-const participants = ref([])
-const problems = ref([])
+const participants = ref<Array<MonitorEntry & {avatar?: string | null}>>([])
+const problems = ref<MonitorProblemInfo[]>([])
 const totalSubmissions = ref(0)
-const rankData = ref([])
+const rankData = ref<Array<RankEntry & {avatar?: string | null}>>([])
 
 // L2 & L3 State
 const drawerVisible = ref(false)
 const codeDialogVisible = ref(false)
 const detailLoading = ref(false)
-const currentSubmission = ref(null)
-const currentProblem = ref(null)
+const currentSubmission = ref<SubmissionDetailResponse | null>(null)
+const currentProblem = ref<ProblemDetailResponse | null>(null)
 
 // AI Analysis State
 const aiLoading = ref(false)
-const aiResult = ref(null)
+const aiResult = ref<CodeAnalysis | null>(null)
 
 // Balloon State
 const showFullscreenBalloons = ref(false)
-const balloons = ref([])
-const rankChangedUsers = ref(new Set())
-let previousRankMap = new Map()
+interface Balloon {id: number; x: number; color: string; duration: number; delay: number; text: string}
+const balloons = ref<Balloon[]>([])
+const rankChangedUsers = ref(new Set<string>())
+let previousRankMap = new Map<string, number>()
 const BALLOON_COLORS = ['#ff4d4f', '#1890ff', '#52c41a', '#fadb14', '#722ed1', '#eb2f96']
 
 // Viewer Settings
@@ -297,7 +304,7 @@ const fontSize = ref(parseInt(localStorage.getItem('editorFontSize') || '16'))
 const fontFamily = ref(localStorage.getItem('editorFontFamily') || "'Fira Code', 'Courier New', monospace")
 const fontLigatures = ref(localStorage.getItem('editorFontLigatures') !== 'false')
 
-const viewerStyle = computed(() => ({
+const viewerStyle = computed<CSSProperties>(() => ({
   fontSize: fontSize.value + 'px',
   fontFamily: fontFamily.value,
   fontVariantLigatures: fontLigatures.value ? 'normal' : 'none'
@@ -305,7 +312,7 @@ const viewerStyle = computed(() => ({
 
 const autoRefresh = ref(localStorage.getItem('exam_monitor_auto_refresh') === 'true')
 const lastUpdateTime = ref('')
-let refreshTimer = null
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 const maxPossibleScore = computed(() => {
   return problems.value.reduce((sum, p) => sum + (p.max_score || 100), 0)
@@ -327,8 +334,8 @@ const highlightedCode = computed(() => {
   }
 })
 
-const triggerFullscreenBalloons = (users) => {
-  const newBalloons = []
+const triggerFullscreenBalloons = (users: Set<string>) => {
+  const newBalloons: Balloon[] = []
   const userList = Array.from(users)
   for (let i = 0; i < 12; i++) {
     newBalloons.push({
@@ -348,6 +355,7 @@ const triggerFullscreenBalloons = (users) => {
 const fetchMonitorData = async (isAuto = false) => {
   if (!isAuto) loading.value = true
   try {
+    if (examId === null) throw new Error('考试 ID 无效')
     const [monitorRes, rankRes] = await Promise.all([
       getExamMonitor(examId),
       getExamRank(examId)
@@ -366,14 +374,14 @@ const fetchMonitorData = async (isAuto = false) => {
 
     if (rankRes) {
       const newRankData = rankRes.rank
-      const currentRankMap = new Map()
-      const improvedUsers = new Set()
+      const currentRankMap = new Map<string, number>()
+      const improvedUsers = new Set<string>()
 
       newRankData.forEach((user, index) => {
         currentRankMap.set(user.username, index)
         if (previousRankMap.has(user.username)) {
           const oldRank = previousRankMap.get(user.username)
-          if (index < oldRank) improvedUsers.add(user.username)
+          if (oldRank !== undefined && index < oldRank) improvedUsers.add(user.username)
         }
       })
 
@@ -383,7 +391,7 @@ const fetchMonitorData = async (isAuto = false) => {
       if (improvedUsers.size > 0) {
         rankChangedUsers.value = improvedUsers
         triggerFullscreenBalloons(improvedUsers)
-        setTimeout(() => { rankChangedUsers.value = new Set() }, 5000)
+        setTimeout(() => { rankChangedUsers.value = new Set<string>() }, 5000)
       }
     }
 
@@ -395,26 +403,26 @@ const fetchMonitorData = async (isAuto = false) => {
   }
 }
 
-const handleAutoRefreshChange = (val) => {
-  localStorage.setItem('exam_monitor_auto_refresh', val)
+const handleAutoRefreshChange = (val: boolean) => {
+  localStorage.setItem('exam_monitor_auto_refresh', String(val))
 }
 
-const getProblemLabel = (problem, index) => {
+const getProblemLabel = (problem: MonitorProblemInfo, index: number) => {
   return problem.display_id ? `P${problem.display_id}` : `T${index + 1}`
 }
 
-const getSubmission = (userId, problemId) => {
+const getSubmission = (userId: number, problemId: number) => {
   const user = participants.value.find(u => u.user_id === userId)
   return user?.submissions?.[problemId] || null
 }
 
-const getScoreStatusClass = (score) => {
+const getScoreStatusClass = (score: number) => {
   if (score >= 100) return 'score-success'
   if (score > 0) return 'score-warning'
   return 'score-danger'
 }
 
-const getProgressColor = (solved) => {
+const getProgressColor = (solved: number) => {
   const total = problems.value.length
   if (total === 0) return '#94a3b8'
   const ratio = solved / total
@@ -424,7 +432,7 @@ const getProgressColor = (solved) => {
   return '#ef4444'
 }
 
-const openLevel2 = async (userId, problemId) => {
+const openLevel2 = async (userId: number, problemId: number) => {
   const sub = getSubmission(userId, problemId)
   if (!sub || !sub.submission_id) return
   drawerVisible.value = true
@@ -462,7 +470,7 @@ const analyzeCode = async () => {
         suggestion: "结合得分情况给出具体的改进建议"
       }
     })
-    aiResult.value = res
+    aiResult.value = codeAnalysisSchema.parse(res)
   } catch (error) {
     ElMessage.error('AI 分析失败')
   } finally {
@@ -470,14 +478,14 @@ const analyzeCode = async () => {
   }
 }
 
-const getAiTagType = (rating) => {
+const getAiTagType = (rating: string) => {
   if (rating === '优秀') return 'success'
   if (rating === '良好') return 'primary'
   if (rating === '及格') return 'warning'
   return 'danger'
 }
 
-const getStatusType = (status) => {
+const getStatusType = (status: string | null | undefined) => {
   if (!status) return 'info'
   const s = status.toLowerCase()
   if (s === 'accepted') return 'success'
@@ -485,9 +493,9 @@ const getStatusType = (status) => {
   return 'danger'
 }
 
-const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : ''
+const formatTime = (time: string | null | undefined) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : ''
 
-const formatDuration = (seconds) => {
+const formatDuration = (seconds: number) => {
   if (!seconds) return '0'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -502,7 +510,7 @@ const copyCode = () => {
   }
 }
 
-watch(autoRefresh, (val) => {
+watch(autoRefresh, (val: boolean) => {
   if (val) refreshTimer = setInterval(() => fetchMonitorData(true), 10000)
   else clearInterval(refreshTimer)
 }, { immediate: true })

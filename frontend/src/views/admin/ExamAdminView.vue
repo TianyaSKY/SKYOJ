@@ -186,7 +186,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { CreateExamInput } from '@/schemas/exam'
+import type { ExamListResponse, ExamProblemItem } from '@/types/exam'
 import {createExamSchema, updateExamSchema} from '@/schemas/exam'
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {
@@ -216,24 +218,25 @@ import { getExamTiming } from '@/utils/examTime'
 import { useNow } from '@/composables/useNow'
 
 const now = useNow()
-const exams = ref([])
+const exams = ref<ExamListResponse[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
 const dialogLoading = ref(false)
 const isEdit = ref(false)
-const currentExamId = ref(null)
+const currentExamId = ref<number | null>(null)
 const removePassword = ref(false)
 let dialogVersion = 0
 let listVersion = 0
 let disposed = false
-const isCurrentDialog = version => !disposed && dialogVisible.value && version === dialogVersion
+const isCurrentDialog = (version: number) => !disposed && dialogVisible.value && version === dialogVersion
 
 // Problem Selection
-const allProblems = ref([])
-const selectedProblemIds = ref([])
+interface SelectableProblem { id: number; title: string; label: string; disabled: boolean }
+const allProblems = ref<SelectableProblem[]>([])
+const selectedProblemIds = ref<number[]>([])
 const problemSearchQuery = ref('')
-const timeRange = ref([])
+const timeRange = ref<Array<Date | null>>([])
 const filteredProblems = computed(() => {
   const query = problemSearchQuery.value.trim().toLowerCase()
   if (!query) return allProblems.value
@@ -243,7 +246,8 @@ const filteredProblems = computed(() => {
     problem.label.toLowerCase().includes(query))
 })
 
-const form = ref({
+type ExamForm = Omit<CreateExamInput, 'password' | 'problem_ids' | 'contest_type'> & {password?: string; problem_ids?: string; contest_type?: string; has_password?: boolean}
+const form = ref<ExamForm>({
   title: '',
   description: '',
   start_time: '',
@@ -272,7 +276,7 @@ const fetchProblems = async () => {
   try {
     const data = await getProblemList()
     if (disposed) return
-    allProblems.value = data.map(p => ({
+    allProblems.value = (Array.isArray(data) ? data : data.problems).map(p => ({
       id: p.id,
       title: p.title,
       label: `${p.id} - ${p.title}`,
@@ -283,22 +287,22 @@ const fetchProblems = async () => {
   }
 }
 
-const getExamStatus = (exam) => {
+const getExamStatus = (exam: ExamListResponse) => {
   const phase = getExamTiming(exam, now.value).phase
-  return {
+  return ({
     upcoming: {label: '未开始', type: 'info'},
     ongoing: {label: '进行中', type: 'success'},
     ended: {label: '已结束', type: 'danger'},
     unknown: {label: '时间无效', type: 'info'},
-  }[phase]
+  } as const)[phase]
 }
 
-const formatTimeShort = (time) => {
+const formatTimeShort = (time: unknown) => {
   const date = parseServerDate(time)
   return date ? dayjs(date).format('MM-DD HH:mm') : '-'
 }
 
-const handleTimeChange = (val) => {
+const handleTimeChange = (val: [Date, Date] | null) => {
   if (val) {
     form.value.start_time = val[0].toISOString()
     form.value.end_time = val[1].toISOString()
@@ -334,7 +338,7 @@ const handleCreate = () => {
   dialogVisible.value = true
 }
 
-const handleEdit = async (row) => {
+const handleEdit = async (row: ExamListResponse) => {
   const version = ++dialogVersion
   resetForm()
   submitting.value = false
@@ -352,7 +356,7 @@ const handleEdit = async (row) => {
     form.value.end_time = timeRange.value[1]?.toISOString() || ''
 
     if (detail.problems && Array.isArray(detail.problems)) {
-      selectedProblemIds.value = detail.problems.map(p => p.problem_id || p.id)
+      selectedProblemIds.value = detail.problems.map((p: ExamProblemItem & {id?: number}) => p.problem_id || p.id).filter((id): id is number => id !== undefined)
     } else {
       selectedProblemIds.value = []
     }
@@ -365,7 +369,7 @@ const handleEdit = async (row) => {
   }
 }
 
-const handleDelete = async (id) => {
+const handleDelete = async (id: number) => {
   try {
     await deleteExam(id)
     ElMessage.success('删除成功')
@@ -375,7 +379,7 @@ const handleDelete = async (id) => {
   }
 }
 
-const handleExport = async (row) => {
+const handleExport = async (row: ExamListResponse) => {
   try {
     const blob = await exportExamScores(row.id)
     const url = window.URL.createObjectURL(new Blob([blob]))
@@ -397,22 +401,24 @@ const handleSubmit = async () => {
   const body = { ...form.value, problem_ids: [...selectedProblemIds.value] }
   if (isEdit.value && removePassword.value) body.password = ''
   else if (isEdit.value && form.value.has_password && !body.password) delete body.password
-  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(body)
-  if (!parsed.success) {
-    ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
+  const validation = isEdit.value
+    ? {editing: true as const, parsed: updateExamSchema.safeParse(body)}
+    : {editing: false as const, parsed: createExamSchema.safeParse(body)}
+  if (!validation.parsed.success) {
+    ElMessage.warning(validation.parsed.error.issues[0]?.message || '请检查输入')
     return
   }
 
   const version = dialogVersion
-  const editing = isEdit.value
   const examId = currentExamId.value
   submitting.value = true
   try {
-    if (editing) {
-      await updateExam(examId, parsed.data)
+    if (validation.editing) {
+      if (examId === null) throw new Error('编辑考试缺少 ID')
+      await updateExam(examId, validation.parsed.data)
       if (isCurrentDialog(version)) ElMessage.success('更新成功')
     } else {
-      await createExam(parsed.data)
+      await createExam(validation.parsed.data)
       if (isCurrentDialog(version)) ElMessage.success('创建成功')
     }
 
@@ -425,7 +431,7 @@ const handleSubmit = async () => {
   }
 }
 
-const filterMethod = (query, item) => {
+const filterMethod = (query: string, item: SelectableProblem) => {
   return item.label.toLowerCase().includes(query.toLowerCase())
 }
 

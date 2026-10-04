@@ -1,15 +1,15 @@
 // 对齐后端响应模型；日期时间在 JSON 协议中使用字符串。
 import type { JsonValue } from './common'
 export interface AskLlmBody {
-  system_setting?: string
-  prompt?: string
+  system_setting: string
+  prompt: string
   output_format?: Record<string, JsonValue> | null
   context_submission_id?: number | null
 }
 
 export interface ExecuteTestGenerationBody {
-  problem_id?: number
-  code?: string
+  problem_id: number
+  code: string
   type?: string | null
   language?: string
 }
