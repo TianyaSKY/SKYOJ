@@ -1,4 +1,4 @@
-import type { ExamListResponse, ExamDetailResponse, EnterExamResponse, ExamTokenResponse } from '@/types/exam'
+import type { ExamListResponse, EnterExamResponse } from '@/types/exam'
 import { useUserStore } from '@/stores/user'
 vi.mock('@/utils/request', () => ({ default: { post: vi.fn() } }))
 import { createPinia, setActivePinia } from 'pinia'

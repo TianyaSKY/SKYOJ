@@ -1,5 +1,5 @@
-import { examResponse, examStatus, problemResponse, deferred } from './fixtures'
-import type { ExamDetailResponse, ExamListResponse, ExamProblemStatusResponse, ExamResponse, ExamTokenResponse } from '@/types/exam'
+import { examResponse, problemResponse, deferred } from './fixtures'
+import type { ExamDetailResponse, ExamListResponse, ExamResponse } from '@/types/exam'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 vi.mock('@/api/exam', () => ({ getExamDetail: vi.fn(), getExamList: vi.fn(), updateExam: vi.fn(), createExam: vi.fn(), addExamProblem: vi.fn(), removeExamProblem: vi.fn(), deleteExam: vi.fn(), exportExamScores: vi.fn() }))

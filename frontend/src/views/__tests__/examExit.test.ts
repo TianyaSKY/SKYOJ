@@ -1,4 +1,4 @@
-import type { ExamListResponse, ExamDetailResponse, EnterExamResponse, ExamTokenResponse } from '@/types/exam'
+import type { ExamTokenResponse } from '@/types/exam'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { shallowMount, flushPromises } from '@vue/test-utils'

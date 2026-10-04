@@ -1,5 +1,5 @@
-import { examResponse, examStatus, problemResponse, deferred } from './fixtures'
-import type { ExamDetailResponse, ExamListResponse, ExamProblemStatusResponse, ExamResponse, ExamTokenResponse } from '@/types/exam'
+import { examResponse, examStatus, deferred } from './fixtures'
+import type { ExamDetailResponse, ExamProblemStatusResponse, ExamTokenResponse } from '@/types/exam'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { reactive, nextTick } from 'vue'

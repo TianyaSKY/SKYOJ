@@ -1,6 +1,6 @@
 import type { AxiosRequestConfig } from 'axios'
 import type { ComponentPublicInstance } from 'vue'
-import type { TagResponse, SolutionListItemResponse, CommentResponse } from '@/types/community'
+import type { SolutionListItemResponse, CommentResponse } from '@/types/community'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { nextTick } from 'vue'

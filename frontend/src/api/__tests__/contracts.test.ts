@@ -27,6 +27,9 @@ const code = { problem_id: 1, code: 'print(3)', language: 'python', exam_id: 2 }
 const form = new FormData()
 form.append('file', new Blob(['data']), 'test.txt')
 const cases: ContractCase[] = [
+  { name: '清空测例保留删除接口', invoke: () => problem.deleteAllTestCases(1), config: {url: '/problems/1/test_cases', method: 'delete'} },
+  { name: '同步 AI 对话保留五分钟超时', invoke: () => llm.askLLM({system_setting: '分析代码', prompt: 'print(3)'}), config: {url: '/llm/ask', method: 'post', data: {system_setting: '分析代码', prompt: 'print(3)'}, timeout: 300000} },
+  { name: '异步执行测例脚本保留请求体与两分钟超时', invoke: () => llm.executeAndSubmitTestData({problem_id: 1, code: 'print(3)'}), config: {url: '/llm/execute-test-generation', method: 'post', data: {problem_id: 1, code: 'print(3)'}, timeout: 120000} },
   { name: '题目列表分页与类别', invoke: () => problem.getProblemList({page: 2, problem_type: 'acm'}), config: {url: '/problems/', method: 'get', params: {page: 2, problem_type: 'acm'}} },
   { name: '搜索参数', invoke: () => problem.searchProblems({query: 'abc', top_k: 5}), config: {url: '/search', method: 'get', params: {query: 'abc', top_k: 5}} },
   { name: '题目详情', invoke: () => problem.getProblemDetail(1), config: {url: '/problems/1', method: 'get'} },

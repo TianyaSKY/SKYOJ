@@ -1,3 +1,5 @@
+import type { TagResponse, SolutionListItemResponse } from '@/types/community'
+import { isRecord } from '@/types/http'
 // 使用真实 Axios 实例验证组件请求经过 baseURL 拼接后的地址。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
@@ -16,10 +18,32 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 const originalAdapter = request.defaults.adapter
-let urls
-let wrapper
-let calls
-let writes
+let urls: string[]
+let wrapper: ReturnType<typeof shallowMount> | undefined
+let calls: [string | undefined, string][]
+let writes: Record<string, unknown>[]
+function mountedWrapper() {
+  if (!wrapper) throw new Error('社区面板未挂载')
+  return wrapper
+}
+// 部分样例刻意只携带该行为会读取的字段，保留原测试的历史响应兼容场景。
+type TestSolution = Pick<SolutionListItemResponse, 'id'> & Partial<SolutionListItemResponse>
+function tagState() {
+  return mountedWrapper().vm as unknown as {
+    isTeacher: boolean; selectedTagId: number | null; openAttach(): void; confirmAttach(): Promise<void>;
+    detach(tag: Pick<TagResponse, 'id' | 'name'>): Promise<void>;
+  }
+}
+function solutionState() {
+  return mountedWrapper().vm as unknown as {
+    isTeacher: boolean; userInfo: { id?: number }; solutions: SolutionListItemResponse[];
+    form: { title: string; content: string; language: string }; newComment: string;
+    toggleLike(item: TestSolution): Promise<void>; toggleFavorite(item: TestSolution): Promise<void>;
+    openComments(item: TestSolution): Promise<void>; openWrite(item?: TestSolution): void;
+    submitSolution(): Promise<void>; hideSolution(item: TestSolution): Promise<void>;
+    submitComment(): Promise<void>; deleteComment(id: number): Promise<void>;
+  }
+}
 const mountOptions = {
   props: { problemId: 42 },
   global: { stubs: Object.fromEntries([
@@ -36,13 +60,17 @@ beforeEach(() => {
   urls = []
   calls = []
   writes = []
-  ElMessageBox.confirm.mockResolvedValue('confirm')
+  vi.mocked(ElMessageBox.confirm).mockResolvedValue('confirm' as Awaited<ReturnType<typeof ElMessageBox.confirm>>)
   request.defaults.adapter = config => {
     urls.push(request.getUri(config))
     calls.push([config.method, request.getUri(config)])
-    if (config.method === 'post') writes.push(JSON.parse(config.data || '{}'))
+    if (config.method === 'post') {
+      const body: unknown = JSON.parse(config.data || '{}')
+      if (!isRecord(body)) throw new Error('请求体应为对象')
+      writes.push(body)
+    }
     return Promise.resolve({
-      data: config.url.includes('solutions') ? { items: [], total: 0 } : [],
+      data: config.url?.includes('solutions') ? { items: [], total: 0 } : [],
       status: 200, statusText: 'OK', headers: {}, config,
     })
   }
@@ -69,10 +97,10 @@ describe('社区组件的 API 请求路径', () => {
   it('挂标签和移除标签也只添加一次 API 前缀', async () => {
     wrapper = shallowMount(TagPanel, mountOptions)
     await flushPromises()
-    wrapper.vm.openAttach()
-    wrapper.vm.selectedTagId = 7
-    await wrapper.vm.confirmAttach()
-    await wrapper.vm.detach({id: 7, name: '数组'})
+    tagState().openAttach()
+    tagState().selectedTagId = 7
+    await tagState().confirmAttach()
+    await tagState().detach({id: 7, name: '数组'})
     await flushPromises()
     expect(calls).toContainEqual(['post', '/api/tags/problems/42/attach'])
     expect(calls).toContainEqual(['delete', '/api/tags/problems/42/7'])
@@ -83,9 +111,9 @@ describe('社区组件的 API 请求路径', () => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
     const item = {id: 7, comment_count: 0}
-    await wrapper.vm.toggleLike(item)
-    await wrapper.vm.toggleFavorite(item)
-    await wrapper.vm.openComments(item)
+    await solutionState().toggleLike(item)
+    await solutionState().toggleFavorite(item)
+    await solutionState().openComments(item)
     await flushPromises()
     expect(calls).toContainEqual(['post', '/api/problems/solutions/7/like'])
     expect(calls).toContainEqual(['post', '/api/problems/solutions/7/favorite'])
@@ -96,18 +124,18 @@ describe('社区组件的 API 请求路径', () => {
   it('题解发布、修改、隐藏和评论写入使用后端真实路径', async () => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
-    wrapper.vm.openWrite()
-    wrapper.vm.form.title = '题解'
-    wrapper.vm.form.content = '解法'
-    await wrapper.vm.submitSolution()
+    solutionState().openWrite()
+    solutionState().form.title = '题解'
+    solutionState().form.content = '解法'
+    await solutionState().submitSolution()
     const item = {id: 7, title: '题解', content: '解法', comment_count: 1}
-    wrapper.vm.openWrite(item)
-    await wrapper.vm.submitSolution()
-    await wrapper.vm.hideSolution(item)
-    await wrapper.vm.openComments(item)
-    wrapper.vm.newComment = '评论'
-    await wrapper.vm.submitComment()
-    await wrapper.vm.deleteComment(8)
+    solutionState().openWrite(item)
+    await solutionState().submitSolution()
+    await solutionState().hideSolution(item)
+    await solutionState().openComments(item)
+    solutionState().newComment = '评论'
+    await solutionState().submitComment()
+    await solutionState().deleteComment(8)
     await flushPromises()
 
     expect(calls).toContainEqual(['post', '/api/problems/42/solutions'])
@@ -123,11 +151,11 @@ describe('社区组件的 API 请求路径', () => {
     store.user = {id: 1, role: 'teacher'}
     wrapper = shallowMount(TagPanel, mountOptions)
     await flushPromises()
-    expect(wrapper.vm.isTeacher).toBe(true)
+    expect(tagState().isTeacher).toBe(true)
 
     store.logout()
     await flushPromises()
-    expect(wrapper.vm.isTeacher).toBe(false)
+    expect(tagState().isTeacher).toBe(false)
   })
 
   it('登出和切换用户时题解面板同步角色与作者身份', async () => {
@@ -135,16 +163,16 @@ describe('社区组件的 API 请求路径', () => {
     store.user = {id: 1, role: 'teacher'}
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
-    expect(wrapper.vm.isTeacher).toBe(true)
-    expect(wrapper.vm.userInfo.id).toBe(1)
+    expect(solutionState().isTeacher).toBe(true)
+    expect(solutionState().userInfo.id).toBe(1)
 
     store.logout()
     await flushPromises()
-    expect(wrapper.vm.isTeacher).toBe(false)
-    expect(wrapper.vm.userInfo.id).toBeUndefined()
+    expect(solutionState().isTeacher).toBe(false)
+    expect(solutionState().userInfo.id).toBeUndefined()
     store.user = {id: 2, role: 'student'}
     await flushPromises()
-    expect(wrapper.vm.userInfo.id).toBe(2)
+    expect(solutionState().userInfo.id).toBe(2)
   })
 
   it('列表返回正文和交互状态后，题解可展示并保留原文编辑', async () => {
@@ -166,20 +194,20 @@ describe('社区组件的 API 请求路径', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('.solution-body').html()).toContain('<h2>解法</h2>')
-    expect(wrapper.vm.solutions[0].liked_by_me).toBe(true)
-    expect(wrapper.vm.solutions[0].favorited_by_me).toBe(true)
-    wrapper.vm.openWrite(wrapper.vm.solutions[0])
-    expect(wrapper.vm.form.content).toBe('## 解法\n原文')
+    expect(mountedWrapper().find('.solution-body').html()).toContain('<h2>解法</h2>')
+    expect(solutionState().solutions[0].liked_by_me).toBe(true)
+    expect(solutionState().solutions[0].favorited_by_me).toBe(true)
+    solutionState().openWrite(solutionState().solutions[0])
+    expect(solutionState().form.content).toBe('## 解法\n原文')
   })
 
-  it.each([['teacher', true], ['student', false]])('标签提交按当前 %s 身份设置审批状态', async (role, expected) => {
+  it.each([['teacher', true], ['student', false]] as const)('标签提交按当前 %s 身份设置审批状态', async (role, expected) => {
     useUserStore().user = {id: 1, role}
     wrapper = shallowMount(TagPanel, mountOptions)
     await flushPromises()
-    wrapper.vm.openAttach()
-    wrapper.vm.selectedTagId = 7
-    await wrapper.vm.confirmAttach()
+    tagState().openAttach()
+    tagState().selectedTagId = 7
+    await tagState().confirmAttach()
     expect(writes).toContainEqual({tag_id: 7, approved: expected})
   })
 
@@ -188,10 +216,10 @@ describe('社区组件的 API 请求路径', () => {
     store.user = {id: 1, role: 'teacher'}
     wrapper = shallowMount(TagPanel, mountOptions)
     await flushPromises()
-    wrapper.vm.openAttach()
-    wrapper.vm.selectedTagId = 7
+    tagState().openAttach()
+    tagState().selectedTagId = 7
     store.user = {id: 2, role: 'student'}
-    await wrapper.vm.confirmAttach()
+    await tagState().confirmAttach()
     expect(writes).toContainEqual({tag_id: 7, approved: false})
   })
 
@@ -202,21 +230,21 @@ describe('社区组件的 API 请求路径', () => {
       global: {...mountOptions.global, renderStubDefaultSlot: true},
     })
     await flushPromises()
-    wrapper.vm.openAttach()
+    tagState().openAttach()
     await flushPromises()
-    expect(wrapper.find('el-checkbox-stub').exists()).toBe(false)
+    expect(mountedWrapper().find('el-checkbox-stub').exists()).toBe(false)
   })
 
   it.each([
     ['短标题', {title: '一'}], ['长标题', {title: 'x'.repeat(201)}],
     ['空白正文', {content: '  \n  '}], ['长正文', {content: 'x'.repeat(20001)}],
     ['长语言字段', {language: 'x'.repeat(51)}],
-  ])('题解无效字段在发请求前被拦截：%s', async (label, patch) => {
+  ] as const)('题解无效字段在发请求前被拦截：%s', async (label, patch) => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
-    wrapper.vm.openWrite()
-    wrapper.vm.form = {title: '题解', content: '正文', language: '', ...patch}
-    await wrapper.vm.submitSolution()
+    solutionState().openWrite()
+    solutionState().form = {title: '题解', content: '正文', language: '', ...patch}
+    await solutionState().submitSolution()
     expect(writes).toEqual([])
     expect(ElMessage.warning).toHaveBeenCalled()
   })
@@ -225,22 +253,22 @@ describe('社区组件的 API 请求路径', () => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
     const content = '    ' + 'x'.repeat(19995) + '\n'
-    wrapper.vm.openWrite()
-    wrapper.vm.form = {title: 'x'.repeat(200), content, language: 'x'.repeat(50)}
-    await wrapper.vm.submitSolution()
+    solutionState().openWrite()
+    solutionState().form = {title: 'x'.repeat(200), content, language: 'x'.repeat(50)}
+    await solutionState().submitSolution()
     expect(writes).toHaveLength(1)
-    expect(writes[0].content).toBe(content)
+    expect(writes[0]?.content).toBe(content)
     expect(ElMessage.warning).not.toHaveBeenCalled()
   })
 
   it('超长评论不发请求并保留输入', async () => {
     wrapper = shallowMount(SolutionPanel, mountOptions)
     await flushPromises()
-    await wrapper.vm.openComments({id: 7, comment_count: 0})
-    wrapper.vm.newComment = 'x'.repeat(1001)
-    await wrapper.vm.submitComment()
+    await solutionState().openComments({id: 7, comment_count: 0})
+    solutionState().newComment = 'x'.repeat(1001)
+    await solutionState().submitComment()
     expect(writes).toEqual([])
-    expect(wrapper.vm.newComment).toHaveLength(1001)
+    expect(solutionState().newComment).toHaveLength(1001)
     expect(ElMessage.warning).toHaveBeenCalled()
   })
 })

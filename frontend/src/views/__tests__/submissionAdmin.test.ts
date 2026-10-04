@@ -58,7 +58,9 @@ describe('提交管理的筛选恢复与请求顺序', () => {
     mountPage(true)
     const option = mountedWrapper().find(`el-option-stub[value="${status}"]`)
     expect(option.exists()).toBe(true)
-    setupState().filterForm.status = option.attributes('value')
+    const value = option.attributes('value')
+    if (!value) throw new Error('状态选项缺少 value')
+    setupState().filterForm.status = value
     setupState().handleFilter()
     await flushPromises()
     expect(getSubmissions).toHaveBeenLastCalledWith({ status, page: 1, per_page: 20 })
