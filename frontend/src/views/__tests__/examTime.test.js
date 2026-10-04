@@ -16,7 +16,7 @@ import { ElMessageBox } from 'element-plus'
 let wrapper
 const exam = { id: 1, title: '考试', description: '', start_time: '2026-06-15T10:00:01', end_time: '2026-06-15T10:00:03', problems: [], is_visible: true, contest_type: 'icpc' }
 function mountPage(component) {
-  wrapper = shallowMount(component, { global: { directives: { loading: () => {} }, stubs: Object.fromEntries(['el-icon','el-tag','el-table','el-table-column','el-link','el-button','el-card','el-col','el-row','el-progress','el-divider','el-alert','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm'].map(name => [name, true])) } })
+  wrapper = shallowMount(component, { global: { directives: { loading: () => {} }, stubs: Object.fromEntries(['el-icon','el-tag','el-table','el-table-column','el-link','el-button','el-card','el-col','el-row','el-progress','el-divider','el-alert','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm','el-checkbox'].map(name => [name, true])) } })
   return wrapper.vm
 }
 beforeEach(() => {

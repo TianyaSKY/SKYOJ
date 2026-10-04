@@ -15,7 +15,7 @@ function deferred() {
   return { promise, resolve, reject }
 }
 function mountPage() {
-  wrapper = shallowMount(ExamAdminView, { global: { directives: { loading: () => {} }, stubs: { ...Object.fromEntries(['el-icon','el-row','el-col','el-card','el-tag','el-link','el-table','el-table-column','el-button','el-divider','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm'].map(name => [name,true])), ...Object.fromEntries(['el-dialog','el-form','el-row','el-col'].map(name => [name, { template: '<div><slot /></div>' }])), 'el-transfer': { name: 'TransferOptions', props: ['data'], template: '<div />' } } } })
+  wrapper = shallowMount(ExamAdminView, { global: { directives: { loading: () => {} }, stubs: { ...Object.fromEntries(['el-icon','el-row','el-col','el-card','el-tag','el-link','el-table','el-table-column','el-button','el-divider','el-input','el-dialog','el-form','el-form-item','el-date-picker','el-switch','el-transfer','el-tooltip','el-popconfirm','el-checkbox'].map(name => [name,true])), ...Object.fromEntries(['el-dialog','el-form','el-row','el-col'].map(name => [name, { template: '<div><slot /></div>' }])), 'el-transfer': { name: 'TransferOptions', props: ['data'], template: '<div />' } } } })
   return wrapper.vm
 }
 beforeEach(() => {
@@ -116,4 +116,25 @@ it('新建或编辑另一场考试时清空旧搜索，恢复完整候选题库'
   expect(wrapper.findComponent({ name: 'TransferOptions' }).props('data')).toHaveLength(2)
   vm.problemSearchQuery = '无匹配'; vm.dialogVisible = false; vm.handleCreate()
   expect(vm.problemSearchQuery).toBe('')
+})
+it('编辑有密码考试时留空保留，填写替换，明确勾选后移除', async () => {
+  const vm = mountPage()
+  const protectedExam = { ...exam(1), has_password: true }
+  getExamDetail.mockResolvedValueOnce(protectedExam); await vm.handleEdit({ id: 1 })
+  expect(vm.form.password).toBe(''); vm.form.title = '仅改标题'
+  await vm.handleSubmit(); expect(updateExam.mock.calls[0][1]).not.toHaveProperty('password')
+  getExamDetail.mockResolvedValueOnce(protectedExam); await vm.handleEdit({ id: 1 })
+  vm.form.password = 'replacement'; await vm.handleSubmit()
+  expect(updateExam.mock.calls[1][1].password).toBe('replacement')
+  getExamDetail.mockResolvedValueOnce(protectedExam); await vm.handleEdit({ id: 1 })
+  vm.removePassword = true; await vm.handleSubmit()
+  expect(updateExam.mock.calls[2][1].password).toBe('')
+})
+it('取消移除密码选择、切换考试或重新创建不会沿用旧的移除标记', async () => {
+  const vm = mountPage(); getExamDetail.mockResolvedValueOnce({ ...exam(1), has_password: true })
+  await vm.handleEdit({ id: 1 }); vm.removePassword = true; vm.removePassword = false
+  await vm.handleSubmit(); expect(updateExam.mock.calls[0][1]).not.toHaveProperty('password')
+  getExamDetail.mockResolvedValueOnce({ ...exam(1), has_password: true }); await vm.handleEdit({ id: 1 })
+  vm.removePassword = true; await vm.handleEdit({ id: 2 }); expect(vm.removePassword).toBe(false)
+  vm.removePassword = true; vm.dialogVisible = false; vm.handleCreate(); expect(vm.removePassword).toBe(false)
 })

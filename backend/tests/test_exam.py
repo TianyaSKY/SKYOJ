@@ -267,3 +267,23 @@ def test_add_problem_api_validates_existence_and_duplicate(client, teacher_token
     stored = db_session.query(ExamProblem).filter_by(exam_id=exam_id).one()
     assert stored.display_id == 'A'
     assert stored.score == 70
+
+
+def test_update_password_omission_replacement_and_explicit_removal(client, teacher_token, db_session):
+    from app.persistence.exam import Exam
+    from app.services.exam import ExamService
+
+    headers = {'Authorization': f'Bearer {teacher_token}'}
+    created = client.post('/api/exams/', headers=headers, json={
+        'title': '密码编辑', 'start_time': '2090-01-01T10:00:00Z',
+        'end_time': '2090-01-01T11:00:00Z', 'password': 'original'})
+    exam_id = created.json()['id']
+    url = f'/api/exams/{exam_id}'
+    assert client.put(url, headers=headers, json={'title': '仅改标题'}).status_code == 200
+    assert db_session.get(Exam, exam_id).password == ExamService._hash_password('original')
+    assert client.get(url, headers=headers).json()['has_password'] is True
+    assert client.put(url, headers=headers, json={'password': 'replacement'}).status_code == 200
+    assert db_session.get(Exam, exam_id).password == ExamService._hash_password('replacement')
+    assert client.put(url, headers=headers, json={'password': ''}).status_code == 200
+    assert db_session.get(Exam, exam_id).password is None
+    assert client.get(url, headers=headers).json()['has_password'] is False

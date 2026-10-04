@@ -124,7 +124,12 @@
             <el-row :gutter="20">
               <el-col :span="14">
                 <el-form-item label="考试密码" prop="password">
-                  <el-input v-model="form.password" placeholder="留空则公开" show-password/>
+                  <el-input v-model="form.password"
+                            :placeholder="isEdit && form.has_password ? '留空保留现有密码，填写则替换' : '留空则公开'"
+                            :disabled="removePassword" show-password/>
+                  <el-checkbox v-if="isEdit && form.has_password" v-model="removePassword">
+                    移除现有密码
+                  </el-checkbox>
                 </el-form-item>
               </el-col>
               <el-col :span="10">
@@ -218,6 +223,7 @@ const dialogVisible = ref(false)
 const dialogLoading = ref(false)
 const isEdit = ref(false)
 const currentExamId = ref(null)
+const removePassword = ref(false)
 let dialogVersion = 0
 let listVersion = 0
 let disposed = false
@@ -303,6 +309,7 @@ const handleTimeChange = (val) => {
 }
 
 const resetForm = () => {
+  removePassword.value = false
   form.value = {
     title: '',
     description: '',
@@ -339,7 +346,7 @@ const handleEdit = async (row) => {
   try {
     const detail = await getExamDetail(row.id)
     if (!isCurrentDialog(version)) return
-    form.value = {...detail}
+    form.value = {...detail, password: ''}
     timeRange.value = [parseServerDate(detail.start_time), parseServerDate(detail.end_time)]
     form.value.start_time = timeRange.value[0]?.toISOString() || ''
     form.value.end_time = timeRange.value[1]?.toISOString() || ''
@@ -387,7 +394,10 @@ const handleExport = async (row) => {
 
 const handleSubmit = async () => {
   if (disposed || !dialogVisible.value || dialogLoading.value || submitting.value) return
-  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse({ ...form.value, problem_ids: [...selectedProblemIds.value] })
+  const body = { ...form.value, problem_ids: [...selectedProblemIds.value] }
+  if (isEdit.value && removePassword.value) body.password = ''
+  else if (isEdit.value && form.value.has_password && !body.password) delete body.password
+  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(body)
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
     return
