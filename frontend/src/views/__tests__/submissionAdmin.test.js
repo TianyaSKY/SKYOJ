@@ -74,7 +74,7 @@ describe('提交管理的筛选恢复与请求顺序', () => {
     }))
     mountPage()
     await flushPromises()
-    expect(getSubmissions).toHaveBeenCalledWith({ problem_id: '12', username: 'alice', page: 1, per_page: 20 })
+    expect(getSubmissions).toHaveBeenCalledWith({ problem_id: 12, username: 'alice', page: 1, per_page: 20 })
   })
 
   it('较早请求迟到时不能覆盖最新筛选结果或提前关闭加载状态', async () => {

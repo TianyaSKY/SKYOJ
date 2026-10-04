@@ -147,9 +147,11 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
+import type { ExamDetailResponse, ExamProblemStatusResponse } from '@/types/exam'
+import { parseRouteId } from '@/utils/route'
 import {exitExam, getExamDetail, getMyExamStatus} from '@/api/exam'
 import {useUserStore} from '@/stores/user'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -169,9 +171,9 @@ import { useNow } from '@/composables/useNow'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const examId = computed(() => route.params.id)
+const examId = computed(() => parseRouteId(route.params.id))
 
-const emptyExam = () => ({
+const emptyExam = (): Pick<ExamDetailResponse, 'title' | 'description' | 'start_time' | 'end_time' | 'problems'> => ({
   title: '加载中...',
   description: '',
   start_time: '',
@@ -180,10 +182,10 @@ const emptyExam = () => ({
 })
 const exam = ref(emptyExam())
 
-const problemStatus = ref([])
+const problemStatus = ref<ExamProblemStatusResponse[]>([])
 const statusLoading = ref(false)
 const sessionConfirmed = ref(false)
-let statusToken = null
+let statusToken: string | null = null
 const now = useNow()
 const timing = computed(() => getExamTiming(exam.value, now.value))
 const remainingTime = computed(() => timing.value.remainingSeconds)
@@ -210,6 +212,7 @@ const fetchExamData = async () => {
   const isCurrent = () => !disposed && scope === scopeVersion && id === examId.value &&
     request === detailRequestVersion && token === localStorage.getItem('token')
   try {
+    if (id === null) throw new Error('考试 ID 无效')
     const data = await getExamDetail(id)
     if (!isCurrent()) return
     exam.value = data
@@ -222,7 +225,7 @@ const fetchExamData = async () => {
 }
 
 const fetchStatus = async () => {
-  if (disposed || statusLoading.value) return
+  if (disposed || statusLoading.value || examId.value === null) return
   const scope = scopeVersion
   const request = ++statusRequestVersion
   const token = localStorage.getItem('token')
@@ -254,15 +257,15 @@ const totalMaxScore = computed(() => {
   return problemStatus.value.reduce((sum, p) => sum + (p.max_score || 0), 0)
 })
 
-const getStatusType = (status) => {
+const getStatusType = (status: string) => {
   if (status === 'Accepted') return 'success'
   if (status === 'Not Attempted') return 'info'
   if (status === 'Pending' || status === 'Judging') return 'warning'
   return 'danger'
 }
 
-const getStatusLabel = (status) => {
-  const map = {
+const getStatusLabel = (status: string) => {
+  const map: Record<string, string> = {
     'Accepted': '已通过',
     'Not Attempted': '未尝试',
     'Pending': '评测中',
@@ -344,20 +347,20 @@ const remainingTimeStr = computed(() => {
 })
 
 const timerStatus = computed(() => {
-  return {
+  return ({
     upcoming: {label: '距离开始', type: 'info'},
     ongoing: {label: '剩余时间', type: 'danger'},
     ended: {label: '已结束', type: 'info'},
     unknown: {label: '加载中', type: 'info'},
-  }[timing.value.phase]
+  } as const)[timing.value.phase]
 })
 
-const formatTime = (time) => {
+const formatTime = (time: unknown) => {
   const date = parseServerDate(time)
   return date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'
 }
 
-const goToProblem = (problemId) => {
+const goToProblem = (problemId: number) => {
   router.push({
     path: `/problem/${problemId}`,
     query: {exam_id: examId.value}

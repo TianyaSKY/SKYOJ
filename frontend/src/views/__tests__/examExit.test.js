@@ -2,7 +2,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: 1 } }), useRouter: () => ({ push }) }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '1' } }), useRouter: () => ({ push }) }))
 vi.mock('@/utils/request', () => ({ default: {} }))
 vi.mock('@/api/exam', () => ({ getExamDetail: vi.fn(), getMyExamStatus: vi.fn(), exitExam: vi.fn() }))
 vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn() }, ElMessageBox: { confirm: vi.fn(), alert: vi.fn() } }))

@@ -112,26 +112,29 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSubmissions } from '@/api/submission'
+import type { SubmissionListResponse, SubmissionQuery } from '@/types/submission'
+import { isRecord } from '@/types/http'
+import type { TagProps } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
-const submissions = ref([])
+const submissions = ref<SubmissionListResponse[]>([])
 
 const STORAGE_KEY = 'skyoj_submission_filter'
 
 // 缓存损坏时清除筛选缓存，保证页面仍能加载。
-const loadSavedFilter = () => {
+const loadSavedFilter = (): Record<string, unknown> => {
   const cached = localStorage.getItem(STORAGE_KEY)
   if (cached === null) return {}
   try {
-    const parsed = JSON.parse(cached)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const parsed: unknown = JSON.parse(cached)
+    if (!isRecord(parsed)) {
       throw new TypeError('筛选缓存必须为对象')
     }
     return parsed
@@ -142,7 +145,7 @@ const loadSavedFilter = () => {
   }
 }
 const savedFilter = loadSavedFilter()
-const savedField = (key) => typeof savedFilter[key] === 'string' ? savedFilter[key] : ''
+const savedField = (key: string) => typeof savedFilter[key] === 'string' ? savedFilter[key] : ''
 // 兼容旧版管理页面保存的错误状态名称。
 const savedStatus = savedField('status') === 'Compilation Error' ? 'Compile Error' : savedField('status')
 
@@ -171,22 +174,23 @@ const fetchSubmissions = async () => {
   const requestId = ++latestRequestId
   loading.value = true
   try {
-    const params = {
-      ...filterForm,
-      page: pagination.page,
-      per_page: pagination.per_page
+    const params: SubmissionQuery = { page: pagination.page, per_page: pagination.per_page }
+    for (const key of ['problem_id', 'user_id', 'exam_id'] as const) {
+      if (filterForm[key]) {
+        const id = Number(filterForm[key])
+        if (!Number.isSafeInteger(id)) throw new TypeError('筛选 ID 必须是安全整数')
+        params[key] = id
+      }
     }
-    // 移除空字符串参数
-    Object.keys(params).forEach(key => {
-      if (params[key] === '' || params[key] === null) delete params[key]
-    })
+    if (filterForm.username) params.username = filterForm.username
+    if (filterForm.status) params.status = filterForm.status
 
     const res = await getSubmissions(params)
     if (requestId !== latestRequestId) return
 
     if (res) {
-      const list = res.items || res.submissions || res.data || (Array.isArray(res) ? res : [])
-      const total = res.total !== undefined ? res.total : (Array.isArray(res) ? res.length : 0)
+      const list = Array.isArray(res) ? res : 'submissions' in res ? res.submissions : res.items || res.data || []
+      const total = Array.isArray(res) ? res.length : res.total ?? 0
 
       submissions.value = list
       pagination.total = total
@@ -208,28 +212,28 @@ const handleFilter = () => {
 }
 
 const resetFilter = () => {
-  Object.keys(filterForm).forEach(key => filterForm[key] = '')
+  for (const key of ['problem_id', 'user_id', 'username', 'exam_id', 'status'] as const) filterForm[key] = ''
   localStorage.removeItem(STORAGE_KEY)
   handleFilter()
 }
 
-const handleSizeChange = (val) => {
+const handleSizeChange = (val: number) => {
   pagination.per_page = val
   pagination.page = 1
   fetchSubmissions()
 }
 
-const handleCurrentChange = (val) => {
+const handleCurrentChange = (val: number) => {
   pagination.page = val
   fetchSubmissions()
 }
 
-const viewDetail = (id) => {
+const viewDetail = (id: number) => {
   router.push({ name: 'submission-detail', params: { id } })
 }
 
-const getStatusType = (status) => {
-  const map = {
+const getStatusType = (status: string) => {
+  const map: Record<string, TagProps['type']> = {
     'Accepted': 'success',
     'Wrong Answer': 'danger',
     'Pending': 'info',
@@ -243,13 +247,13 @@ const getStatusType = (status) => {
   return map[status] || 'info'
 }
 
-const getScoreClass = (score) => {
+const getScoreClass = (score: number) => {
   if (score === 100) return 'text-success'
   if (score > 0) return 'text-warning'
   return 'text-danger'
 }
 
-const formatTime = (time) => time ? new Date(time).toLocaleString() : ''
+const formatTime = (time: string | null) => time ? new Date(time).toLocaleString() : ''
 
 onMounted(() => {
   fetchSubmissions()

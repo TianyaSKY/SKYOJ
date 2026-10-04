@@ -84,8 +84,11 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref} from 'vue'
+import type { ExamListResponse } from '@/types/exam'
+import { isRecord } from '@/types/http'
+import { errorMessage } from '@/utils/error'
 import {enterExam, getExamList} from '@/api/exam'
 import {useUserStore} from '@/stores/user'
 import {ElMessage} from 'element-plus'
@@ -101,7 +104,7 @@ dayjs.extend(duration)
 
 const now = useNow()
 const loading = ref(false)
-const allExams = ref([])
+const allExams = ref<ExamListResponse[]>([])
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -111,7 +114,7 @@ let disposed = false
 const passwordDialogVisible = ref(false)
 const submittingPassword = ref(false)
 const passwordInput = ref('')
-const currentExamId = ref(null)
+const currentExamId = ref<number | null>(null)
 
 const fetchExams = async () => {
   loading.value = true
@@ -125,14 +128,14 @@ const fetchExams = async () => {
   }
 }
 
-const getExamStatus = (exam) => {
+const getExamStatus = (exam: ExamListResponse) => {
   const phase = getExamTiming(exam, now.value).phase
-  return {
+  return ({
     upcoming: {text: '未开始', type: 'info'},
     ongoing: {text: '进行中', type: 'success'},
     ended: {text: '已结束', type: 'danger'},
     unknown: {text: '时间无效', type: 'info'},
-  }[phase]
+  } as const)[phase]
 }
 
 const filteredExams = computed(() => {
@@ -143,12 +146,12 @@ const filteredExams = computed(() => {
   })
 })
 
-const formatTime = (time) => {
+const formatTime = (time: unknown) => {
   const date = parseServerDate(time)
   return date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'
 }
 
-const getDuration = (start, end) => {
+const getDuration = (start: unknown, end: unknown) => {
   const diff = (parseServerDate(end)?.getTime() ?? 0) - (parseServerDate(start)?.getTime() ?? 0)
   const dur = dayjs.duration(diff)
   const hours = Math.floor(dur.asHours())
@@ -156,11 +159,11 @@ const getDuration = (start, end) => {
   return `${hours}小时${minutes}分钟`
 }
 
-const handlePasswordClose = (done) => {
+const handlePasswordClose = (done: () => void) => {
   if (!submittingPassword.value) done()
 }
 
-const requestEntry = async (examId, password, passwordAttempt) => {
+const requestEntry = async (examId: number, password: string, passwordAttempt: boolean) => {
   entering.value = true
   submittingPassword.value = passwordAttempt
   let expectedToken = localStorage.getItem('token')
@@ -176,8 +179,10 @@ const requestEntry = async (examId, password, passwordAttempt) => {
     await router.push(`/exam/${examId}`)
   } catch (error) {
     if (!isCurrentSession()) return
-    const message = error.response?.data?.error || error.message
-    if (!passwordAttempt && error.response?.status === 403 && message === '考试密码错误') {
+    const response = isRecord(error) && isRecord(error.response) ? error.response : null
+    const payload = response && isRecord(response.data) ? response.data : null
+    const message = payload?.error || errorMessage(error, '')
+    if (!passwordAttempt && response?.status === 403 && message === '考试密码错误') {
       passwordInput.value = ''
       passwordDialogVisible.value = true
     } else {
@@ -191,7 +196,7 @@ const requestEntry = async (examId, password, passwordAttempt) => {
   }
 }
 
-const handleEnterExam = async (exam) => {
+const handleEnterExam = async (exam: ExamListResponse) => {
   if (disposed || entering.value || passwordDialogVisible.value) return
   const phase = getExamTiming(exam, Date.now()).phase
   if (phase !== 'ongoing') {

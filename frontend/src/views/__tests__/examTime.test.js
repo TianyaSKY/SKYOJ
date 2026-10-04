@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import dayjs from 'dayjs'
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: 1 } }), useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '1' } }), useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/api/exam', () => ({ getExamList: vi.fn(), getExamDetail: vi.fn(), getMyExamStatus: vi.fn(), enterExam: vi.fn(), exitExam: vi.fn(), createExam: vi.fn(), updateExam: vi.fn(), deleteExam: vi.fn(), exportExamScores: vi.fn(), addExamProblem: vi.fn(), removeExamProblem: vi.fn() }))
 vi.mock('@/api/problem', () => ({ getProblemList: vi.fn() }))
 vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() }, ElMessageBox: { alert: vi.fn(), confirm: vi.fn() } }))

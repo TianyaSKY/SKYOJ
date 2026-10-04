@@ -180,33 +180,36 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
+import type { RankEntry, RankProblemInfo, RankProblemStats } from '@/types/exam'
+import { parseRouteId } from '@/utils/route'
 import {getExamRank} from '@/api/exam'
 import {Refresh, Top, Trophy} from '@element-plus/icons-vue'
 import {ElMessage} from 'element-plus'
 import dayjs from 'dayjs'
 
 const route = useRoute()
-const examId = route.params.id
+const examId = parseRouteId(route.params.id)
 const examTitle = ref('加载中...')
 const loading = ref(false)
-const rankData = ref([])
-const problems = ref([])
+const rankData = ref<Array<RankEntry & {avatar?: string | null}>>([])
+const problems = ref<RankProblemInfo[]>([])
 const autoRefresh = ref(localStorage.getItem('exam_rank_auto_refresh') === 'true')
 const lastUpdateTime = ref('')
-const rankChangedUsers = ref(new Set())
+const rankChangedUsers = ref(new Set<string>())
 const showFullscreenBalloons = ref(false)
-const balloons = ref([])
+interface Balloon { id: number; x: number; color: string; duration: number; delay: number; text: string }
+const balloons = ref<Balloon[]>([])
 
-let refreshTimer = null
-let previousRankMap = new Map()
+let refreshTimer: ReturnType<typeof setInterval> | undefined
+let previousRankMap = new Map<string, number>()
 
 const BALLOON_COLORS = ['#ff4d4f', '#1890ff', '#52c41a', '#fadb14', '#722ed1', '#eb2f96']
 
-const triggerFullscreenBalloons = (users) => {
-  const newBalloons = []
+const triggerFullscreenBalloons = (users: Set<string>) => {
+  const newBalloons: Balloon[] = []
   const userList = Array.from(users)
 
   for (let i = 0; i < 15; i++) {
@@ -232,19 +235,20 @@ const triggerFullscreenBalloons = (users) => {
 const fetchRankData = async (isAuto = false) => {
   if (!isAuto) loading.value = true
   try {
+    if (examId === null) throw new Error('考试 ID 无效')
     const data = await getExamRank(examId)
     examTitle.value = data.exam_title
     problems.value = data.problems
 
     const newRankData = data.rank
-    const currentRankMap = new Map()
-    const improvedUsers = new Set()
+    const currentRankMap = new Map<string, number>()
+    const improvedUsers = new Set<string>()
 
     newRankData.forEach((user, index) => {
       currentRankMap.set(user.username, index)
       if (previousRankMap.has(user.username)) {
         const oldRank = previousRankMap.get(user.username)
-        if (index < oldRank) {
+        if (oldRank !== undefined && index < oldRank) {
           improvedUsers.add(user.username)
         }
       }
@@ -258,7 +262,7 @@ const fetchRankData = async (isAuto = false) => {
       rankChangedUsers.value = improvedUsers
       triggerFullscreenBalloons(improvedUsers)
       setTimeout(() => {
-        rankChangedUsers.value = new Set()
+        rankChangedUsers.value = new Set<string>()
       }, 6000)
     }
   } catch (error) {
@@ -268,32 +272,32 @@ const fetchRankData = async (isAuto = false) => {
   }
 }
 
-const handleAutoRefreshChange = (val) => {
-  localStorage.setItem('exam_rank_auto_refresh', val)
+const handleAutoRefreshChange = (val: boolean) => {
+  localStorage.setItem('exam_rank_auto_refresh', String(val))
 }
 
-const getProblemLabel = (problem, index) => {
+const getProblemLabel = (problem: RankProblemInfo, index: number) => {
   return problem.display_id ? `P${problem.display_id}` : String.fromCharCode(65 + index)
 }
 
-const getProblemStatus = (row, problemId) => {
+const getProblemStatus = (row: RankEntry, problemId: number) => {
   return row.problems?.[problemId] || null
 }
 
-const getStatusClass = (status) => {
-  if (status.solved) return 'status-ac'
-  if (status.pending_attempts > 0) return 'status-pending'
-  if (status.failed_attempts > 0) return 'status-wa'
+const getStatusClass = (status: RankProblemStats | null) => {
+  if (status?.solved) return 'status-ac'
+  if ((status?.pending_attempts ?? 0) > 0) return 'status-pending'
+  if ((status?.failed_attempts ?? 0) > 0) return 'status-wa'
   return ''
 }
 
-const formatTime = (seconds) => {
+const formatTime = (seconds: number) => {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   return `${h}:${m.toString().padStart(2, '0')}`
 }
 
-const formatDuration = (seconds) => {
+const formatDuration = (seconds: number) => {
   if (!seconds) return '0'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -301,7 +305,7 @@ const formatDuration = (seconds) => {
   return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-const tableRowClassName = ({ row, rowIndex }) => {
+const tableRowClassName = ({ row, rowIndex }: {row: RankEntry; rowIndex: number}) => {
   let classes = []
   if (rowIndex === 0) classes.push('gold-row')
   else if (rowIndex === 1) classes.push('silver-row')
@@ -314,7 +318,7 @@ const tableRowClassName = ({ row, rowIndex }) => {
   return classes.join(' ')
 }
 
-watch(autoRefresh, (val) => {
+watch(autoRefresh, (val: boolean) => {
   if (val) refreshTimer = setInterval(() => fetchRankData(true), 30000)
   else clearInterval(refreshTimer)
 }, { immediate: true })

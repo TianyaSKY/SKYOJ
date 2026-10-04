@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { h } from 'vue'
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: 1 } }) }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '1' } }) }))
 vi.mock('@/api/exam', () => ({ getExamRank: vi.fn() }))
 vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn() } }))
 
