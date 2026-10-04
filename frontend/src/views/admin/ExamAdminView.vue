@@ -383,7 +383,7 @@ const handleExport = async (row) => {
 
 const handleSubmit = async () => {
   if (disposed || !dialogVisible.value || dialogLoading.value || submitting.value) return
-  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(form.value)
+  const parsed = (isEdit.value ? updateExamSchema : createExamSchema).safeParse(isEdit.value ? form.value : { ...form.value, problem_ids: [...selectedProblemIds.value] })
   if (!parsed.success) {
     ElMessage.warning(parsed.error.issues[0]?.message || '请检查输入')
     return

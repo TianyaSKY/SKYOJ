@@ -18,6 +18,7 @@ const fields = z.object({
 const timesValid = value => !value.start_time || !value.end_time ||
   Date.parse(value.start_time) < Date.parse(value.end_time)
 export const createExamSchema = fields.extend({
+  problem_ids: z.array(z.number().int().positive()).refine(ids => new Set(ids).size === ids.length, '考试题目不能重复').default([]),
   description: fields.shape.description.default(''),
   contest_type: fields.shape.contest_type.default('icpc'),
   is_visible: fields.shape.is_visible.default(false),

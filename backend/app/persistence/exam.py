@@ -117,6 +117,14 @@ class ExamRepository:
         self._db.refresh(exam)
         return _to_exam_record(exam)
 
+    def existing_problem_ids(self, problem_ids: tuple[int, ...]) -> set[int]:
+        """批量校验创建考试时选择的题目是否存在。"""
+        from app.persistence.problem import Problem
+
+        if not problem_ids:
+            return set()
+        return {row[0] for row in self._db.query(Problem.id).filter(Problem.id.in_(problem_ids)).all()}
+
     def get_by_id(self, exam_id: int):
         return _to_exam_record(self._db.get(Exam, exam_id))
 

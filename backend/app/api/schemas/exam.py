@@ -1,7 +1,7 @@
 """考试 API 请求体模型。"""
 
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,7 @@ class CreateExamBody(BaseModel):
     freeze_minutes: Optional[int] = Field(default=None, ge=0)
     password: Optional[str] = None
     is_visible: bool = False
+    problem_ids: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list)
 
 
 class UpdateExamBody(BaseModel):

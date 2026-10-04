@@ -204,3 +204,26 @@ def test_status_requested_exam_does_not_create_a_session(client, student_token):
     response = client.get('/api/exams/status', params={'exam_id': 8},
                           headers={'Authorization': f'Bearer {student_token}'})
     assert response.status_code == 400
+
+
+def test_create_api_preserves_selected_problems(client, teacher_token, sample_problem):
+    headers = {'Authorization': f'Bearer {teacher_token}'}
+    response = client.post('/api/exams/', headers=headers, json={
+        'title': '有选题的考试', 'start_time': '2090-01-01T10:00:00Z',
+        'end_time': '2090-01-01T11:00:00Z', 'problem_ids': [sample_problem.id]})
+    assert response.status_code == 201
+    detail = client.get(f"/api/exams/{response.json()['id']}", headers=headers)
+    assert detail.status_code == 200
+    assert [item['problem_id'] for item in detail.json()['problems']] == [sample_problem.id]
+
+
+@pytest.mark.parametrize('ids,status', [([99999], 404), ([0], 422), ([-1], 422), ([1, 1], 400)])
+def test_create_api_rejects_invalid_selection_without_new_exam(client, teacher_token, db_session, ids, status):
+    from app.persistence.exam import Exam
+
+    before = db_session.query(Exam).count()
+    response = client.post('/api/exams/', headers={'Authorization': f'Bearer {teacher_token}'}, json={
+        'title': '无效选题', 'start_time': '2090-01-01T10:00:00Z',
+        'end_time': '2090-01-01T11:00:00Z', 'problem_ids': ids})
+    assert response.status_code == status
+    assert db_session.query(Exam).count() == before

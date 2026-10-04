@@ -53,3 +53,10 @@ describe('HTTP 请求校验契约', () => {
     })
   })
 })
+it('创建考试保留选题数组，省略时为空，拒绝重复和无效题目 ID', () => {
+  expect(createExamSchema.parse({ ...exam, problem_ids: [2, 1] }).problem_ids).toEqual([2, 1])
+  expect(createExamSchema.parse(exam).problem_ids).toEqual([])
+  for (const problem_ids of [[1, 1], [0], [-1], ['1'], null]) {
+    expect(createExamSchema.safeParse({ ...exam, problem_ids }).success).toBe(false)
+  }
+})

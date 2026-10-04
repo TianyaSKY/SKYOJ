@@ -10,7 +10,7 @@ from app.persistence.problem import Problem
 from app.persistence.submission import Submission
 from app.persistence.unit_of_work import UnitOfWork
 from app.persistence.user import User
-from app.core.errors import InvalidStateError
+from app.core.errors import InvalidStateError, ResourceNotFoundError
 from app.services.exam import (
     AddExamProblemParams,
     CreateExamParams,
@@ -618,3 +618,52 @@ def test_status_requires_requested_exam_to_match_session_before_queries(seeded, 
                                 requested_exam_id=seeded["exam"].id)
     assert len(result) == 2
     assert result == service.get_status(seeded["alice"].id, seeded["exam"].id)
+
+
+def test_create_exam_persists_selected_problems_in_one_transaction(seeded):
+    params = CreateExamParams(title='选题考试', description='', start_time=T0,
+                              end_time=T0 + timedelta(hours=1), created_by=seeded['teacher'].id,
+                              problem_ids=(seeded['p2'].id, seeded['p1'].id))
+    detail = seeded['service'].create_exam('teacher', params)
+    assert {item.problem_id for item in detail.problems} == set(params.problem_ids)
+    stored = seeded['repository'].list_problems(detail.id)
+    assert {item.problem_id for item in stored} == set(params.problem_ids)
+    assert all(item.score == 100 for item in stored)
+
+
+@pytest.mark.parametrize('problem_ids,error', [((99999,), ResourceNotFoundError), ((1, 1), InvalidStateError), ((0,), InvalidStateError)])
+def test_invalid_create_selection_does_not_create_exam(seeded, problem_ids, error):
+    from app.persistence.exam import Exam
+
+    before = seeded['session'].query(Exam).count()
+    with pytest.raises(error):
+        seeded['service'].create_exam('teacher', CreateExamParams(
+            title='无效选题', description='', start_time=T0, end_time=T0 + timedelta(hours=1),
+            created_by=seeded['teacher'].id, problem_ids=problem_ids))
+    assert seeded['session'].query(Exam).count() == before
+
+
+def test_create_exam_rolls_back_exam_and_earlier_problem_on_attachment_failure(seeded, monkeypatch):
+    from app.persistence.exam import Exam
+
+    session = seeded['session']
+    before_exams = session.query(Exam).count()
+    before_problems = session.query(ExamProblem).count()
+    original = seeded['service']._repository.add_problem
+    calls = 0
+
+    def fail_second(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError('模拟第二个题目写入失败')
+        return original(*args)
+
+    monkeypatch.setattr(seeded['service']._repository, 'add_problem', fail_second)
+    with pytest.raises(RuntimeError, match='第二个题目'):
+        seeded['service'].create_exam('teacher', CreateExamParams(
+            title='原子选题', description='', start_time=T0, end_time=T0 + timedelta(hours=1),
+            created_by=seeded['teacher'].id, problem_ids=(seeded['p1'].id, seeded['p2'].id)))
+    assert calls == 2
+    assert session.query(Exam).count() == before_exams
+    assert session.query(ExamProblem).count() == before_problems

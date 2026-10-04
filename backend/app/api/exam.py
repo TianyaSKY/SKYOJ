@@ -69,6 +69,7 @@ def create_exam(
             password=body.password,
             is_visible=body.is_visible,
             created_by=auth.user.id,
+            problem_ids=tuple(body.problem_ids),
         ),
     )
     return _exam_response(exam)

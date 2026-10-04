@@ -75,3 +75,21 @@ it('离开页面后旧详情和写请求不再关闭窗口、提示或刷新', a
   wrapper.unmount(); wrapper = undefined; response.resolve({}); await pending
   expect(ElMessage.success).not.toHaveBeenCalled(); expect(getExamList).toHaveBeenCalledOnce()
 })
+it('创建请求携带所选题目快照，创建成功后关闭窗口', async () => {
+  const vm = mountPage(); vm.handleCreate()
+  Object.assign(vm.form, { title: '新考试', start_time: '2090-06-15T10:00:00Z', end_time: '2090-06-15T11:00:00Z' })
+  vm.selectedProblemIds = [2, 1]
+  const response = deferred(); createExam.mockReturnValueOnce(response.promise)
+  const pending = vm.handleSubmit(); vm.selectedProblemIds = [3]
+  expect(createExam.mock.calls[0][0].problem_ids).toEqual([2, 1])
+  response.resolve({ id: 3 }); await pending
+  expect(vm.dialogVisible).toBe(false); expect(addExamProblem).not.toHaveBeenCalled()
+})
+it('创建失败保留所选题目与表单供重试', async () => {
+  const vm = mountPage(); vm.handleCreate()
+  Object.assign(vm.form, { title: '新考试', start_time: '2090-06-15T10:00:00Z', end_time: '2090-06-15T11:00:00Z' })
+  vm.selectedProblemIds = [2, 1]; createExam.mockRejectedValueOnce(new Error('failed'))
+  await vm.handleSubmit()
+  expect(vm.dialogVisible).toBe(true); expect(vm.selectedProblemIds).toEqual([2, 1]); expect(vm.submitting).toBe(false)
+  await vm.handleSubmit(); expect(createExam.mock.calls[1][0].problem_ids).toEqual([2, 1])
+})

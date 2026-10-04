@@ -33,6 +33,7 @@ class CreateExamParams:
     password: Optional[str] = None
     is_visible: bool = False
     created_by: int = 0
+    problem_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -278,19 +279,29 @@ class ExamService:
         start_time = to_utc_naive(params.start_time)
         end_time = to_utc_naive(params.end_time)
         self._validate_times(start_time, end_time)
-        exam = self._repository.create(
-            title=params.title,
-            description=params.description,
-            start_time=start_time,
-            end_time=end_time,
-            contest_type=params.contest_type,
-            freeze_minutes=params.freeze_minutes,
-            password=self._hash_password(params.password),
-            is_visible=params.is_visible,
-            created_by=params.created_by,
-        )
-        self._uow.commit()
-        return to_exam_detail(exam, [])
+        if any(problem_id < 1 for problem_id in params.problem_ids):
+            raise InvalidStateError("题目 ID 必须为正整数")
+        if len(set(params.problem_ids)) != len(params.problem_ids):
+            raise InvalidStateError("考试题目不能重复")
+        existing = self._repository.existing_problem_ids(params.problem_ids)
+        if set(params.problem_ids) != existing:
+            raise ResourceNotFoundError("所选题目不存在")
+        with self._uow.transaction():
+            exam = self._repository.create(
+                title=params.title,
+                description=params.description,
+                start_time=start_time,
+                end_time=end_time,
+                contest_type=params.contest_type,
+                freeze_minutes=params.freeze_minutes,
+                password=self._hash_password(params.password),
+                is_visible=params.is_visible,
+                created_by=params.created_by,
+            )
+            for problem_id in params.problem_ids:
+                self._repository.add_problem(exam.id, problem_id, None, 100)
+            detail = to_exam_detail(exam, self._repository.list_problems(exam.id))
+        return detail
 
     def list_exams(self, requester_role: str) -> list[ExamListItem]:
         exams = self._repository.list_visible_for(requester_role)
