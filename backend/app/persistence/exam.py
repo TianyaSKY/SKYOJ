@@ -128,6 +128,16 @@ class ExamRepository:
     def get_by_id(self, exam_id: int):
         return _to_exam_record(self._db.get(Exam, exam_id))
 
+    def get_by_id_for_update(self, exam_id: int) -> ExamRecord | None:
+        """持有父行写锁后重新读取，避免旧 ORM 对象或事务快照覆盖新数据。"""
+        if not self.lock_exam(exam_id):
+            return None
+        row = (
+            self._db.query(Exam).filter(Exam.id == exam_id)
+            .with_for_update().populate_existing().first()
+        )
+        return _to_exam_record(row)
+
     def list_visible_for(self, role: str) -> list[ExamRecord]:
         query = self._db.query(Exam)
         return [
@@ -159,9 +169,11 @@ class ExamRepository:
         self._db.flush()
 
     def list_problems(
-        self, exam_id: int, ordered: bool = False
+        self, exam_id: int, ordered: bool = False, *, for_update: bool = False
     ) -> list[ExamProblemRecord]:
         query = self._db.query(ExamProblem).filter_by(exam_id=exam_id)
+        if for_update:
+            query = query.with_for_update().populate_existing()
         if ordered:
             query = query.order_by(ExamProblem.display_id)
         return [

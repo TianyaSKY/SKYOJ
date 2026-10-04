@@ -752,3 +752,40 @@ def test_add_problem_rolls_back_when_repository_fails_after_flush(seeded, monkey
         seeded['service'].add_problem('teacher', exam_id, AddExamProblemParams(p3_id))
     assert seeded['repository'].get_exam_problem(exam_id, p3_id) is None
     assert len(seeded['repository'].list_problems(exam_id)) == 2
+
+
+def test_update_uses_latest_exam_fields_even_when_session_has_cached_row(seeded):
+    from sqlalchemy.orm import Session
+
+    session, exam_id = seeded['session'], seeded['exam'].id
+    cached = session.get(Exam, exam_id)
+    with Session(session.get_bind()) as other:
+        worker = ExamService(ExamRepository(other), uow=UnitOfWork(other))
+        worker.update_exam('teacher', exam_id, UpdateExamParams(title='另一请求的标题', freeze_minutes=15))
+    assert cached.title == '期中考试'
+    result = seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(description='本次说明'))
+    assert result.title == '另一请求的标题'
+    assert result.freeze_minutes == 15
+    assert result.description == '本次说明'
+    assert seeded['repository'].get_by_id(exam_id).title == '另一请求的标题'
+
+
+@pytest.mark.parametrize('valid', [True, False])
+def test_time_validation_uses_latest_opposite_boundary(seeded, valid):
+    from sqlalchemy.orm import Session
+
+    session, exam_id = seeded['session'], seeded['exam'].id
+    # 保留原 ORM 对象，模拟请求在另一会话提交前已经读过考试。
+    cached = session.get(Exam, exam_id)
+    with Session(session.get_bind()) as other:
+        worker = ExamService(ExamRepository(other), uow=UnitOfWork(other))
+        worker.update_exam('teacher', exam_id, UpdateExamParams(
+            end_time=T0 + timedelta(hours=3)) if valid else UpdateExamParams(start_time=T0 + timedelta(hours=1)))
+    assert cached.start_time == T0
+    if valid:
+        result = seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(start_time=T0 + timedelta(hours=2, minutes=30)))
+        assert result.end_time == T0 + timedelta(hours=3)
+    else:
+        with pytest.raises(InvalidStateError):
+            seeded['service'].update_exam('teacher', exam_id, UpdateExamParams(end_time=T0 + timedelta(minutes=30)))
+        assert seeded['repository'].get_by_id(exam_id).start_time == T0 + timedelta(hours=1)

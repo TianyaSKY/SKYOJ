@@ -349,3 +349,42 @@ def test_concurrent_exam_problem_additions_do_not_create_duplicates(business_dat
         assert sorted(future.result(timeout=10) for future in futures) == ['added', 'duplicate']
     with Session(engine) as check:
         assert check.query(ExamProblem).filter_by(exam_id=created.id, problem_id=1).count() == 1
+
+
+def test_concurrent_partial_exam_updates_preserve_each_other_fields(business_database):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from datetime import datetime, timedelta
+    from app.persistence.exam import Exam, ExamRepository
+    from app.services.exam import ExamService, CreateExamParams, UpdateExamParams
+
+    db, engine = business_database
+    now = datetime(2090, 1, 1)
+    created = ExamService(ExamRepository(db), uow=UnitOfWork(db)).create_exam('teacher',
+        CreateExamParams(title='原始标题', description='原始说明', start_time=now,
+                         end_time=now + timedelta(hours=1), created_by=1))
+    barrier = Barrier(2)
+
+    def save(params):
+        with Session(engine) as session:
+            cached = session.get(Exam, created.id)
+            assert cached.title == '原始标题'
+            repo = ExamRepository(session)
+            lock = repo.lock_exam
+
+            def synchronized_lock(exam_id):
+                barrier.wait(timeout=5)
+                return lock(exam_id)
+
+            repo.lock_exam = synchronized_lock
+            return ExamService(repo, uow=UnitOfWork(session)).update_exam('teacher', created.id, params)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        futures = [workers.submit(save, UpdateExamParams(title='新的标题')),
+                   workers.submit(save, UpdateExamParams(description='新的说明'))]
+        for future in futures:
+            future.result(timeout=10)
+    with Session(engine) as check:
+        row = check.get(Exam, created.id)
+        assert row.title == '新的标题'
+        assert row.description == '新的说明'

@@ -377,17 +377,19 @@ class ExamService:
         self, requester_role: str, exam_id: int, params: UpdateExamParams
     ) -> ExamDetail:
         self._require_teacher(requester_role)
-        exam = self._require_exam(exam_id)
-        start_time = to_utc_naive(
-            params.start_time if params.start_time is not None else exam.start_time
-        )
-        end_time = to_utc_naive(
-            params.end_time if params.end_time is not None else exam.end_time
-        )
-        self._validate_times(start_time, end_time)
-        if params.problem_ids is not None:
-            self._validate_problem_ids(params.problem_ids)
         with self._uow.transaction():
+            exam = self._repository.get_by_id_for_update(exam_id)
+            if exam is None:
+                raise ResourceNotFoundError("考试不存在")
+            start_time = to_utc_naive(
+                params.start_time if params.start_time is not None else exam.start_time
+            )
+            end_time = to_utc_naive(
+                params.end_time if params.end_time is not None else exam.end_time
+            )
+            self._validate_times(start_time, end_time)
+            if params.problem_ids is not None:
+                self._validate_problem_ids(params.problem_ids)
             for field, value in (
                 ("title", params.title),
                 ("description", params.description),
@@ -405,7 +407,7 @@ class ExamService:
                 exam.password = self._hash_password(params.password)
             self._repository.update(exam)
             if params.problem_ids is not None:
-                original = self._repository.list_problems(exam_id)
+                original = self._repository.list_problems(exam_id, for_update=True)
                 desired = set(params.problem_ids)
                 existing = {item.problem_id for item in original}
                 for item in original:
@@ -414,7 +416,7 @@ class ExamService:
                 for problem_id in params.problem_ids:
                     if problem_id not in existing:
                         self._repository.add_problem(exam_id, problem_id, None, 100)
-            detail = to_exam_detail(exam, self._repository.list_problems(exam_id))
+            detail = to_exam_detail(exam, self._repository.list_problems(exam_id, for_update=True))
         invalidate_rank_cache(exam_id)
         return detail
 
@@ -454,11 +456,13 @@ class ExamService:
         self, requester_role: str, exam_id: int, problem_id: int
     ) -> None:
         self._require_teacher(requester_role)
-        item = self._repository.get_exam_problem(exam_id, problem_id)
-        if item is None:
-            raise ResourceNotFoundError("考试题目不存在")
-        self._repository.delete_exam_problem(item)
-        self._uow.commit()
+        with self._uow.transaction():
+            if not self._repository.lock_exam(exam_id):
+                raise ResourceNotFoundError("考试不存在")
+            item = self._repository.get_exam_problem(exam_id, problem_id, for_update=True)
+            if item is None:
+                raise ResourceNotFoundError("考试题目不存在")
+            self._repository.delete_exam_problem(item)
         invalidate_rank_cache(exam_id)
 
     def monitor(self, requester_role: str, exam_id: int) -> MonitorResult:
