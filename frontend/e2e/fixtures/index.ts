@@ -1,3 +1,9 @@
+import type { Page } from '@playwright/test'
+import { z } from 'zod'
+import { cachedUserSchema } from '../../src/schemas/user'
+
+export interface TestUser { username: string; password: string; role: string; email: string }
+const loginResponseSchema = z.object({ token: z.string().min(1), user: cachedUserSchema })
 /**
  * Playwright 测试 Fixtures
  * 定义测试用户和共享测试数据
@@ -9,7 +15,7 @@ const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:80'
  * 测试用户账号
  * 注意：实际测试时需要确保这些账号存在于后端数据库中
  */
-export const testUsers = {
+export const testUsers: Record<'student' | 'teacher' | 'admin', TestUser> = {
   student: {
     username: 'test_student',
     password: 'Test123456',
@@ -110,7 +116,7 @@ export function generateUniqueUsername(prefix = 'user') {
  * @param {string} selector - CSS 选择器
  * @param {number} timeout - 超时时间(ms)
  */
-export async function waitForElement(page, selector, timeout = 10000) {
+export async function waitForElement(page: Page, selector: string, timeout = 10000) {
   await page.waitForSelector(selector, { state: 'visible', timeout })
 }
 
@@ -118,7 +124,7 @@ export async function waitForElement(page, selector, timeout = 10000) {
  * 清除 localStorage
  * @param {import('@playwright/test').Page} page
  */
-export async function clearStorage(page) {
+export async function clearStorage(page: Page) {
   // 新建页面为 about:blank，必须先进入应用来源才能访问存储。
   if (!page.url().startsWith(FRONTEND)) await page.goto(FRONTEND)
   await page.evaluate(() => localStorage.clear())
@@ -129,12 +135,13 @@ export async function clearStorage(page) {
  * @param {import('@playwright/test').Page} page
  * @param {object} user - 用户信息
  */
-export async function setAuthState(page, user) {
+export async function setAuthState(page: Page, user: Pick<TestUser, 'username' | 'password'>) {
   const response = await page.request.post(`${FRONTEND}/api/auth/login`, {
     data: {username: user.username, password: user.password},
   })
   if (!response.ok()) throw new Error(`测试用户登录失败：${response.status()} ${await response.text()}`)
-  const auth = await response.json()
+  const raw: unknown = await response.json()
+  const auth = loginResponseSchema.parse(raw)
   if (!page.url().startsWith(FRONTEND)) await page.goto(FRONTEND)
   await page.evaluate(
     ({token, user}) => {

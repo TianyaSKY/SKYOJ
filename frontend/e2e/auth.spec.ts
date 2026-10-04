@@ -10,7 +10,7 @@ import {
   clearStorage,
   setAuthState,
   selectors,
-} from './fixtures/index.js'
+} from './fixtures/index'
 
 test.describe('认证流程', () => {
   test.beforeEach(async ({ page }) => {

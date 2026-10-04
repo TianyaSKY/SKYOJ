@@ -8,7 +8,7 @@ test.beforeEach(async ({page}) => {
 })
 
 test('登录允许后端支持的一位密码并发送已校验的请求', async ({page}) => {
-  let payload
+  let payload: unknown
   await page.route('**/api/auth/login', async route => {
     payload = route.request().postDataJSON()
     await route.fulfill({json: {token: 'test-token', user: {id: 1, username: 'a', role: 'student'}}})
@@ -22,7 +22,7 @@ test('登录允许后端支持的一位密码并发送已校验的请求', async
 
 test('注册拒绝超长用户名，修改后接受一位用户名', async ({page}) => {
   let calls = 0
-  let payload
+  let payload: unknown
   await page.route('**/api/auth/register', async route => {
     calls += 1
     payload = route.request().postDataJSON()

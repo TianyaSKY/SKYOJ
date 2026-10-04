@@ -3,7 +3,7 @@
  * 测试常用工具函数
  */
 import { describe, it, expect } from 'vitest'
-import { generateUniqueUsername } from '../../../e2e/fixtures/index.js'
+import { generateUniqueUsername } from '../../../e2e/fixtures/index'
 
 describe('generateUniqueUsername', () => {
   it('生成带前缀的唯一用户名', () => {

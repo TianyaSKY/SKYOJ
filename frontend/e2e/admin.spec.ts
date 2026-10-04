@@ -11,7 +11,7 @@ import {
   setAuthState,
   clearStorage,
   generateUniqueUsername,
-} from './fixtures/index.js'
+} from './fixtures/index'
 
 test.describe('教师管理 - 访问控制', () => {
   test('学生账号不能访问管理后台', async ({ page }) => {

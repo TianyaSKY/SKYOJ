@@ -8,7 +8,7 @@ import {
   FRONTEND,
   setAuthState,
   clearStorage,
-} from './fixtures/index.js'
+} from './fixtures/index'
 
 test.describe('导航栏', () => {
   test('顶部导航栏存在', async ({ page }) => {
@@ -220,7 +220,7 @@ test.describe('404 和错误处理', () => {
     // 应该显示错误消息或跳转到其他页面
     const content = await page.locator('body').textContent()
     // 验证页面有内容
-    expect(content.length).toBeGreaterThan(0)
+    expect(content?.length ?? 0).toBeGreaterThan(0)
 
     await clearStorage(page)
   })

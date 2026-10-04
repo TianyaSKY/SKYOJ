@@ -9,7 +9,7 @@ import {
   FRONTEND,
   setAuthState,
   clearStorage,
-} from './fixtures/index.js'
+} from './fixtures/index'
 
 // 按页面隔离考试模式，避免并行用例修改全局系统配置互相影响。
 test.beforeEach(async ({page}) => {

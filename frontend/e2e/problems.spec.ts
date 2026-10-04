@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 /**
  * E2E 测试: 题目模块
  * 覆盖题目列表、详情、提交等功能
@@ -9,9 +10,9 @@ import {
   FRONTEND,
   setAuthState,
   clearStorage,
-} from './fixtures/index.js'
+} from './fixtures/index'
 
-async function enterCode(page, code) {
+async function enterCode(page: Page, code: string) {
   // Monaco 的隐藏 IME textarea 不可点击；通过实际编辑区域输入。
   const editor = page.locator('.editor-wrapper .monaco-editor .view-lines').first()
   await expect(editor).toBeVisible()
